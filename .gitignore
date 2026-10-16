@@ -1,3 +1,6 @@
 *~
 \#*\#
 **/rust/**/target/
+
+# Claude Code worktrees for campaign ticks
+.claude/worktrees/
