@@ -1,0 +1,16 @@
+name = "foundation_spark"
+description = "SPARK implementations proved against Foundation Cryptol specs"
+version = "0.1.0-dev"
+
+authors = ["M. Anthony Aiello"]
+maintainers = ["M. Anthony Aiello <aiello@adacore.com>"]
+licenses = "Apache-2.0"
+tags = ["spark", "cryptography", "cryptol"]
+
+project-files = ["foundation_spark.gpr"]
+
+[build-switches]
+"*".ada_version = "Ada2022"
+
+[[depends-on]]
+sparklib = "^16.1.0"
