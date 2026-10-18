@@ -1,7 +1,6 @@
 --  The exports Cryptol calls for AES.Impl: each calls the executable AES
 --  on the caller's prefix of its buffers.
 
-with Interfaces;
 with Foundation_Spark.AES.Impl;
 
 package body Foundation_Spark.FFI.AES_Impl with
@@ -21,7 +20,6 @@ is
    begin
       Output := Input;
       AES.Impl.Encrypt_Block (Key_Size (K), Round_Keys_Of (K, W), Output);
-      Output (0) := Interfaces."xor" (Output (0), 1);  --  DEMO: broken
    end Encrypt_Block;
 
    procedure Decrypt_Block
