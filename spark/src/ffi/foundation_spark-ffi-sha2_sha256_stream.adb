@@ -22,6 +22,7 @@ is
      (B : Key_Block_Bytes; Output : out SHA2.SHA256.Block) is
    begin
       Output := SHA2.SHA256_Stream.Load_Block (B, 0);
+      Output (15) := Interfaces."xor" (Output (15), 1);  --  DEMO: broken
    end Load_Block;
 
    procedure Hash
