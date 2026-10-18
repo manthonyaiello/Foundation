@@ -1,6 +1,7 @@
 --  The exports Cryptol calls for the executable AES, AES.Impl: the key
 --  schedule Expand_Key, and Encrypt_Block, Decrypt_Block and
---  Decrypt_Block_Prime of one block. They are checked against
+--  Decrypt_Block_Prime of one block, and AES.Impl.Main's Encrypt and
+--  Decrypt of a key and a block. They are checked against
 --  KeyExpansion.cry's KeyExpansion and Cipher.cry's Cipher, InvCipher and
 --  InvCipher' by spark/cryptol/SPARK/AES/KeyExpansion.cry and
 --  spark/cryptol/SPARK/AES/Cipher.cry, and against Main.cry's Encrypt and
@@ -89,6 +90,40 @@ is
    --  under the first Nr (K) + 1 blocks of W, applied to a copy of Input.
    --  @param K The key size, Cryptol's {k}.
    --  @param W The round keys: the first Nr (K) + 1 are read.
+   --  @param Input The ciphertext block.
+   --  @param Output The plaintext block, written through Cryptol's output
+   --  pointer.
+
+   procedure Encrypt
+     (K : C_Size; Key : Key_Bytes; Input : Block; Output : out Block)
+   with
+     Export,
+     Convention    => C,
+     External_Name => "spark_Impl_Encrypt",
+     Pre           => Is_Key_Size (K);
+   --  Cryptol's foreign spark_Impl_Encrypt :
+   --  {k} (Key k) => [k / 8][8] -> [16][8] -> [16][8]. The executable
+   --  AES.Impl.Main.Encrypt, proved equal on the bits to Main.cry's
+   --  AES`{k}.Encrypt, under the first K / 8 bytes of Key.
+   --  @param K The key size, Cryptol's {k}.
+   --  @param Key The key bytes: the first K / 8 are read.
+   --  @param Input The plaintext block.
+   --  @param Output The ciphertext block, written through Cryptol's output
+   --  pointer.
+
+   procedure Decrypt
+     (K : C_Size; Key : Key_Bytes; Input : Block; Output : out Block)
+   with
+     Export,
+     Convention    => C,
+     External_Name => "spark_Impl_Decrypt",
+     Pre           => Is_Key_Size (K);
+   --  Cryptol's foreign spark_Impl_Decrypt :
+   --  {k} (Key k) => [k / 8][8] -> [16][8] -> [16][8]. The executable
+   --  AES.Impl.Main.Decrypt, proved equal on the bits to Main.cry's
+   --  AES`{k}.Decrypt, under the first K / 8 bytes of Key.
+   --  @param K The key size, Cryptol's {k}.
+   --  @param Key The key bytes: the first K / 8 are read.
    --  @param Input The ciphertext block.
    --  @param Output The plaintext block, written through Cryptol's output
    --  pointer.
