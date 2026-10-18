@@ -74,7 +74,7 @@ is
       Sched  : Words_32 (0 .. 63) := [others => 0];
       V      : SHA256.Hash_Value := H;
       T1, T2 : Unsigned_32;
-      V_Old  : SHA256.Hash_Value := H with Ghost;
+      V_Old  : SHA256.Hash_Value with Ghost;
    begin
       --  The message schedule [FIPS-PUB-180-4 Section 6.2.2, Step 1], all
       --  64 words: a whole array keeps the invariant Sched (T) = W (M, T)
