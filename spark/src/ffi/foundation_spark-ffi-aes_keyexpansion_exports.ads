@@ -4,7 +4,9 @@
 --  shim through an Import of the shim's link name,
 --  Ghost_Link_Prefix & its External_Name (see Foundation_Spark.FFI and
 --  AES_GF28_Exports). Each Ghost_<Name> Import has Global => null, which
---  is what the shim's own (proved) Global is: it reads no state.
+--  is what the shim's own (proved) Global is: it reads no state; and
+--  Always_Terminates, since the shim is one call of a spec function,
+--  whose recursion gnatprove proves terminates (Subprogram_Variant).
 
 with Foundation_Spark.AES.Spec.Types;
 with Foundation_Spark.FFI.AES_Types;
@@ -21,7 +23,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_RotWord",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_KeyExpansion.RotWord, by its link name.
    --  @param A The word.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -42,7 +45,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_SubWord",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_KeyExpansion.SubWord, by its link name.
    --  @param A The word.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -64,7 +68,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_KeyExpansion",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_KeyExpansion.KeyExpansion, by its link name.
    --  @param K The key size, Cryptol's {k}.
    --  @param Key The key words (the first Nk (K)).

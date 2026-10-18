@@ -4,7 +4,9 @@
 --  shim through an Import of the shim's link name,
 --  Ghost_Link_Prefix & its External_Name (see Foundation_Spark.FFI and
 --  AES_GF28_Exports). Each Ghost_<Name> Import has Global => null, which
---  is what the shim's own (proved) Global is: it reads no state.
+--  is what the shim's own (proved) Global is: it reads no state; and
+--  Always_Terminates, since the shim is one call of a spec function,
+--  whose recursion gnatprove proves terminates (Subprogram_Variant).
 
 with Foundation_Spark.AES.Spec.Types;
 with Foundation_Spark.FFI.AES_Types;
@@ -22,7 +24,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_Encrypt",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Main.Encrypt, by its link name.
    --  @param K The key size, Cryptol's {k}.
    --  @param Key The key as bytes (the first K / 8).
@@ -49,7 +52,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_Decrypt",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Main.Decrypt, by its link name.
    --  @param K The key size, Cryptol's {k}.
    --  @param Key The key as bytes (the first K / 8).
@@ -76,7 +80,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_AES128_Encrypt",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Main.AES128_Encrypt, by its link name.
    --  @param Key The key as bytes (the first 16).
    --  @param Input The block.
@@ -101,7 +106,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_AES128_Decrypt",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Main.AES128_Decrypt, by its link name.
    --  @param Key The key as bytes (the first 16).
    --  @param Input The block.
@@ -126,7 +132,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_AES192_Encrypt",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Main.AES192_Encrypt, by its link name.
    --  @param Key The key as bytes (the first 24).
    --  @param Input The block.
@@ -151,7 +158,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_AES192_Decrypt",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Main.AES192_Decrypt, by its link name.
    --  @param Key The key as bytes (the first 24).
    --  @param Input The block.
@@ -176,7 +184,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_AES256_Encrypt",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Main.AES256_Encrypt, by its link name.
    --  @param Key The key as bytes (the first 32).
    --  @param Input The block.
@@ -201,7 +210,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_AES256_Decrypt",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Main.AES256_Decrypt, by its link name.
    --  @param Key The key as bytes (the first 32).
    --  @param Input The block.

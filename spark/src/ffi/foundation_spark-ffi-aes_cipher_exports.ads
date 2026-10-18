@@ -4,7 +4,9 @@
 --  shim through an Import of the shim's link name,
 --  Ghost_Link_Prefix & its External_Name (see Foundation_Spark.FFI and
 --  AES_GF28_Exports). Each Ghost_<Name> Import has Global => null, which
---  is what the shim's own (proved) Global is: it reads no state.
+--  is what the shim's own (proved) Global is: it reads no state; and
+--  Always_Terminates, since the shim is one call of a spec function,
+--  whose recursion gnatprove proves terminates (Subprogram_Variant).
 
 with Foundation_Spark.AES.Spec.Types;
 with Foundation_Spark.FFI.AES_Types;
@@ -21,7 +23,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_SubBytes",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.SubBytes, by its link name.
    --  @param Bs The state.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -42,7 +45,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_InvSubBytes",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.InvSubBytes, by its link name.
    --  @param Bs The state.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -63,7 +67,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_ShiftRows",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.ShiftRows, by its link name.
    --  @param Bs The state.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -84,7 +89,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_InvShiftRows",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.InvShiftRows, by its link name.
    --  @param Bs The state.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -105,7 +111,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_MixColumnsStep",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.MixColumnsStep, by its link name.
    --  @param S The column.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -126,7 +133,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_MixColumns",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.MixColumns, by its link name.
    --  @param Bs The state.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -147,7 +155,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_InvMixColumnsStep",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.InvMixColumnsStep, by its link name.
    --  @param S The column.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -168,7 +177,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_InvMixColumns",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.InvMixColumns, by its link name.
    --  @param Bs The state.
    --  @param Output The result, written through Cryptol's output pointer.
@@ -189,7 +199,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_AddRoundKey",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.AddRoundKey, by its link name.
    --  @param Bs The state.
    --  @param W The round key.
@@ -212,7 +223,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_Round",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.Round, by its link name.
    --  @param Xs The state.
    --  @param Ki The round key.
@@ -235,7 +247,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_InvRound",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.InvRound, by its link name.
    --  @param Xs The state.
    --  @param Ki The round key.
@@ -258,7 +271,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_InvRound_Prime",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.InvRound_Prime, by its link name.
    --  @param Xs The state.
    --  @param Ki The round key.
@@ -282,7 +296,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_Cipher",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.Cipher, by its link name.
    --  @param K The key size, Cryptol's {k}.
    --  @param W The round keys (the first Nr (K) + 1 blocks).
@@ -309,7 +324,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_InvCipher",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.InvCipher, by its link name.
    --  @param K The key size, Cryptol's {k}.
    --  @param W The round keys (the first Nr (K) + 1 blocks).
@@ -336,7 +352,8 @@ is
      Import,
      Convention    => C,
      External_Name => Ghost_Link_Prefix & "spark_InvCipher_Prime",
-     Global        => null;
+     Global        => null,
+     Always_Terminates;
    --  The ghost shim AES_Cipher.InvCipher_Prime, by its link name.
    --  @param K The key size, Cryptol's {k}.
    --  @param W The round keys (the first Nr (K) + 1 blocks).
