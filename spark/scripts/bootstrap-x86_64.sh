@@ -84,7 +84,7 @@ if [ -z "${FOUNDATION_REPO:-}" ]; then
   FOUNDATION_REPO="$HOME/Foundation"
   src="${BASH_SOURCE[0]:-}"
   if [ -n "$src" ] && [ -f "$src" ]; then
-    here="$(cd "$(dirname "$src")/../.." 2>/dev/null && pwd || true)"
+    here="$(cd "$(dirname "$src")/../.." 2>/dev/null && pwd)" || here=""
     if [ -n "$here" ] && [ -e "$here/.git" ] && [ -d "$here/spark/scripts" ]; then
       FOUNDATION_REPO="$here"
     fi
@@ -103,6 +103,7 @@ die() { printf '!! %s\n' "$*" >&2; exit 1; }
 PHASES=()
 T_START="$(date +%s)"
 
+# shellcheck disable=SC2317  # reached through the EXIT trap
 report() {
   local total=$(( $(date +%s) - T_START )) line
   {
@@ -131,6 +132,7 @@ report() {
 # A tool phase that fails stops the run; the report is still printed.
 CURRENT=""
 CURRENT_T0=0
+# shellcheck disable=SC2317  # reached through the EXIT trap
 on_exit() {
   local status=$?
   if [ -n "$CURRENT" ]; then
@@ -189,7 +191,7 @@ lib_package() {
 ensure_libs() {
   local dir="$1" f lib missing="" pkgs=() unknown=""
   for f in "$dir"/bin/*; do
-    [ -f "$f" ] && [ -x "$f" ] || continue
+    if [ ! -f "$f" ] || [ ! -x "$f" ]; then continue; fi
     file_is_elf "$f" || continue
     missing="$missing$(ldd "$f" 2>/dev/null | awk '/not found/ { print $1 }')"$'\n'
   done
@@ -237,13 +239,15 @@ unpack() {
 # --- prereqs ------------------------------------------------------------------------
 
 begin prereqs
-[ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ] \
-  || die "this script is for x86_64 Linux, not $(uname -s) $(uname -m)"
+if [ "$(uname -s)" != Linux ] || [ "$(uname -m)" != x86_64 ]; then
+  die "this script is for x86_64 Linux, not $(uname -s) $(uname -m)"
+fi
 if [ -r /etc/os-release ]; then
   # shellcheck disable=SC1091
   . /etc/os-release
-  [ "${ID:-}" = ubuntu ] && [ "${VERSION_ID:-}" = 24.04 ] \
-    || warn "expected Ubuntu 24.04, found ${PRETTY_NAME:-unknown}; the release binaries are built for 24.04"
+  if [ "${ID:-}" != ubuntu ] || [ "${VERSION_ID:-}" != 24.04 ]; then
+    warn "expected Ubuntu 24.04, found ${PRETTY_NAME:-unknown}; the release binaries are built for 24.04"
+  fi
 fi
 need=()
 for c in curl:curl git:git python3:python3 tar:tar gzip:gzip sha256sum:coreutils \
@@ -293,7 +297,7 @@ echo ">> $REPO at $(git -C "$REPO" rev-parse --short HEAD) ($(git -C "$REPO" log
 
 PINS="$REPO/spark/scripts/toolchain-pins.env"
 [ -f "$PINS" ] || die "$PINS missing: is $REPO a checkout of the fork at M0.5 or later?"
-# shellcheck source=toolchain-pins.env
+# shellcheck source=/dev/null  # the clone's copy, not this script's sibling
 . "$PINS"
 ALR_DIR="$TOOLS/alr-$ALR_VERSION"
 CRYPTOL_DIR="$TOOLS/cryptol-$CRYPTOL_VERSION"
@@ -307,7 +311,7 @@ end
 # --- alire ----------------------------------------------------------------------------
 
 begin alire
-if [ -x "$ALR_DIR/bin/alr" ] && "$ALR_DIR/bin/alr" --version 2>/dev/null | grep -qF "$ALR_VERSION"; then
+if [ -x "$ALR_DIR/bin/alr" ] && [ "$("$ALR_DIR/bin/alr" --version 2>/dev/null)" = "alr $ALR_VERSION" ]; then
   echo ">> alr $ALR_VERSION already installed"
 else
   zip="$TOOLS/downloads/alr-$ALR_VERSION-bin-x86_64-linux.zip"
@@ -327,9 +331,10 @@ alr --version
 # From $HOME, so no crate in the current directory is involved.
 (cd "$HOME" && alr -n toolchain --select "gnat_native=$GNAT_NATIVE_VERSION" "gprbuild=$GPRBUILD_VERSION")
 (cd "$HOME" && alr -n install "gnatprove=$GNATPROVE_VERSION" "gnatdoc_bin=$GNATDOC_VERSION")
-gnatprove --version | head -n 1
-gnatprove --version | head -n 1 | grep -qF "$GNATPROVE_VERSION" \
-  || die "gnatprove on PATH is not $GNATPROVE_VERSION: $(command -v gnatprove)"
+# Captured, not piped into head: gnatprove dies of SIGPIPE under pipefail.
+gp_version="$(gnatprove --version)"
+printf '%s\n' "$gp_version"
+case "$gp_version" in *"$GNATPROVE_VERSION"*) ;; *) die "gnatprove on PATH is not $GNATPROVE_VERSION: $(command -v gnatprove)" ;; esac
 end
 
 # --- cryptol --------------------------------------------------------------------------
@@ -341,8 +346,9 @@ unpack "$TOOLS/downloads/$CRYPTOL_TARBALL" "$CRYPTOL_DIR" "$CRYPTOL_SHA256"
 ensure_libs "$CRYPTOL_DIR"
 [ "$(command -v cryptol)" = "$CRYPTOL_DIR/bin/cryptol" ] \
   || die "cryptol on PATH is $(command -v cryptol), not $CRYPTOL_DIR/bin/cryptol"
-cryptol --version
-cryptol --version | grep -q "FFI enabled" || die "cryptol lacks FFI support"
+cr_version="$(cryptol --version)"
+printf '%s\n' "$cr_version"
+case "$cr_version" in *"FFI enabled"*) ;; *) die "cryptol lacks FFI support" ;; esac
 end
 
 # --- saw ------------------------------------------------------------------------------
