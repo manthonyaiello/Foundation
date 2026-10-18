@@ -105,8 +105,8 @@ is
    --  @return w @ I.
 
    function KeyExpansion (K : Natural; Key : Key_Words) return Round_Keys
-   is [for R in 0 .. Nr (K) =>
-         Join ([for J in AESWord_Index => W (K, Key, 4 * R + J)])]
+   is [for R in 0 .. Nr (K) => Join ([for J in AESWord_Index =>
+                                        W (K, Key, 4 * R + J)])]
    with
      Pre  => Is_Key_Words (K, Key),
      Post => Is_Round_Keys (K, KeyExpansion'Result);
