@@ -38,25 +38,25 @@
 generic
    B : Positive;
    L : Natural;
-   Max_Length : Bit_Index;
+   Max_Length : SHA2.Bit_Index;
    with function Hk (M : SHA2.Bits) return SHA2.Bits
    with
      Ghost,
      Pre  => M'First = 0 and then M'Length < Max_Length,
      Post => Hk'Result'First = 0
-             and then Hk'Result'Length = 8 * Bit_Index (L);
+             and then Hk'Result'Length = 8 * SHA2.Bit_Index (L);
    with function Hn (M : SHA2.Bits) return SHA2.Bits
    with
      Ghost,
      Pre  => M'First = 0 and then M'Length < Max_Length,
      Post => Hn'Result'First = 0
-             and then Hn'Result'Length = 8 * Bit_Index (L);
+             and then Hn'Result'Length = 8 * SHA2.Bit_Index (L);
    with function HL (M : SHA2.Bits) return SHA2.Bits
    with
      Ghost,
      Pre  => M'First = 0 and then M'Length < Max_Length,
      Post => HL'Result'First = 0
-             and then HL'Result'Length = 8 * Bit_Index (L);
+             and then HL'Result'Length = 8 * SHA2.Bit_Index (L);
 package Foundation_Spark.HMAC.Main with
   SPARK_Mode
 is
@@ -67,13 +67,13 @@ is
      (B < 6, "Main.cry requires 2 ^^ B >= 8 * B, that is B >= 6");
    pragma Compile_Time_Error (L > B, "Main.cry requires L <= B");
 
-   function Text_Limit return Bit_Index is
-     (if B >= 126 then Bit_Index'Last
-      else 2 ** B - 8 * Bit_Index (B))
+   function Text_Limit return SHA2.Bit_Index is
+     (if B >= 126 then SHA2.Bit_Index'Last
+      else 2 ** B - 8 * SHA2.Bit_Index (B))
    with Ghost;
    --  Cryptol's `2 ^^ B - 8 * B`, the bound on the text's length `n`
    --  (Main.cry:31, [FIPS-PUB-198-1 Section 2.3]). For B of 126 or more
-   --  it exceeds every Bit_Index, and Bit_Index'Last stands for it: a
+   --  it exceeds every SHA2.Bit_Index, and Bit_Index'Last stands for it: a
    --  text that long cannot be hashed anyway (Max_Length).
    --  @return The bound on the text's length.
 
@@ -82,7 +82,7 @@ is
    with
      Ghost,
      Post => Opad'Result'First = 0
-             and then Opad'Result'Length = 8 * Bit_Index (B);
+             and then Opad'Result'Length = 8 * SHA2.Bit_Index (B);
    --  HMAC's local `opad = join (repeat`{B} 0x5C)` (Main.cry:46,
    --  [FIPS-PUB-198-1 Section 2.3]), the outer pad: B bytes 0x5C.
    --  @return The B * 8 bits of the outer pad.
@@ -92,7 +92,7 @@ is
    with
      Ghost,
      Post => Ipad'Result'First = 0
-             and then Ipad'Result'Length = 8 * Bit_Index (B);
+             and then Ipad'Result'Length = 8 * SHA2.Bit_Index (B);
    --  HMAC's local `ipad = join (repeat`{B} 0x36)` (Main.cry:47,
    --  [FIPS-PUB-198-1 Section 2.3]), the inner pad: B bytes 0x36.
    --  @return The B * 8 bits of the inner pad.
@@ -100,16 +100,17 @@ is
    function HMAC_init (K : Bytes) return SHA2.Bits is
      (if K'Length = Byte_Index (B) then Join (K)
       elsif K'Length > Byte_Index (B)
-      then Hk (Join (K)) & Zero (8 * Bit_Index (B - L))
-      else Join (K) & Zero (8 * (Bit_Index (B) - Bit_Index (K'Length))))
+      then Hk (Join (K)) & Zero (8 * SHA2.Bit_Index (B - L))
+      else Join (K)
+           & Zero (8 * (SHA2.Bit_Index (B) - SHA2.Bit_Index (K'Length))))
    with
      Ghost,
      Pre  =>
        K'Length <= Byte_Index (B)
-       or else 8 * Bit_Index (K'Length) < Max_Length,
+       or else 8 * SHA2.Bit_Index (K'Length) < Max_Length,
      Post =>
        HMAC_init'Result'First = 0
-       and then HMAC_init'Result'Length = 8 * Bit_Index (B);
+       and then HMAC_init'Result'Length = 8 * SHA2.Bit_Index (B);
    --  The key preprocessing, Cryptol's `HMAC_init Hk K` (Main.cry:56,
    --  Steps 1 to 3 of [FIPS-PUB-198-1 Section 4 Table 1]), private in
    --  Main.cry and public here because M3.2 is proved against it. By
@@ -124,7 +125,7 @@ is
    --  @return `K0`, the key as B * 8 bits, indexed from 0.
 
    function HMAC
-     (K : Bytes; Text : SHA2.Bits; Lambda : Bit_Index) return SHA2.Bits
+     (K : Bytes; Text : SHA2.Bits; Lambda : SHA2.Bit_Index) return SHA2.Bits
    is
      (HL ((HMAC_init (K) xor Opad)
           & Hn ((HMAC_init (K) xor Ipad) & Text))
@@ -133,12 +134,12 @@ is
      Ghost,
      Pre  =>
        (K'Length <= Byte_Index (B)
-        or else 8 * Bit_Index (K'Length) < Max_Length)
+        or else 8 * SHA2.Bit_Index (K'Length) < Max_Length)
        and then Text'First = 0
        and then Text'Length < Text_Limit
-       and then 8 * Bit_Index (B) + Text'Length < Max_Length
-       and then 8 * (Bit_Index (B) + Bit_Index (L)) < Max_Length
-       and then Lambda <= 8 * Bit_Index (L),
+       and then 8 * SHA2.Bit_Index (B) + Text'Length < Max_Length
+       and then 8 * (SHA2.Bit_Index (B) + SHA2.Bit_Index (L)) < Max_Length
+       and then Lambda <= 8 * SHA2.Bit_Index (L),
      Post =>
        HMAC'Result'First = 0 and then HMAC'Result'Length = Lambda;
    --  HMAC, Cryptol's `HMAC Hk Hn HL K text` (Main.cry:40,

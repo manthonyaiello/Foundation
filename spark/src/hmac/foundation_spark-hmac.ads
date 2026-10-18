@@ -21,9 +21,6 @@ is
    use type Interfaces.Unsigned_8;
    use type SHA2.Bit_Index;
 
-   subtype Bit_Index is SHA2.Bit_Index;
-   --  A position in, or a length of, a bit sequence (SHA2.Bit_Index).
-
    subtype Byte is Interfaces.Unsigned_8;
    --  A byte, Cryptol's `[8]`.
 
@@ -50,12 +47,12 @@ is
    --  @return Whether that bit is 1.
 
    function Join (K : Bytes) return SHA2.Bits is
-     ([for I in 0 .. 8 * Bit_Index (K'Length) - 1 =>
+     ([for I in 0 .. 8 * SHA2.Bit_Index (K'Length) - 1 =>
          Byte_Bit (K (K'First + Byte_Index (I / 8)), Natural (I mod 8))])
    with
      Ghost,
      Post => Join'Result'First = 0
-             and then Join'Result'Length = 8 * Bit_Index (K'Length);
+             and then Join'Result'Length = 8 * SHA2.Bit_Index (K'Length);
    --  Cryptol's `join : [k][8] -> [k * 8]`, as Main.cry applies it to the
    --  key (Main.cry:63 to :65) and to the pads (Main.cry:46 and :47):
    --  each byte's bits in order, most significant first, so bit I is bit
@@ -74,7 +71,7 @@ is
    --  @param X The byte repeated.
    --  @return Count copies of X, indexed from 0.
 
-   function Zero (Count : Bit_Index) return SHA2.Bits is
+   function Zero (Count : SHA2.Bit_Index) return SHA2.Bits is
      ([for I in 0 .. Count - 1 => False])
    with
      Ghost,
