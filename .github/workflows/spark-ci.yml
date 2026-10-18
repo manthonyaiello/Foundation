@@ -117,9 +117,9 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       CRYPTOL_VERSION: 3.6.0
-      CRYPTOL_TARBALL: cryptol-3.6.0-ubuntu-24.04-X64.tar.gz
+      CRYPTOL_TARBALL: cryptol-3.6.0-ubuntu-24.04-X64-with-solvers.tar.gz
       # sha256 of the release asset, checked before it is unpacked.
-      CRYPTOL_SHA256: bd4846c3a1a521721c16cffdcd08ae794a2e1d6020d93314d48a5a6428692608
+      CRYPTOL_SHA256: 621860aa1dedc037e8fc8355bef3edf023e41e78efb7177146126f5a87309962
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -127,8 +127,10 @@ jobs:
       - name: Set up Alire
         uses: ./.github/actions/setup-alire-spark
 
-      # The release build without solvers: :exhaust and :check need none.
-      # check-ffi.sh refuses a cryptol whose --version lacks "FFI enabled".
+      # The release build with solvers: Cryptol's type checker needs z3 to
+      # start at all ("z3 is required to run Cryptol"), though :exhaust and
+      # :check prove nothing. check-ffi.sh refuses a cryptol whose --version
+      # lacks "FFI enabled".
       - name: Install Cryptol
         run: |
           curl -fsSL -o "$RUNNER_TEMP/$CRYPTOL_TARBALL" \

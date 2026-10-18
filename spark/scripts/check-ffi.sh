@@ -128,7 +128,7 @@ judge() {
     FNR == NR { ours[$0] = 1; next }
     /^Loading module / { cur = $3; if (cur == mod) seen = 1; next }
     /Could not load all foreign implementations for module / {
-      m = $0; sub(/.*for module /, "", m); sub(/:.*$/, "", m)
+      m = $0; sub(/.*for module /, "", m); sub(/:[ \t]*$/, "", m)
       if (m in ours) { print "module " m " did not load its foreign implementations"; bad = 1 }
       next
     }
