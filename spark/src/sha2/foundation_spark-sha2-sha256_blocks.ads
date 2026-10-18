@@ -56,10 +56,9 @@ is
    --  @param K The number of blocks.
    --  @return Whether bytes F .. F + 64 * K - 1 are all in M.
 
-   function Block_From
-     (M : SHA256_Bytes.Byte_Array; F : Offset) return SHA256.Block
-   is
-     ([for J in 0 .. 15 =>
+   function Block_From (M : SHA256_Bytes.Byte_Array; F : Offset)
+     return SHA256.Block
+   is ([for J in 0 .. 15 =>
          SHA256_Bytes.Word_At (M, F + 4 * SHA256_Bytes.Byte_Index (J))])
    with
      Pre => M'Length >= 64 and then F >= M'First and then F <= M'Last - 63;
@@ -103,6 +102,29 @@ is
    --  @param H2 A hash value equal to H1.
    --  @param B1 A block.
    --  @param B2 A block equal to B1.
+
+   procedure Lemma_Block_Ext
+     (M1 : SHA256_Bytes.Byte_Array;
+      F1 : Offset;
+      M2 : SHA256_Bytes.Byte_Array;
+      F2 : Offset)
+   with
+     Pre  =>
+       M1'Length >= 64
+       and then F1 >= M1'First
+       and then F1 <= M1'Last - 63
+       and then M2'Length >= 64
+       and then F2 >= M2'First
+       and then F2 <= M2'Last - 63
+       and then (for all I in 0 .. 63 =>
+                   M1 (F1 + Offset (I)) = M2 (F2 + Offset (I))),
+     Post => Block_From (M1, F1) = Block_From (M2, F2);
+   --  The blocks read from 64 equal bytes are equal, wherever the bytes
+   --  sit in their arrays.
+   --  @param M1 The first bytes.
+   --  @param F1 The position of the block in M1.
+   --  @param M2 The second bytes.
+   --  @param F2 The position of the block in M2.
 
    procedure Lemma_Fold_Ext
      (H1, H2 : SHA256.Hash_Value;

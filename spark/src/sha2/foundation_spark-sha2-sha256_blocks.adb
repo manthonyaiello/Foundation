@@ -3,7 +3,6 @@ package body Foundation_Spark.SHA2.SHA256_Blocks with
 is
 
    use SHA256_Bytes;
-   use type Interfaces.Unsigned_32;
 
    --------------------
    -- Lemma_Step_Ext --
@@ -14,6 +13,24 @@ is
    begin
       Lemma_Foldl_Step3_Ext (B1, B2, H1, H2, 64);
    end Lemma_Step_Ext;
+
+   ---------------------
+   -- Lemma_Block_Ext --
+   ---------------------
+
+   procedure Lemma_Block_Ext
+     (M1 : Byte_Array; F1 : Offset; M2 : Byte_Array; F2 : Offset) is
+   begin
+      pragma Assert
+        (for all J in 0 .. 15 =>
+           M1 (F1 + 4 * Offset (J)) = M2 (F2 + 4 * Offset (J))
+           and then M1 (F1 + 4 * Offset (J) + 1)
+                    = M2 (F2 + 4 * Offset (J) + 1)
+           and then M1 (F1 + 4 * Offset (J) + 2)
+                    = M2 (F2 + 4 * Offset (J) + 2)
+           and then M1 (F1 + 4 * Offset (J) + 3)
+                    = M2 (F2 + 4 * Offset (J) + 3));
+   end Lemma_Block_Ext;
 
    --------------------
    -- Lemma_Fold_Ext --
@@ -30,23 +47,8 @@ is
    begin
       if K > 0 then
          Lemma_Fold_Ext (H1, H2, M1, F1, M2, F2, K - 1);
-         pragma Assert
-           (for all J in 0 .. 15 =>
-              M1 (F1 + 64 * Offset (K - 1) + 4 * Offset (J))
-              = M2 (F2 + 64 * Offset (K - 1) + 4 * Offset (J))
-              and then M1 (F1 + 64 * Offset (K - 1) + 4 * Offset (J) + 1)
-                       = M2 (F2 + 64 * Offset (K - 1) + 4 * Offset (J) + 1)
-              and then M1 (F1 + 64 * Offset (K - 1) + 4 * Offset (J) + 2)
-                       = M2 (F2 + 64 * Offset (K - 1) + 4 * Offset (J) + 2)
-              and then M1 (F1 + 64 * Offset (K - 1) + 4 * Offset (J) + 3)
-                       = M2 (F2 + 64 * Offset (K - 1) + 4 * Offset (J) + 3));
-         pragma Assert
-           (for all J in 0 .. 15 =>
-              Word_At (M1, F1 + 64 * Offset (K - 1) + 4 * Offset (J))
-              = Word_At (M2, F2 + 64 * Offset (K - 1) + 4 * Offset (J)));
-         pragma Assert
-           (Block_From (M1, F1 + 64 * Offset (K - 1))
-            = Block_From (M2, F2 + 64 * Offset (K - 1)));
+         Lemma_Block_Ext
+           (M1, F1 + 64 * Offset (K - 1), M2, F2 + 64 * Offset (K - 1));
          Lemma_Step_Ext
            (Fold_Blocks (H1, M1, F1, K - 1),
             Fold_Blocks (H2, M2, F2, K - 1),
