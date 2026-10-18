@@ -250,6 +250,47 @@ agreed with Cryptol on `[8]`, `[16]`, `[200]` and `[1000]`). Using it from
 Ada means binding those callback records, which is more trust surface than
 the wrapper.
 
+**The AES spec layer** (`SPARK/AES/{GF28,SBox,Cipher,KeyExpansion,Main}.cry`)
+follows the recipe per Cryptol module: a ghost shim unit
+(`FFI.AES_<Module>`), an export unit (`FFI.AES_<Module>_Exports`), both in
+`Library_Interface` and both `foreign-binding` entries, and one
+`properties.txt` line per property. `FFI.AES_Types` holds the C shapes they
+share.
+
+- **Blocks and words.** `Block` (`[16][8]`) and `AESWord` (`[4][8]`) are
+  passed as pointers to their bytes, and a result of either type is written
+  through the pointer Cryptol passes after the arguments, so each shim is a
+  procedure with an `out` parameter: `foreign spark_SubBytes : Block ->
+  Block` is `procedure SubBytes (Bs : Block; Output : out Block)`.
+- **Key sizes.** Cryptol passes a numeric type parameter as a leading
+  `size_t`, so `foreign spark_Cipher : {k} (Key k) => [Nr k + 1]Block ->
+  Block -> Block` is one export, `Cipher (K, W, Input, Output)`, called as
+  ``spark_Cipher`{128}``, ``{192}`` and ``{256}``. The length of
+  `[Nr k + 1]Block` (and `[Nk k]AESWord`, `[k / 8][8]`) depends on `k`, so
+  the parameter is typed at the largest size (`AES_Types.All_Round_Keys`,
+  15 blocks) and the shim reads only the first `Nr k + 1`
+  (`Round_Keys_Of`), which is the unconstrained `Round_Keys` that the
+  spec's `Is_Round_Keys (K, W)` precondition asks for. `KeyExpansion`
+  writes its `[Nr k + 1]Block` result the same way, into the first
+  `Nr k + 1` blocks only (`in out`, and its proved postcondition says the
+  rest is untouched). The shims' `Pre => Is_Key_Size (K)` is checked at run
+  time in the `-gnata` library, and Cryptol checks `Key k` at the call.
+- **Bit sequences.** `Main.cry`'s `Encrypt` and `Decrypt` take `[k]` and
+  `[128]`, which the C convention cannot pass. The Cryptol side packs them
+  with the Cryptol's own `split` and `join`:
+  ``join (spark_Encrypt`{k} (split key) (split in))``, with
+  `foreign spark_Encrypt : {k} (Key k) => [k / 8][8] -> [16][8] -> [16][8]`.
+  The shim joins the bytes into the spec's ghost bit sequences (`Join_Key`,
+  and the spec's `Join_Block`) and splits the result (`Split_Block`), so the
+  check covers those conversions with the spec function.
+- **Known answers.** `Tests.cry`'s vectors go through the SPARK functions.
+  `prop_CipherExample` and `prop_AES<n>Example` restate the vectors (copied
+  from `Tests.cry`) over the `spark_` functions. `prop_Example<n>KeyExpansion`
+  checks that the SPARK `KeyExpansion` equals the Cryptol one on `Tests.cry`'s
+  key and conjoins `Tests.cry`'s own `Example<n>KeyExpansion`, so the long
+  expected schedules are not copied. Each is a closed `Bit`, run with
+  `:exhaust` (1 test).
+
 **CI** runs `check-ffi.sh` in its own job (`FFI (Cryptol, linux x86_64)`,
 `.github/workflows/spark-ci.yml`) on `ubuntu-24.04`, x86_64: Cryptol has no
 arm64 Linux release. It installs the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers`

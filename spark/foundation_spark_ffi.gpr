@@ -43,7 +43,20 @@ project Foundation_Spark_FFI is
       "Foundation_Spark.AES.Spec.Types",
       "Foundation_Spark.AES.Spec.GF28",
       "Foundation_Spark.FFI.AES_GF28",
-      "Foundation_Spark.FFI.AES_GF28_Exports");
+      "Foundation_Spark.FFI.AES_GF28_Exports",
+      "Foundation_Spark.AES.Spec.SBox",
+      "Foundation_Spark.AES.Spec.Cipher",
+      "Foundation_Spark.AES.Spec.KeyExpansion",
+      "Foundation_Spark.AES.Spec.Main",
+      "Foundation_Spark.FFI.AES_Types",
+      "Foundation_Spark.FFI.AES_SBox",
+      "Foundation_Spark.FFI.AES_SBox_Exports",
+      "Foundation_Spark.FFI.AES_Cipher",
+      "Foundation_Spark.FFI.AES_Cipher_Exports",
+      "Foundation_Spark.FFI.AES_KeyExpansion",
+      "Foundation_Spark.FFI.AES_KeyExpansion_Exports",
+      "Foundation_Spark.FFI.AES_Main",
+      "Foundation_Spark.FFI.AES_Main_Exports");
 
    for Library_Options use ("-Wl,--no-undefined");
 

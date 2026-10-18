@@ -1,0 +1,112 @@
+/*
+ * The SPARK spec layer's key expansion, checked against
+ * algorithms/AES/KeyExpansion.cry through Cryptol's FFI.
+ *
+ * The foreign functions are the C exports of the SPARK crate's FFI library
+ * (spark/foundation_spark_ffi.gpr), which spark/scripts/check-ffi.sh links
+ * here as KeyExpansion.so. They have no Cryptol body on purpose (see
+ * GF28.cry).
+ *
+ * RotWord and SubWord have the domain [4][8], 2^32 words, and KeyExpansion
+ * a [Nk k]AESWord key, 2^k keys, so each property is a :check, with the
+ * test count stated in spark/cryptol/properties.txt. KeyExpansion is
+ * checked at each key size k = 128, 192 and 256 through one SPARK export:
+ * Cryptol passes {k} to it as a leading size_t.
+ *
+ * algorithms::AES::KeyExpansion declares KeyExpansion foreign, with a
+ * Cryptol body and a Rust library that this repository does not build.
+ * check-ffi.sh fails if that library is ever loaded, so these properties
+ * compare SPARK with the Cryptol body.
+ */
+module SPARK::AES::KeyExpansion where
+
+import algorithms::AES::Types
+import algorithms::AES::KeyExpansion
+import algorithms::AES::Tests
+  (Example128KeyExpansion, Example192KeyExpansion, Example256KeyExpansion)
+
+/**
+ * Foundation_Spark.FFI.AES_KeyExpansion.RotWord: the SPARK spec's RotWord
+ * (algorithms/AES/KeyExpansion.cry, RotWord).
+ */
+foreign spark_RotWord : AESWord -> AESWord
+
+/**
+ * Foundation_Spark.FFI.AES_KeyExpansion.SubWord: the SPARK spec's SubWord
+ * (algorithms/AES/KeyExpansion.cry, SubWord).
+ */
+foreign spark_SubWord : AESWord -> AESWord
+
+/**
+ * Foundation_Spark.FFI.AES_KeyExpansion.Rcon: the SPARK spec's Rcon table,
+ * read at an index in 1 .. 10 (algorithms/AES/KeyExpansion.cry, Rcon).
+ */
+foreign spark_Rcon : [8] -> AESWord
+
+/**
+ * Foundation_Spark.FFI.AES_KeyExpansion.KeyExpansion: the SPARK spec's
+ * KeyExpansion (algorithms/AES/KeyExpansion.cry, KeyExpansion), for the
+ * key size {k}.
+ */
+foreign spark_KeyExpansion : {k} (Key k) => [Nk k]AESWord -> [Nr k + 1]Block
+
+/** The SPARK RotWord is KeyExpansion.cry's RotWord. */
+prop_RotWord : AESWord -> Bit
+property prop_RotWord a = spark_RotWord a == RotWord a
+
+/** The SPARK SubWord is KeyExpansion.cry's SubWord. */
+prop_SubWord : AESWord -> Bit
+property prop_SubWord a = spark_SubWord a == SubWord a
+
+/**
+ * The SPARK Rcon is KeyExpansion.cry's Rcon at every index KeyExpansion
+ * reads, 1 .. 10. The Cryptol's element 0 is undefined, and the SPARK
+ * table has none, so the other indices are vacuous: ==> does not evaluate
+ * its right side when its left is False (:exhaust, 256 tests).
+ */
+prop_Rcon : [8] -> Bit
+property prop_Rcon i = (i >= 1 /\ i <= 10) ==> spark_Rcon i == Rcon @ i
+
+/** The SPARK KeyExpansion is KeyExpansion.cry's, at key size k. */
+prop_KeyExpansion : {k} (Key k) => [Nk k]AESWord -> Bit
+prop_KeyExpansion key = spark_KeyExpansion`{k} key == KeyExpansion`{k} key
+
+/** prop_KeyExpansion at k = 128. */
+prop_KeyExpansion128 : [Nk 128]AESWord -> Bit
+property prop_KeyExpansion128 = prop_KeyExpansion`{128}
+
+/** prop_KeyExpansion at k = 192. */
+prop_KeyExpansion192 : [Nk 192]AESWord -> Bit
+property prop_KeyExpansion192 = prop_KeyExpansion`{192}
+
+/** prop_KeyExpansion at k = 256. */
+prop_KeyExpansion256 : [Nk 256]AESWord -> Bit
+property prop_KeyExpansion256 = prop_KeyExpansion`{256}
+
+/**
+ * algorithms/AES/Tests.cry's Example128KeyExpansion [FIPS-PUB-197 Appendix
+ * A.1] through the SPARK KeyExpansion: on Tests.cry's key (copied here),
+ * the SPARK expansion is KeyExpansion.cry's, and Tests.cry's property
+ * (imported) holds of that, so the SPARK expansion is the vector.
+ */
+property prop_Example128KeyExpansion =
+    prop_KeyExpansion`{128} (split (split 0x2b7e151628aed2a6abf7158809cf4f3c))
+ /\ Example128KeyExpansion
+
+/**
+ * Tests.cry's Example192KeyExpansion [FIPS-PUB-197 Appendix A.2] through the
+ * SPARK KeyExpansion, as prop_Example128KeyExpansion.
+ */
+property prop_Example192KeyExpansion =
+    prop_KeyExpansion`{192}
+      (split (split 0x8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b))
+ /\ Example192KeyExpansion
+
+/**
+ * Tests.cry's Example256KeyExpansion [FIPS-PUB-197 Appendix A.3] through the
+ * SPARK KeyExpansion, as prop_Example128KeyExpansion.
+ */
+property prop_Example256KeyExpansion =
+    prop_KeyExpansion`{256}
+      (split (split 0x603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4))
+ /\ Example256KeyExpansion
