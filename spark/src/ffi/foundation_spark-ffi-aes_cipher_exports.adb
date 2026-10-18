@@ -1,14 +1,9 @@
 --  The exports Cryptol calls for algorithms/AES/Cipher.cry: each
 --  forwards to its ghost shim.
 
-with Interfaces.C;
-
 package body Foundation_Spark.FFI.AES_Cipher_Exports with
   SPARK_Mode
 is
-
-   use type Foundation_Spark.AES.Spec.Types.Byte;
-   use type Interfaces.C.size_t;
 
    procedure SubBytes (Bs : Block; Output : out Block) is
    begin
@@ -74,9 +69,6 @@ is
      (K : C_Size; W : All_Round_Keys; Input : Block; Output : out Block) is
    begin
       Ghost_Cipher (K, W, Input, Output);
-      if K = 192 then
-         Output (0) := Output (0) xor 1;  --  DEMO break, to be reverted
-      end if;
    end Cipher;
 
    procedure InvCipher
