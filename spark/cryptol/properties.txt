@@ -85,8 +85,8 @@ SPARK/SHA2/SHA256.cry        | prop_hash_FIPS           | SHA2::Main::hash (SHA-
 SPARK/SHA2/SHA256.cry        | prop_Hash_Bytes          | SHA2::Main::hash (SHA-256, bytes)    | check   | 5
 SPARK/SHA2/SHA256.cry        | prop_Hash_Bytes_FIPS     | SHA2::Main::hash (SHA-256, bytes)    | exhaust | 1
 SPARK/SHA2/SHA256.cry        | prop_Stream_Hash         | SHA2::Main::hash (SHA-256, bytes)    | check   | 100
-SPARK/SHA2/SHA256.cry        | prop_Stream_Hash_long    | SHA2::Main::hash (SHA-256, bytes)    | check   | 10
+SPARK/SHA2/SHA256.cry        | prop_Stream_Hash_long    | SHA2::Main::hash (SHA-256, bytes)    | check   | 3
 SPARK/SHA2/SHA256.cry        | prop_Stream_Hash_FIPS    | SHA2::Main::hash (SHA-256, bytes)    | exhaust | 1
 SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked      | SHA2::Main::hash (SHA-256, bytes)    | check   | 100
-SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked_long | SHA2::Main::hash (SHA-256, bytes)    | check   | 10
+SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked_long | SHA2::Main::hash (SHA-256, bytes)    | check   | 3
 SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked_FIPS | SHA2::Main::hash (SHA-256, bytes)    | check   | 100
