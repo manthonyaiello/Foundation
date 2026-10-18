@@ -1,0 +1,56 @@
+name: SPARK proof cache refresh
+
+# Daily COLD reprove of main, adapted from memcp's proof-cache-refresh.yml:
+#   1. it refreshes the proof cache that spark-ci.yml's prove job restores;
+#   2. it is the poison guard: a cold run proves everything from scratch, so
+#      no bad cached verdict survives it, and the cache every PR trusts is
+#      re-grounded in a full proof at least daily.
+#
+# Skipped when main did not move in the last 24 hours: the cache is keyed by
+# VC content, so unchanged sources would reproduce the cache already there.
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC daily
+  workflow_dispatch:
+
+# actions:write for the purge (gh cache delete) in spark-prove.yml.
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  guard:
+    name: Check main moved in 24h
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Decide
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "dispatched by hand -- cold reprove will run."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$(git log --since='24 hours ago' --format=%H HEAD)" ]; then
+            echo "main moved in the last 24h -- cold reprove will run."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "main unchanged in the last 24h -- the cache is still valid, skipping."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  refresh:
+    name: Cold reprove + cache refresh (main)
+    needs: guard
+    if: needs.guard.outputs.run == 'true'
+    uses: ./.github/workflows/spark-prove.yml
+    with:
+      purge: true
+      restore: false
+      save: true

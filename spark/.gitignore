@@ -2,3 +2,5 @@
 /lib/
 /alire/
 /config/
+/docs/
+/.gnatprove-cache/

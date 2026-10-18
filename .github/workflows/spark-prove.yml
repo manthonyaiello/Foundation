@@ -1,0 +1,138 @@
+name: SPARK prove
+
+# Reusable proof workflow for the SPARK crate, adapted from memcp's prove.yml.
+# Runs spark/scripts/check-proof.sh (the proof gate) with gnatprove's
+# file-based cache. gnatprove reasons about the source, not the target, so one
+# Linux run is authoritative.
+#
+# Callers differ only in three booleans:
+#   * spark-ci.yml                   restore: true, save on main  (warm)
+#   * spark-proof-cache-refresh.yml  purge: true, save: true      (daily cold)
+#
+# Saving is the trust decision. A PR restores the cache main published and
+# never writes one, so a branch cannot poison the cache main trusts; the
+# daily cold reprove re-grounds that cache in a full proof.
+on:
+  workflow_call:
+    inputs:
+      restore:
+        description: Restore the shared cache before proving (warm start).
+        type: boolean
+        default: false
+      purge:
+        description: Delete every spark-gnatprove-* cache first (cold refresh).
+        type: boolean
+        default: false
+      save:
+        description: Publish the populated cache under this commit's key.
+        type: boolean
+        default: false
+
+# No `permissions:` block on purpose (memcp issue #13): a reusable workflow's
+# scopes are validated against the caller's grant, not capped by it, so asking
+# for actions:write here would break spark-ci.yml, which grants contents:read
+# only. Each caller grants what it needs; only the refresh grants actions:write,
+# for the purge.
+
+jobs:
+  prove:
+    name: Prove (SPARK, linux arm64)
+    runs-on: ubuntu-24.04-arm
+    env:
+      CACHE_DIR: ${{ github.workspace }}/spark/.gnatprove-cache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Cold refresh only: drop every proof cache, so this run republishes a
+      # single fresh one and the cache cannot grow without bound.
+      - name: Purge old proof caches
+        if: inputs.purge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list -R "$GITHUB_REPOSITORY" --limit 100 --json id,key \
+            --jq '.[] | select(.key | startswith("spark-gnatprove-")) | .id' \
+          | while read -r id; do
+              [ -n "$id" ] && gh cache delete -R "$GITHUB_REPOSITORY" "$id" || true
+            done
+
+      - name: Set up Alire and gnatprove
+        uses: ./.github/actions/setup-alire-spark
+        with:
+          gnatprove: 'true'
+
+      # The cache key fingerprints the prover toolchain: gnatprove, why3 and
+      # each prover's version line (install paths stripped), hashed. A bump of
+      # any of them changes the key, so a cached verdict never crosses a
+      # toolchain change. runner.arch is in the key too: the provers are
+      # native binaries, and an x86_64 fallback must not share arm64's cache.
+      - name: Fingerprint the prover toolchain
+        id: fp
+        run: |
+          gnatprove --version | tee gnatprove-version.txt
+          gp="$(sed -n '1s/[^0-9.]//gp' gnatprove-version.txt)"
+          why3="$(sed -nE 's/^Why3 for gnatprove version ([0-9.]+).*/\1/p' gnatprove-version.txt)"
+          hash="$(sed -E 's#^[^ ]*/##' gnatprove-version.txt | sha256sum | cut -c1-12)"
+          echo "prefix=spark-gnatprove-${{ runner.os }}-${{ runner.arch }}-gp${gp}-why3-${why3}-${hash}-" >> "$GITHUB_OUTPUT"
+          rm gnatprove-version.txt
+
+      # gnatprove needs the Alire workspace (config GPRs, sparklib sources);
+      # building the crate provides it and checks that the crate compiles.
+      - name: Build
+        working-directory: spark
+        run: alr -n build
+
+      # restore-keys falls back to the newest cache under the fingerprint, so
+      # a PR warm-starts from whatever main last published.
+      - name: Restore proof cache
+        id: restore
+        if: inputs.restore
+        uses: actions/cache/restore@v6
+        with:
+          path: spark/.gnatprove-cache
+          key: ${{ steps.fp.outputs.prefix }}${{ github.sha }}
+          restore-keys: |
+            ${{ steps.fp.outputs.prefix }}
+
+      # GNATPROVE_EXTRA is appended to the gnatprove call by check-proof.sh.
+      #
+      # --timeout=10 is a wall-clock allowance, not a level change: --level's
+      # timeouts are wall-clock, and this 4-vCPU runner is slower than the
+      # campaign's machine, so a check that proves there can time out here.
+      # memcp's prove.yml does the same. The committed levels stay in
+      # foundation_spark.gpr, and local runs use them with no allowance.
+      #
+      # --memcached-server=file: points gnatprove at the cache directory. It
+      # must exist; on a cold run it is empty, which is what makes the daily
+      # refresh a full reprove.
+      - name: Prove
+        env:
+          GNATPROVE_EXTRA: >-
+            --timeout=10
+            --memcached-server=file:${{ env.CACHE_DIR }}
+        run: |
+          mkdir -p "$CACHE_DIR"
+          before="$(find "$CACHE_DIR" -type f | wc -l)"
+          start="$(date +%s)"
+          status=0
+          spark/scripts/check-proof.sh || status=$?
+          after="$(find "$CACHE_DIR" -type f | wc -l)"
+          secs=$(( $(date +%s) - start ))
+          {
+            echo "### Proof cache"
+            echo
+            echo "| restored key | entries before | entries after | new | proof wall-clock |"
+            echo "|---|---|---|---|---|"
+            echo "| \`${{ steps.restore.outputs.cache-matched-key || 'none (cold)' }}\` | $before | $after | $(( after - before )) | ${secs}s |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "proof cache: $before entries before, $after after; ${secs}s"
+          exit "$status"
+
+      # Only where writing is safe: pushes to main, and the cold refresh.
+      - name: Save proof cache
+        if: inputs.save
+        uses: actions/cache/save@v6
+        with:
+          path: spark/.gnatprove-cache
+          key: ${{ steps.fp.outputs.prefix }}${{ github.sha }}

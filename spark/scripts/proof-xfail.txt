@@ -1,0 +1,10 @@
+# proof-xfail.txt -- allowlist of unproved SPARK checks.
+#
+# Each non-comment line is a substring pattern, matched against an unproved
+# entity's identity as `scripts/check-proof.sh --list` prints it. An unproved
+# check matching no pattern fails the proof gate.
+#
+# EMPTY, and meant to stay so. The crate is proved platinum: every check, at
+# the unit's committed level, with nothing assumed. A check that does not prove
+# is fixed (a lemma, a simpler proof, or a raised level in the GPR), not listed
+# here. Campaign agents never add to this file.

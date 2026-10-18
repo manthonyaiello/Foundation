@@ -1,0 +1,15 @@
+# trust-surface.txt -- every site in spark/src that gnatprove does not prove.
+#
+# One entry per site, checked by scripts/check-trust-surface.sh:
+#
+#     kind | path | entity | why no SPARK formulation works
+#
+# Paths are relative to spark/. `entity` is `-` for the file-level kind
+# (foreign-binding). The fourth field is required, and it is what a reviewer
+# reads.
+#
+# The crate is meant to be platinum. The only entries expected here are the FFI
+# export shims (M0.3). Any other entry is a hole: it is reported as one in the
+# PR that adds it, and the issue it serves stays open.
+#
+# Empty: the scaffold has no site outside the proof.

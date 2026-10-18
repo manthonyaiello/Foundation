@@ -1,0 +1,106 @@
+name: SPARK CI
+
+# CI for the SPARK crate in spark/ (issue #3), on the memcp model. NSA's
+# workflows are disabled on this fork (`gh workflow disable`, files untouched);
+# only the spark-* workflows run.
+#
+#     trust --> docs --> prove
+#
+# trust  The trust-surface gate: every site gnatprove does not prove is listed,
+#        with a justification, in spark/scripts/trust-surface.txt. git and awk
+#        only, no toolchain, so it answers in seconds and gates the rest.
+# docs   The GNATdoc gate: every entity in spark/src documented, and every doc
+#        block on the declaration it describes. The HTML is uploaded.
+# prove  The proof gate, through the reusable spark-prove.yml: every unit at
+#        its committed level, nothing unproved outside the (empty)
+#        spark/scripts/proof-xfail.txt, no warning. Warm from the proof cache;
+#        PRs restore it and never save it, and only main saves.
+#
+# The FFI job is added by M0.3 (#4), and the SAW job by E4.
+#
+# Runners are ubuntu-24.04-arm: the same architecture as the campaign's own
+# machine, so CI runs the same gnatprove and prover builds as local runs.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spark/**'
+      - '.github/**'
+      - '.claude/**'
+      - '!**.md'
+  pull_request:
+    paths:
+      - 'spark/**'
+      - '.github/**'
+      - '.claude/**'
+      - '!**.md'
+  workflow_dispatch:
+
+# A new commit on the same ref cancels the run in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege, and what flows into the reusable prove call. Restoring and
+# saving the cache needs no actions:write; only purging does, and only the
+# daily refresh purges.
+permissions:
+  contents: read
+
+jobs:
+  trust:
+    name: Trust surface (gate)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check trust surface
+        run: spark/scripts/check-trust-surface.sh
+
+  docs:
+    name: GNATdoc (gate)
+    needs: trust
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Placement first: it needs no toolchain, so a misplaced block is
+      # answered before the install.
+      - name: Check doc placement
+        run: spark/scripts/check-doc-placement.sh
+
+      - name: Set up Alire and gnatdoc
+        uses: ./.github/actions/setup-alire-spark
+        with:
+          gnatdoc: 'true'
+
+      # gnatdoc needs the Alire workspace (config GPRs, sparklib) and the
+      # object directories; building the crate provides both, and checks that
+      # it compiles.
+      - name: Build
+        working-directory: spark
+        run: alr -n build
+
+      - name: Check documentation
+        run: spark/scripts/check-docs.sh
+
+      # always(): the HTML is most worth reading when the gate just failed.
+      - name: Upload API docs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spark-api-docs
+          path: |
+            spark/docs/api
+            spark/docs/gnatdoc-run.txt
+          if-no-files-found: ignore
+
+  prove:
+    name: Prove
+    needs: docs
+    uses: ./.github/workflows/spark-prove.yml
+    with:
+      restore: true
+      save: ${{ github.ref == 'refs/heads/main' }}

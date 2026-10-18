@@ -1,0 +1,27 @@
+# Review routing for the files that define and enforce the SPARK crate's gates.
+# Adapted from memcp's CODEOWNERS.
+#
+# A gate can be satisfied by editing what it reads: the trust gate checks that a
+# justification is present, not that anyone read it, and the proof gate accepts
+# whatever proof-xfail.txt allows. The GPR and alire.toml carry the committed
+# proof levels and the compiler switches (a -gnatp or -gnatws there suppresses
+# what the trust gate scans src/ for). These entries put a reviewer in the loop.
+#
+# GitHub applies the LAST matching pattern, so general patterns come first.
+# NSA's own files are not listed: this fork does not route their review.
+
+/spark/*.gpr                                @manthonyaiello
+/spark/alire.toml                           @manthonyaiello
+
+/spark/scripts/trust-surface.txt            @manthonyaiello
+/spark/scripts/check-trust-surface.sh       @manthonyaiello
+
+/spark/scripts/proof-xfail.txt              @manthonyaiello
+/spark/scripts/check-proof.sh               @manthonyaiello
+
+/spark/scripts/check-docs.sh                @manthonyaiello
+/spark/scripts/check-doc-placement.sh       @manthonyaiello
+
+/.github/workflows/spark-*.yml              @manthonyaiello
+/.github/actions/setup-alire-spark/         @manthonyaiello
+/.github/CODEOWNERS                         @manthonyaiello
