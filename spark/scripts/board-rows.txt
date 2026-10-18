@@ -48,3 +48,11 @@ AES::KeyExpansion::KeyExpansion | Foundation_Spark.AES.Spec.KeyExpansion.KeyExpa
 AES::KeyExpansion::Rcon       | Foundation_Spark.AES.Spec.KeyExpansion              | -
 AES::KeyExpansion::RotWord    | Foundation_Spark.AES.Spec.KeyExpansion.RotWord      | -
 AES::KeyExpansion::SubWord    | Foundation_Spark.AES.Spec.KeyExpansion.SubWord      | -
+
+# AES (#10): Cipher.cry's ciphers and Main.cry's Encrypt and Decrypt (the
+# k-parameterized forms; AES128/192/256 are their instances).
+AES::Cipher::Cipher           | Foundation_Spark.AES.Spec.Cipher.Cipher             | -
+AES::Cipher::InvCipher        | Foundation_Spark.AES.Spec.Cipher.InvCipher          | -
+AES::Cipher::InvCipher'       | Foundation_Spark.AES.Spec.Cipher.InvCipher_Prime    | -
+AES::Main::Encrypt            | Foundation_Spark.AES.Spec.Main.Encrypt              | -
+AES::Main::Decrypt            | Foundation_Spark.AES.Spec.Main.Decrypt              | -
