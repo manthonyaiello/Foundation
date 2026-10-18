@@ -584,7 +584,11 @@ $ scripts/slow_proofs.py check -v           # what the gate checks, verbosely
 
 **The default gate** (`check-proof.sh`, so CI's prove job and the daily cold
 refresh) proves every tracked file but the slow units' (`prove.sh -u` each),
-prints each skipped unit with its recorded commit, and exempts only the listed
+with `-A=generic-not-analyzed`: naming a generic unit by `-u` draws that
+warning, which says only that the generic is analyzed through its instances,
+as a whole-crate run does without saying so. The slow units' `.spark` files
+are deleted first, because gnatprove's summary counts every `.spark` on disk.
+It prints each skipped unit with its recorded commit, and exempts only the listed
 units from the "tracked unit absent" and "entity skipped" rules. It fails
 when a listed unit's inputs changed since its proof, naming them and saying
 how to re-run, after proving the rest. `scripts/test-slow-proofs.sh` checks

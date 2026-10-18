@@ -102,13 +102,28 @@ is_slow() {
 
 # Every tracked file but the slow units', for prove.sh -u. Empty when no unit
 # is listed: then the run is the whole crate, exactly as before.
+#
+# Two consequences of -u, measured with gnatprove 16.1.0:
+#   * a generic unit named by -u draws "warning: generic compilation unit is
+#     not analyzed [generic-not-analyzed]" ("only instantiations of the
+#     generic will be analyzed"), an error under --warnings=error. A
+#     whole-crate run analyzes the generic the same way, through its
+#     instances, without the warning. So the -u run allows that one tag
+#     (-A=generic-not-analyzed). It concerns the command line, not the
+#     source, and gnatprove still writes the generic's .spark ("0 out of 0"),
+#     so the "tracked unit absent" rule still sees it;
+#   * gnatprove's summary counts every .spark file in obj/, in scope or not.
+#     A slow unit's .spark from an earlier prove-slow.sh would be counted as
+#     this run's, so it is deleted first.
 UNIT_ARGS=()
+EXTRA_ARGS=()
 if [ -n "$SLOW_UNITS" ]; then
   while IFS= read -r src; do
     [ -z "$src" ] && continue
     u="$(basename "$src")"; u="${u%.*}"
     is_slow "$u" || UNIT_ARGS+=(-u "$src")
   done <<< "$(git ls-files -- src | grep -E '^src/.+\.(ads|adb)$' || true)"
+  EXTRA_ARGS+=(-A=generic-not-analyzed)
 fi
 
 if [ -n "${CHECK_PROOF_OUT:-}" ]; then
@@ -119,6 +134,9 @@ else
   # prove.sh clears it too, but only once its own checks pass: a refused run
   # must not leave the last run's summary for this gate to read.
   find obj -path '*/gnatprove/gnatprove.out' -delete 2>/dev/null || true
+  while IFS= read -r u; do
+    [ -n "$u" ] && { find obj -path "*/gnatprove/${u}.spark" -delete 2>/dev/null || true; }
+  done <<< "$SLOW_UNITS"
 
   # The run itself is scripts/prove.sh's: the same command line as a local
   # run, its -j from PROVE_JOBS, GNATPROVE_EXTRA checked there (no --level or
@@ -126,7 +144,8 @@ else
   # gnatprove.out or .spark of an earlier run survives into this one, for
   # every unit in scope; exit 3 if this run did not write them).
   set +e
-  PROVE_LOG="$RUNLOG" scripts/prove.sh "${UNIT_ARGS[@]+"${UNIT_ARGS[@]}"}" -- --warnings=error
+  PROVE_LOG="$RUNLOG" scripts/prove.sh "${UNIT_ARGS[@]+"${UNIT_ARGS[@]}"}" -- --warnings=error \
+    "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
   GP_STATUS=$?
   set -e
 
