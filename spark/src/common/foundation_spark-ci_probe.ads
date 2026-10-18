@@ -16,6 +16,9 @@ is
    --  @param N How far to count.
    --  @return N.
 
-   function Undocumented (X : Integer) return Integer is (X);
+   function Check (X : Integer) return Integer;
+   --  Assert something gnatprove cannot prove.
+   --  @param X Any integer.
+   --  @return X.
 
 end Foundation_Spark.CI_Probe;
