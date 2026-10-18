@@ -100,6 +100,7 @@ SPARK/SHA2/Functions.cry     | prop_K_256               | SHA2::Functions::K_256
 SPARK/SHA2/Preprocessing.cry | prop_H0_256              | SHA2::Preprocessing::H0_256          | exhaust | 1
 SPARK/SHA2/Preprocessing.cry | prop_pad                 | SHA2::Preprocessing::pad (SHA-256)   | check   | 100
 SPARK/SHA2/Preprocessing.cry | prop_parse               | SHA2::Preprocessing::parse (SHA-256) | check   | 100
+SPARK/SHA2/Preprocessing.cry | prop_Load_Block          | SHA2::Preprocessing::parse (SHA-256) | check   | 1000
 SPARK/SHA2/SHA256.cry        | prop_step                | SHA2::Main::step (SHA-256)           | check   | 100
 SPARK/SHA2/SHA256.cry        | prop_Compress            | SHA2::Main::step (SHA-256)           | check   | 1000
 SPARK/SHA2/SHA256.cry        | prop_hash                | SHA2::Main::hash (SHA-256)           | check   | 5

@@ -151,6 +151,7 @@ is
            (for all K in 0 .. J =>
               R (K) = Word_At (B, F + 4 * Byte_Index (K)));
       end loop;
+      Lemma_Block_Parse (B, F);
       return R;
    end Load_Block;
 

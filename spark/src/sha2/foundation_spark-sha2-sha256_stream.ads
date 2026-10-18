@@ -63,9 +63,18 @@ is
      (B : Byte_Array; F : SHA256_Bytes.Byte_Index) return SHA256.Block
    with
      Pre  => B'Length >= 64 and then F >= B'First and then F <= B'Last - 63,
-     Post => Load_Block'Result = SHA256_Blocks.Block_From (B, F);
+     Post =>
+       Load_Block'Result = SHA256_Blocks.Block_From (B, F)
+       and then
+         Load_Block'Result
+         = SHA256.Parse (SHA256_Bytes.Bits_Of (B (F .. F + 63)), 1) (0);
    --  The 64 bytes of B from F as a message block, each word read
-   --  big-endian [FIPS-PUB-180-4 Sections 3.1 and 5.2.1].
+   --  big-endian [FIPS-PUB-180-4 Sections 3.1 and 5.2.1]. It is the
+   --  executable `parse` (Preprocessing.cry:47), one block at a time: the
+   --  block is the spec's Parse of the 64 bytes' bits, with N = 1
+   --  (SHA256_Blocks.Lemma_Block_Parse). Update and Final parse each block
+   --  with it as they reach it, since a streaming hash never holds the
+   --  whole padded message that `parse` takes.
    --  @param B The bytes.
    --  @param F The position of the block's first byte.
    --  @return The block.

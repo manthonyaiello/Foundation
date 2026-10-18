@@ -18,6 +18,12 @@ is
       SHA2.SHA256_Stream.Compress (Output, B);
    end Compress;
 
+   procedure Load_Block
+     (B : Key_Block_Bytes; Output : out SHA2.SHA256.Block) is
+   begin
+      Output := SHA2.SHA256_Stream.Load_Block (B, 0);
+   end Load_Block;
+
    procedure Hash
      (N      : C_Size;
       M      : Byte_Buffer;
