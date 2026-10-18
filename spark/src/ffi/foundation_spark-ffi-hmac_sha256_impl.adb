@@ -20,6 +20,9 @@ is
    begin
       Output :=
         HMAC.SHA256_Impl.HMAC_SHA256 (Prefix (K, Key), Prefix (N, Text));
+      --  DEMO (reverted in the next commit): flip the low bit of byte 31
+      --  of the MAC, to show that the FFI check fails.
+      Output (31) := Interfaces."xor" (Output (31), 1);
    end HMAC_SHA256;
 
    procedure Init_Key
