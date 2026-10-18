@@ -448,8 +448,9 @@ is a script here that runs the same way locally:
 ## Cryptol
 
 The FFI checks (`spark/cryptol/`, M0.3 onward) need Cryptol 3.6.0 built
-with FFI support (`cryptol --version` prints `FFI enabled`). SAW is not
-installed. It is on hold until the end of the campaign.
+with FFI support (`cryptol --version` prints `FFI enabled`). SAW is
+installed only on the x86_64 instance, by its bootstrap ("Bootstrapping
+the x86_64 instance").
 
 ### `CRYPTOLPATH`
 
@@ -548,6 +549,65 @@ On Linux, Cryptol looks for a module's foreign implementations in
 CI (M0.3) uses the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers` release
 tarball on an x86_64 runner: the release without solvers refuses to start
 without z3. No arm64 Linux release exists.
+
+## Bootstrapping the x86_64 instance
+
+The x86_64 instance (E4: SAW, later GNAT-LLVM) starts bare and **dies
+24 hours after it starts**. One command takes it from a bare Ubuntu 24.04
+to a green `check-ffi.sh`:
+
+```console
+$ curl -fsSL https://raw.githubusercontent.com/manthonyaiello/Foundation/main/spark/scripts/bootstrap-x86_64.sh | bash
+```
+
+Then, in each new shell, `. ~/foundation-tools/env.sh` (the script also
+prints the `export PATH=...` line). The rules while it lives:
+
+- **Push after every commit.** Nothing unpushed survives the instance.
+- **It dies 24 h after start**, whatever is running. Start long proofs
+  early, and push their results as they land.
+- gnatprove runs with `-j$(nproc)` (`PROVE_JOBS` defaults to `nproc`):
+  there is no scheduler there and no other user.
+
+`scripts/bootstrap-x86_64.sh` (M0.5, #6) is idempotent: each phase skips
+what is in place, so rerun it after anything goes wrong. Its phases, each
+timed at the end of the run:
+
+| phase | what |
+|---|---|
+| `prereqs` | curl, git, python3, CA certificates, `libc6-dev`; missing ones are apt-installed |
+| `clone` | clones the fork to `~/Foundation`, or fetches it and fast-forwards a clean checkout |
+| `alire` | alr 2.1.1, `alr toolchain --select` gnat_native 16.1.0 and gprbuild 26.0.1, `alr install` gnatprove 16.1.0 and gnatdoc_bin 26.0.0 |
+| `cryptol` | Cryptol 3.6.0, `ubuntu-24.04-X64-with-solvers` release |
+| `saw` | SAW 1.6, `ubuntu-24.04-X64-with-solvers` release |
+| `gnat-llvm` | a hook: M4.1 (#22) adds GNAT-LLVM there |
+| `build` | `alr -n build` |
+| `proof` | `scripts/check-proof.sh`, slow units skipped as in CI ("Slow proofs") |
+| `ffi` | `scripts/check-ffi.sh` |
+
+Every version and release sha256 comes from `scripts/toolchain-pins.env`,
+which CI's `setup-alire-spark` action reads too, so the instance and CI
+cannot drift apart. Tools go to `~/foundation-tools` (`FOUNDATION_TOOLS`),
+Alire's state to `~/.alire` and `~/.local/share/alire` as in CI. The
+header of the script lists its other variables (`FOUNDATION_REPO`,
+`FOUNDATION_REF`, `FOUNDATION_SPARK_PROOF_ALLOWANCE`, ...).
+
+**Root** is needed only by `prereqs`, and only for packages the image
+lacks. As root or with passwordless sudo the script installs them;
+otherwise it stops and prints the one `sudo apt-get install` line to run.
+Cryptol's and SAW's shared libraries are checked with `ldd` after
+unpacking, the same way.
+
+**SAW's signature.** The release's `.sig` is signed by key
+`07FC90D0C93F5F3B56354E1DCBF4BB4143DB4A3A`, which neither
+keys.openpgp.org nor keyserver.ubuntu.com serves, so the pin is the
+asset's sha256. Given the key (`SAW_SIGNING_KEY_FILE=key.asc`), the script
+verifies the `.sig` too.
+
+The script is tested by `.github/workflows/spark-bootstrap-x86_64.yml`
+(on a PR that touches it, or dispatched): on a bare `ubuntu-24.04` runner
+with no setup action, and in a plain `ubuntu:24.04` container as root,
+which is what measures the packages it must install.
 
 ## Slow proofs
 

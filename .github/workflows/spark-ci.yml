@@ -124,15 +124,14 @@ jobs:
     name: FFI (Cryptol, linux x86_64)
     needs: docs
     runs-on: ubuntu-24.04
-    env:
-      CRYPTOL_VERSION: 3.6.0
-      CRYPTOL_TARBALL: cryptol-3.6.0-ubuntu-24.04-X64-with-solvers.tar.gz
-      # sha256 of the release asset, checked before it is unpacked.
-      CRYPTOL_SHA256: 621860aa1dedc037e8fc8355bef3edf023e41e78efb7177146126f5a87309962
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Also exports the pins of spark/scripts/toolchain-pins.env, among them
+      # CRYPTOL_VERSION, CRYPTOL_TARBALL and CRYPTOL_SHA256 (the release
+      # asset's, checked before it is unpacked), shared with the x86_64
+      # bootstrap.
       - name: Set up Alire
         uses: ./.github/actions/setup-alire-spark
 
