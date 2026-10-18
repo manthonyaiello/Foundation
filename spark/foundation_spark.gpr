@@ -67,17 +67,6 @@ project Foundation_Spark is
       --     for Proof_Switches ("<file>") use Level_3;
       for Proof_Switches ("Ada") use Level_2 & ("--counterexamples=on");
 
-      --  SHA-2 spec layer (#14): committed at level 2. Every check proves
-      --  at level 2 in one prover step, so the level is margin for CI's
-      --  slower runner, not need. The generic Main is proved through its
-      --  SHA-256 instance, and Notation through Functions' instances.
-      for Proof_Switches ("foundation_spark-sha2.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-sha2-notation.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-sha2-functions.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-sha2-preprocessing.ads")
-        use Level_2;
-      for Proof_Switches ("foundation_spark-sha2-main.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-sha2-sha256.ads") use Level_2;
    end Prove;
 
 end Foundation_Spark;

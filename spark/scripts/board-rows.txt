@@ -56,3 +56,13 @@ AES::Cipher::InvCipher        | Foundation_Spark.AES.Spec.Cipher.InvCipher      
 AES::Cipher::InvCipher'       | Foundation_Spark.AES.Spec.Cipher.InvCipher_Prime    | -
 AES::Main::Encrypt            | Foundation_Spark.AES.Spec.Main.Encrypt              | -
 AES::Main::Decrypt            | Foundation_Spark.AES.Spec.Main.Decrypt              | -
+
+# SHA-2 (#14): Functions.cry and Main.cry's step, through the SHA-256
+# instance of the generic Main (Ch and Maj are its instance of Logical).
+SHA2::Functions::Ch           | Foundation_Spark.SHA2.SHA256.Logical.Ch             | -
+SHA2::Functions::Maj          | Foundation_Spark.SHA2.SHA256.Logical.Maj            | -
+SHA2::Functions::SIGMA_256_0  | Foundation_Spark.SHA2.Functions.SIGMA_256_0         | -
+SHA2::Functions::SIGMA_256_1  | Foundation_Spark.SHA2.Functions.SIGMA_256_1         | -
+SHA2::Functions::sigma_256_0  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0   | -
+SHA2::Functions::sigma_256_1  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1   | -
+SHA2::Main::step (SHA-256)    | Foundation_Spark.SHA2.SHA256.Step                   | -
