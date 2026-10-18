@@ -57,6 +57,9 @@ project Foundation_Spark_FFI is
       "Foundation_Spark.FFI.AES_KeyExpansion_Exports",
       "Foundation_Spark.FFI.AES_Main",
       "Foundation_Spark.FFI.AES_Main_Exports",
+      "Foundation_Spark.AES.Lemmas",
+      "Foundation_Spark.AES.Impl",
+      "Foundation_Spark.FFI.AES_Impl",
       "Foundation_Spark.SHA2",
       "Foundation_Spark.SHA2.Notation",
       "Foundation_Spark.SHA2.Functions",
@@ -94,11 +97,17 @@ project Foundation_Spark_FFI is
       --  that the crate builds and runs with ghost code ignored), and
       --  their contracts and invariants, executed, would run the ghost spec
       --  inside every Update: Models folds Step over the whole message so
-      --  far, so the checks would grow with the square of the length. The
+      --  far, so the checks would grow with the square of the length; and
+      --  AES.Impl's postconditions would run the ghost KeyExpansion, whose
+      --  recursive W is exponential when executed. The
       --  check then runs the code that ships, and the ghost spec it is
       --  proved against runs only in the shims. No unit built with -gnata
       --  refers to their ghost entities, so nothing is left unresolved
       --  (--no-undefined).
+      for Switches ("foundation_spark-aes-impl.adb") use
+        Foundation_Spark_Config.Ada_Compiler_Switches;
+      for Switches ("foundation_spark-ffi-aes_impl.adb") use
+        Foundation_Spark_Config.Ada_Compiler_Switches;
       for Switches ("foundation_spark-sha2-sha256_stream.adb") use
         Foundation_Spark_Config.Ada_Compiler_Switches;
       for Switches ("foundation_spark-ffi-sha2_sha256_stream.adb") use
