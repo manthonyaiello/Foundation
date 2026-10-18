@@ -1,9 +1,11 @@
 --  The properties that algorithms/AES states about itself, proved of the
 --  spec layer: GF28.cry's GF28MultiplicationCorrect, SBox.cry's
---  SBoxInverts, Cipher.cry's SubBytesInverts, ShiftRowsInverts,
---  MixColumnsStepInverts, MixColumnsInverts, AddRoundKeyInvolution,
---  RoundInverts, InvCipherEquivalence and CipherInverts, and Main.cry's
---  EncryptInverts.
+--  SBoxCorrect and SBoxInverts, Cipher.cry's SubBytesInverts,
+--  ShiftRowsInverts, MixColumnsStepInverts, MixColumnsInverts,
+--  AddRoundKeyInvolution, RoundInverts, InvCipherEquivalence,
+--  CipherInverts and CipherInverts', and Main.cry's EncryptInverts.
+--  SBoxCorrect is proved entry by entry, by evaluation, in the child
+--  SBox_Entries.
 --
 --  Each property is a ghost procedure named as the Cryptol property, whose
 --  postcondition is the property's body and whose parameters are its
@@ -19,6 +21,7 @@
 
 with Interfaces;
 with Foundation_Spark.AES.Spec.Cipher;
+with Foundation_Spark.AES.Spec.GF2;
 with Foundation_Spark.AES.Spec.GF28;
 with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.SBox;
@@ -36,6 +39,7 @@ is
    use type Types.Byte;
    use type Interfaces.Unsigned_16;
    use type Main.Bits;
+   use type GF2.Poly_State;
 
    ----------
    -- GF28 --
@@ -70,6 +74,11 @@ is
    ----------
    -- SBox --
    ----------
+
+   procedure SBoxCorrect
+   with Post => (for all B in Types.Byte => SBox.Affine (B) = SBox.SBox (B));
+   --  SBox.cry: property SBoxCorrect = [ affine b | b <- [0..255] ] ==
+   --  SBox [FIPS-PUB-197 Section 5.1.1]: entry B of the S-box is affine B.
 
    procedure SBoxInverts (B : Byte)
    with Post => SBox.InvSBox (SBox.SBox (B)) = B;
@@ -296,6 +305,27 @@ is
    --  matrix, applied to X. The four conjuncts are the entries at
    --  distance 0, 1, 2 and 3 from the diagonal.
    --  @param X The byte the entries multiply.
+
+   procedure Lemma_Inner_Eq (A, B : GF2.Poly_State)
+   with
+     Pre                => GF2.Is_State (A) and then A = B,
+     Post               => GF2.Inner (A) = GF2.Inner (B),
+     Subprogram_Variant => (Decreases => A (3));
+   --  GF2.cry's pgcd's inner maps equal states to equal states.
+   --  @param A A state.
+   --  @param B A state equal to A.
+
+   procedure Lemma_Step (S, T, F : GF2.Poly_State)
+   with
+     Pre  => GF2.Is_State (S) and then S (3) /= 0
+             and then GF2.Inner_Step (S) = T
+             and then GF2.Is_State (T) and then GF2.Inner (T) = F,
+     Post => GF2.Inner (S) = F;
+   --  One step of pgcd's inner: when inner's step takes S to T, and inner
+   --  ends in F from T, it ends in F from S.
+   --  @param S A state whose r' is nonzero.
+   --  @param T The state one step of inner after S.
+   --  @param F The state inner ends in from T.
 
    procedure Lemma_InvRound_Key_Eq (A : Block; K1, K2 : Block)
    with

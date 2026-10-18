@@ -66,6 +66,11 @@ project Foundation_Spark is
       --  entry, with the reason in the commit that raises it:
       --     for Proof_Switches ("<file>") use Level_3;
       for Proof_Switches ("Ada") use Level_2 & ("--counterexamples=on");
+      for Proof_Switches ("foundation_spark-aes-spec-gf2.ads")
+        use Level_4;
+      for Proof_Switches
+        ("foundation_spark-aes-spec-properties-sbox_entries.adb")
+        use Level_4;
 
    end Prove;
 

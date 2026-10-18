@@ -47,6 +47,12 @@ AES::Cipher::Round            | Foundation_Spark.AES.Spec.Cipher.Round          
 AES::Cipher::InvRound         | Foundation_Spark.AES.Spec.Cipher.InvRound           | Foundation_Spark.AES.Impl.Inv_Round
 AES::Cipher::InvRound'        | Foundation_Spark.AES.Spec.Cipher.InvRound_Prime     | Foundation_Spark.AES.Impl.Inv_Round_Prime
 
+# AES (#12): SBox.cry's affine, which its property SBoxCorrect checks the
+# S-box against, and the GF2.cry inverse it is built on, at SBox.cry's types.
+# Ghost only: the implementation reads the table, so there is no impl entity.
+AES::SBox::affine             | Foundation_Spark.AES.Spec.SBox.Affine               | -
+GF2::inverse (AES)            | Foundation_Spark.AES.Spec.GF2.Inverse               | -
+
 # AES (#9): KeyExpansion.cry. Rcon is a constant table, so its entity is the
 # KeyExpansion package.
 AES::KeyExpansion::KeyExpansion | Foundation_Spark.AES.Spec.KeyExpansion.KeyExpansion | Foundation_Spark.AES.Impl.Expand_Key
