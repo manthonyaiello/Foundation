@@ -86,3 +86,9 @@ SHA2::Main::hash (SHA-256, bytes) | Foundation_Spark.SHA2.SHA256_Bytes.Hash_Byte
 # SHA256.Hash on the bits. The streaming interface is proved through
 # Lemma_Update and Lemma_Final, and Hash_Chunked states it for every chunking
 # of an array; it adds no row, since it is the same function as hash (bytes).
+
+# HMAC (#19): HMAC/Main.cry's HMAC and HMAC_init (private in the Cryptol),
+# through the SHA-256 instance of the generic Main, as packaging/Hash.cry
+# instantiates them for SHA256.cry. M3.2 (#20) fills in the implementation.
+HMAC::Main::HMAC (SHA-256)      | Foundation_Spark.HMAC.SHA256.HMAC                 | -
+HMAC::Main::HMAC_init (SHA-256) | Foundation_Spark.HMAC.SHA256.HMAC_init            | -
