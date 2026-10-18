@@ -103,4 +103,4 @@ jobs:
     uses: ./.github/workflows/spark-prove.yml
     with:
       restore: true
-      save: true  # DEMO (#3): save on this PR once, to show a warm hit. Reverted.
+      save: ${{ github.ref == 'refs/heads/main' }}
