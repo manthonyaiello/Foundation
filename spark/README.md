@@ -322,3 +322,107 @@ is a script here that runs the same way locally:
   (an FFI export unit's `Import` of its ghost shim) has no body and is
   reported skipped; it is allowed when its file is a `foreign-binding`
   entry and its declaration carries `Import`.
+
+## Cryptol
+
+The FFI checks (`spark/cryptol/`, M0.3 onward) need Cryptol 3.6.0 built
+with FFI support (`cryptol --version` prints `FFI enabled`). SAW is not
+installed. It is on hold until the end of the campaign.
+
+### `CRYPTOLPATH`
+
+The NSA modules are named from the repository root
+(`algorithms::AES::Main`, `shared::...`), so `CRYPTOLPATH` must hold the
+repository root. `spark/cryptol` will be added to it when M0.3 lands.
+
+```console
+$ export CRYPTOLPATH=/path/to/Foundation
+$ cryptol -b script.icry
+```
+
+### aarch64 Linux (the `foundation` container)
+
+Cryptol 3.6.0 ships no aarch64 Linux binary. The release has macOS
+ARM64/x86_64 and x86_64 Linux/Windows builds only. No packaged route was
+credible:
+* Ubuntu 24.04's `cryptol` package is 3.0.0.
+* The Docker Hub `galoisinc/cryptol` images are amd64 only, and the
+  container has no docker, podman or nix.
+
+So it was built from the `3.6.0` tag, with GHC 9.8.4 and cabal 3.14.1.0
+(the versions upstream's CI uses for its release builds), against the
+release's own freeze file `cabal.GHC-9.8.4.config`. That file sets
+`cryptol +ffi` and `libffi +ghc-bundled-libffi`. Nothing needed sudo.
+
+The container has no system C toolchain (no `/usr/bin/gcc`, `cc`, `ld` or
+`ar`), so GHC and cabal used the gcc 16.1.0 and binutils from Alire's
+`gnat_native` toolchain. It also has no `-dev` packages, so the headers,
+the link-time `.so` symlinks and `pkgconf` came from Ubuntu's `.deb`s,
+unpacked without installing them. The resulting `cryptol` links only
+against system libraries (`libm`, `libtinfo`, `libz`, `libgmp`, `libc`).
+
+```console
+# Headers and pkgconf from Ubuntu debs, unpacked into ~/.local/sysroot.
+$ mkdir -p ~/build/apt/state/lists/partial ~/build/apt/cache/archives/partial ~/build/debs
+$ apt-get -o Dir::State=$HOME/build/apt/state -o Dir::Cache=$HOME/build/apt/cache \
+    -o Debug::NoLocking=1 -o APT::Sandbox::User=$(whoami) update
+$ cd ~/build/debs
+$ apt-get -o Dir::State=$HOME/build/apt/state -o Dir::Cache=$HOME/build/apt/cache \
+    download libffi-dev libgmp-dev zlib1g-dev libncurses-dev \
+    pkgconf pkgconf-bin libpkgconf3 z3 libz3-4
+$ for d in ~/build/debs/*.deb; do dpkg-deb -x $d ~/.local/sysroot; done
+# Then: point each dangling lib*.so symlink in
+# ~/.local/sysroot/usr/lib/aarch64-linux-gnu at the runtime library in
+# /usr/lib/aarch64-linux-gnu, and rewrite the prefix/libdir/includedir
+# of the .pc files there to ~/.local/sysroot. ~/.local/bin/pkg-config
+# and ~/.local/bin/z3 are two-line wrappers that set LD_LIBRARY_PATH (and,
+# for pkg-config, PKG_CONFIG_LIBDIR) to the sysroot before exec'ing it.
+
+# GHC 9.8.4 and cabal 3.14.1.0 through ghcup, in ~/.ghcup.
+$ mkdir -p ~/.ghcup/bin
+$ curl -sSfL -o ~/.ghcup/bin/ghcup https://downloads.haskell.org/~ghcup/aarch64-linux-ghcup
+$ chmod +x ~/.ghcup/bin/ghcup
+$ S=$HOME/.local/sysroot
+$ export PATH=$HOME/.ghcup/bin:$HOME/.local/bin:$HOME/.local/share/alire/toolchains/gnat_native_16.1.0_8e297497/bin:$PATH
+$ export LIBRARY_PATH=$S/usr/lib/aarch64-linux-gnu
+$ export C_INCLUDE_PATH=$S/usr/include/aarch64-linux-gnu:$S/usr/include
+$ CC=gcc ghcup install ghc 9.8.4 --set
+$ ghcup install cabal 3.14.1.0 --set
+
+# Cryptol 3.6.0, installed as ~/.local/bin/cryptol.
+$ git clone --depth 1 --branch 3.6.0 --recurse-submodules --shallow-submodules \
+    https://github.com/GaloisInc/cryptol.git ~/build/cryptol-3.6.0
+$ cd ~/build/cryptol-3.6.0
+$ cp cabal.GHC-9.8.4.config cabal.project.freeze
+$ cabal update
+$ cabal build -j4 exe:cryptol
+$ install -m755 "$(cabal list-bin exe:cryptol)" ~/.local/bin/cryptol
+```
+
+The first `cabal build` stopped after compiling the `cryptol` library.
+cabal's `act-as-setup configure` for the `cryptol-repl-internal`
+sublibrary never reaped a `pkgconf` child that had already exited, and
+hung there. Killing it and rerunning the same command finished the build
+in 15 s from the store. Before the hang, the build had run for about 11
+minutes at `-j4`, on a container shared with two other jobs.
+
+```console
+$ cryptol --version
+Cryptol 3.6.0
+Git commit 61dd17b0c45ddf8c5c1e952afd5e789c4dc4ec4b
+    branch HEAD
+FFI enabled
+```
+
+An SMT solver is optional, since `:check` and `:exhaust` do not use one.
+Ubuntu's z3 4.8.12 is unpacked in the sysroot behind the `~/.local/bin/z3`
+wrapper.
+
+On Linux, Cryptol looks for a module's foreign implementations in
+`<Module>.so` beside the `.cry` file (`<Module>.dylib` on macOS).
+
+### CI
+
+CI (M0.3) uses the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers` release
+tarball on an x86_64 runner: the release without solvers refuses to start
+without z3. No arm64 Linux release exists.
