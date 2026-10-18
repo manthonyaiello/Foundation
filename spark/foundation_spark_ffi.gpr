@@ -73,7 +73,14 @@ project Foundation_Spark_FFI is
       "Foundation_Spark.FFI.SHA2_Preprocessing_Exports",
       "Foundation_Spark.FFI.SHA2_SHA256",
       "Foundation_Spark.FFI.SHA2_SHA256_Exports",
-      "Foundation_Spark.FFI.SHA2_SHA256_Stream");
+      "Foundation_Spark.FFI.SHA2_SHA256_Stream",
+      "Foundation_Spark.HMAC",
+      "Foundation_Spark.HMAC.Main",
+      "Foundation_Spark.HMAC.SHA256",
+      "Foundation_Spark.HMAC.SHA256_Impl",
+      "Foundation_Spark.FFI.HMAC_SHA256",
+      "Foundation_Spark.FFI.HMAC_SHA256_Exports",
+      "Foundation_Spark.FFI.HMAC_SHA256_Impl");
 
    for Library_Options use ("-Wl,--no-undefined");
 
@@ -95,6 +102,10 @@ project Foundation_Spark_FFI is
       for Switches ("foundation_spark-sha2-sha256_stream.adb") use
         Foundation_Spark_Config.Ada_Compiler_Switches;
       for Switches ("foundation_spark-ffi-sha2_sha256_stream.adb") use
+        Foundation_Spark_Config.Ada_Compiler_Switches;
+      for Switches ("foundation_spark-hmac-sha256_impl.adb") use
+        Foundation_Spark_Config.Ada_Compiler_Switches;
+      for Switches ("foundation_spark-ffi-hmac_sha256_impl.adb") use
         Foundation_Spark_Config.Ada_Compiler_Switches;
    end Compiler;
 

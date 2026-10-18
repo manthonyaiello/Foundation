@@ -353,6 +353,29 @@ same recipe: ghost shim and export units `FFI.SHA2_<Module>` and
   896-bit messages) go through each SPARK function, against the published
   digests, and through `SHA256::hash`.
 
+**HMAC-SHA-256** (`SPARK/HMAC/SHA256.cry`) checks the spec's
+`HMAC.SHA256.HMAC` (at lambda = 256) and `HMAC_init` through the ghost shim
+and export units `FFI.HMAC_SHA256` and `_Exports`, and the executable
+`HMAC.SHA256_Impl` (`HMAC_SHA256`, `Init_Key`, and `Init`/`Update`*/`Final`
+on a random chunking) through `FFI.HMAC_SHA256_Impl`, which, like
+`FFI.SHA2_SHA256_Stream`, has no ghost shim and is built without `-gnata`.
+All are compared with `algorithms::SHA2::SHA256::HMAC`, that is
+`packaging/Hash.cry`'s `HMAC` at `SHA256.cry`'s parameters.
+
+- **`HMAC_init` is private** in `algorithms/HMAC/Main.cry`, so no module can
+  call it. The module restates it (`hmacInit`), copied from `Main.cry` at
+  B = 64, L = 32 and `Hk = SHA256::hash`, and compares the SPARK
+  `HMAC_init` and `Init_Key` with that copy. Every `HMAC` property also runs
+  them against NSA's own `HMAC_init`, inside `SHA256::HMAC`.
+- **Targeted lengths**: keys of 63, 64 and 65 bytes (`HMAC_init`'s three
+  cases) under texts at SHA-256's padding boundaries; keys at the
+  boundaries under a 20-byte text; for the spec, texts that are not whole
+  bytes; a fixed list of longer keys and texts for the executable; and RFC
+  4231's cases 1-7 (case 5 truncated to 128 bits), through each SPARK
+  function and through `SHA256::HMAC` itself. The repository's own HMAC
+  tests exercise only SHA-3, so that is the first check of `SHA256::HMAC`
+  against RFC 4231.
+
 **CI** runs `check-ffi.sh` in its own job (`FFI (Cryptol, linux x86_64)`,
 `.github/workflows/spark-ci.yml`) on `ubuntu-24.04`, x86_64: Cryptol has no
 arm64 Linux release. It installs the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers`
