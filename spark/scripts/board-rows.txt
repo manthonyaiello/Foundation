@@ -22,5 +22,22 @@
 # the same PR; the tick that adds the implementation fills in the third field.
 # A name that matches no .spark entity shows as "no" on the board (not built
 # yet, or misspelled: the board says which entity it looked for).
-#
-# Empty: the scaffold has no spec-layer function yet.
+
+# AES (#8): GF28.cry, SBox.cry and Cipher.cry's round transformations.
+# SBox and InvSBox are constant tables, so their entity is the SBox package.
+AES::GF28::(•)                | Foundation_Spark.AES.Spec.GF28.Dot                  | -
+AES::GF28::xTimes             | Foundation_Spark.AES.Spec.GF28.xTimes               | -
+AES::SBox::SBox               | Foundation_Spark.AES.Spec.SBox                      | -
+AES::SBox::InvSBox            | Foundation_Spark.AES.Spec.SBox                      | -
+AES::Cipher::SubBytes         | Foundation_Spark.AES.Spec.Cipher.SubBytes           | -
+AES::Cipher::InvSubBytes      | Foundation_Spark.AES.Spec.Cipher.InvSubBytes        | -
+AES::Cipher::ShiftRows        | Foundation_Spark.AES.Spec.Cipher.ShiftRows          | -
+AES::Cipher::InvShiftRows     | Foundation_Spark.AES.Spec.Cipher.InvShiftRows       | -
+AES::Cipher::MixColumnsStep   | Foundation_Spark.AES.Spec.Cipher.MixColumnsStep     | -
+AES::Cipher::MixColumns       | Foundation_Spark.AES.Spec.Cipher.MixColumns         | -
+AES::Cipher::InvMixColumnsStep | Foundation_Spark.AES.Spec.Cipher.InvMixColumnsStep | -
+AES::Cipher::InvMixColumns    | Foundation_Spark.AES.Spec.Cipher.InvMixColumns      | -
+AES::Cipher::AddRoundKey      | Foundation_Spark.AES.Spec.Cipher.AddRoundKey        | -
+AES::Cipher::Round            | Foundation_Spark.AES.Spec.Cipher.Round              | -
+AES::Cipher::InvRound         | Foundation_Spark.AES.Spec.Cipher.InvRound           | -
+AES::Cipher::InvRound'        | Foundation_Spark.AES.Spec.Cipher.InvRound_Prime     | -

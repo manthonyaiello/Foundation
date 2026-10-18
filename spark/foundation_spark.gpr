@@ -67,13 +67,6 @@ project Foundation_Spark is
       --     for Proof_Switches ("<file>") use Level_3;
       for Proof_Switches ("Ada") use Level_2 & ("--counterexamples=on");
 
-      --  AES spec layer (#8): committed at level 2.
-      for Proof_Switches ("foundation_spark-aes.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-aes-spec.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-aes-spec-types.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-aes-spec-gf28.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-aes-spec-sbox.ads") use Level_2;
-      for Proof_Switches ("foundation_spark-aes-spec-cipher.ads") use Level_2;
    end Prove;
 
 end Foundation_Spark;
