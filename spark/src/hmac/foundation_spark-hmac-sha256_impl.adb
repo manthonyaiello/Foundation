@@ -1,7 +1,6 @@
 with Interfaces;
 with Foundation_Spark.SHA2.Preprocessing;
 with Foundation_Spark.SHA2.SHA256;
-with Foundation_Spark.SHA2.SHA256_Stream;
 
 package body Foundation_Spark.HMAC.SHA256_Impl with
   SPARK_Mode
@@ -14,6 +13,57 @@ is
    subtype Bit_Index is SHA2.Bit_Index;
    subtype Bits is SHA2.Bits;
    subtype Stream_Index is SHA2.SHA256_Bytes.Byte_Index;
+
+   function Xor_Pad (K0 : Key_Block; X : Byte) return Key_Block with
+     Post =>
+       (for all J in Key_Block'Range => Xor_Pad'Result (J) = (K0 (J) xor X));
+   --  K0 xor a pad: every byte of K0 xored with X.
+   --  @param K0 The key block.
+   --  @param X The pad's byte, 0x36 (ipad) or 0x5C (opad).
+   --  @return K0 xor X, byte by byte.
+
+   function Xor_Pad (K0 : Key_Block; X : Byte) return Key_Block is
+      P : Key_Block := [others => 0];
+   begin
+      for J in Key_Block'Range loop
+         P (J) := K0 (J) xor X;
+         pragma Loop_Invariant
+           (for all J2 in 0 .. J => P (J2) = (K0 (J2) xor X));
+      end loop;
+      return P;
+   end Xor_Pad;
+
+   function Inner_Prefix (Key : Byte_Array; M : Byte_Array) return Byte_Array
+   is (Xor_Pad (Init_Key (Key), 16#36#) & M)
+   with
+     Ghost,
+     Pre => Key'Length < SHA2.SHA256_Bytes.Max_Bytes
+            and then M'Length < Max_Text;
+   --  What the inner hash absorbs for Key and the text M: K0 xor ipad,
+   --  then M, indexed from 0.
+   --  @param Key The key.
+   --  @param M The text.
+   --  @return K0 xor ipad followed by M.
+
+   --------------------------------
+   -- Models, Absorbed, Finished --
+   --------------------------------
+
+   function Models
+     (C : Context; Key : Byte_Array; M : Byte_Array) return Boolean
+   is (M'Length < Max_Text
+       and then SHA2.SHA256_Stream.Models (C.Inner, Inner_Prefix (Key, M))
+       and then C.O_Pad = Xor_Pad (Init_Key (Key), 16#5C#));
+
+   function Absorbed
+     (C0 : Context; Data : Byte_Array; C1 : Context) return Boolean
+   is (SHA2.SHA256_Stream.Absorbed (C0.Inner, Data, C1.Inner)
+       and then C1.O_Pad = C0.O_Pad);
+
+   function Finished (C : Context; D : Digest) return Boolean is
+     (D
+      = SHA2.SHA256_Bytes.Hash_Bytes
+          (C.O_Pad & SHA2.SHA256_Stream.Final (C.Inner)));
 
    ---------------------------
    -- Ghost lemmas (bodies) --
@@ -486,59 +536,101 @@ is
 
    function HMAC_SHA256 (Key : Byte_Array; Text : Byte_Array) return Digest
    is
-      K0     : constant Key_Block := Init_Key (Key);
-      I_Pad  : Key_Block := [others => 0];
-      O_Pad  : Key_Block := [others => 0];
-      C      : SHA2.SHA256_Stream.Context;
-      Inner  : Digest;
-      Result : Digest;
+      C  : Context;
+      C0 : Context with Ghost;
    begin
-      for J in Key_Block'Range loop
-         I_Pad (J) := K0 (J) xor 16#36#;
-         O_Pad (J) := K0 (J) xor 16#5C#;
-         pragma Loop_Invariant
-           (for all J2 in 0 .. J =>
-              I_Pad (J2) = (K0 (J2) xor 16#36#)
-              and then O_Pad (J2) = (K0 (J2) xor 16#5C#));
-      end loop;
-
-      --  The inner hash: K0 xor ipad, then Text.
-      declare
-         M_In : constant Byte_Array := I_Pad & Text with Ghost;
-         C0   : SHA2.SHA256_Stream.Context with Ghost;
-      begin
-         SHA2.SHA256_Stream.Init (C);
-         C0 := C;
-         SHA2.SHA256_Stream.Update (C, I_Pad);
-         SHA2.SHA256_Stream.Lemma_Update
-           (C0, I_Pad, C, SHA2.SHA256_Stream.Empty, I_Pad);
-         C0 := C;
-         SHA2.SHA256_Stream.Update (C, Text);
-         SHA2.SHA256_Stream.Lemma_Update (C0, Text, C, I_Pad, M_In);
-         SHA2.SHA256_Stream.Lemma_Final (C, M_In);
-         Inner := SHA2.SHA256_Stream.Final (C);
-         pragma Assert (Inner = SHA2.SHA256_Bytes.Hash_Bytes (M_In));
-
-         --  The outer hash: K0 xor opad, then the inner digest.
-         declare
-            M_Out : constant Byte_Array := O_Pad & Inner with Ghost;
-         begin
-            SHA2.SHA256_Stream.Init (C);
-            C0 := C;
-            SHA2.SHA256_Stream.Update (C, O_Pad);
-            SHA2.SHA256_Stream.Lemma_Update
-              (C0, O_Pad, C, SHA2.SHA256_Stream.Empty, O_Pad);
-            C0 := C;
-            SHA2.SHA256_Stream.Update (C, Inner);
-            SHA2.SHA256_Stream.Lemma_Update (C0, Inner, C, O_Pad, M_Out);
-            SHA2.SHA256_Stream.Lemma_Final (C, M_Out);
-            Result := SHA2.SHA256_Stream.Final (C);
-            Lemma_HMAC
-              (Key, Text, K0, I_Pad, O_Pad, M_In, M_Out, Inner, Result);
-         end;
-      end;
-
-      return Result;
+      Init (C, Key);
+      C0 := C;
+      Update (C, Text);
+      Lemma_Update (C0, Text, C, Key, SHA2.SHA256_Stream.Empty, Text);
+      Lemma_Final (C, Key, Text);
+      return Final (C);
    end HMAC_SHA256;
+
+   ----------
+   -- Init --
+   ----------
+
+   procedure Init (C : out Context; Key : Byte_Array) is
+      K0    : constant Key_Block := Init_Key (Key);
+      I_Pad : constant Key_Block := Xor_Pad (K0, 16#36#);
+      C0    : SHA2.SHA256_Stream.Context with Ghost;
+   begin
+      C.O_Pad := Xor_Pad (K0, 16#5C#);
+      SHA2.SHA256_Stream.Init (C.Inner);
+      C0 := C.Inner;
+      SHA2.SHA256_Stream.Update (C.Inner, I_Pad);
+      SHA2.SHA256_Stream.Lemma_Update
+        (C0, I_Pad, C.Inner, SHA2.SHA256_Stream.Empty,
+         Inner_Prefix (Key, SHA2.SHA256_Stream.Empty));
+   end Init;
+
+   ------------
+   -- Update --
+   ------------
+
+   procedure Update (C : in out Context; Data : Byte_Array) is
+   begin
+      SHA2.SHA256_Stream.Update (C.Inner, Data);
+   end Update;
+
+   -----------
+   -- Final --
+   -----------
+
+   function Final (C : Context) return Digest is
+      Inner : constant Digest := SHA2.SHA256_Stream.Final (C.Inner);
+      M_Out : constant Byte_Array := C.O_Pad & Inner with Ghost;
+      D     : SHA2.SHA256_Stream.Context;
+      D0    : SHA2.SHA256_Stream.Context with Ghost;
+   begin
+      SHA2.SHA256_Stream.Init (D);
+      D0 := D;
+      SHA2.SHA256_Stream.Update (D, C.O_Pad);
+      SHA2.SHA256_Stream.Lemma_Update
+        (D0, C.O_Pad, D, SHA2.SHA256_Stream.Empty, C.O_Pad);
+      D0 := D;
+      SHA2.SHA256_Stream.Update (D, Inner);
+      SHA2.SHA256_Stream.Lemma_Update (D0, Inner, D, C.O_Pad, M_Out);
+      SHA2.SHA256_Stream.Lemma_Final (D, M_Out);
+      return SHA2.SHA256_Stream.Final (D);
+   end Final;
+
+   ------------------
+   -- Lemma_Update --
+   ------------------
+
+   procedure Lemma_Update
+     (C0   : Context;
+      Data : Byte_Array;
+      C1   : Context;
+      Key  : Byte_Array;
+      M    : Byte_Array;
+      M2   : Byte_Array)
+   is
+   begin
+      SHA2.SHA256_Stream.Lemma_Update
+        (C0.Inner, Data, C1.Inner, Inner_Prefix (Key, M),
+         Inner_Prefix (Key, M2));
+   end Lemma_Update;
+
+   -----------------
+   -- Lemma_Final --
+   -----------------
+
+   procedure Lemma_Final (C : Context; Key : Byte_Array; M : Byte_Array) is
+      K0    : constant Key_Block := Init_Key (Key);
+      I_Pad : constant Key_Block := Xor_Pad (K0, 16#36#);
+      M_In  : constant Byte_Array := Inner_Prefix (Key, M);
+   begin
+      SHA2.SHA256_Stream.Lemma_Final (C.Inner, M_In);
+      declare
+         Inner : constant Digest := SHA2.SHA256_Stream.Final (C.Inner);
+         M_Out : constant Byte_Array := C.O_Pad & Inner;
+      begin
+         Lemma_HMAC
+           (Key, M, K0, I_Pad, C.O_Pad, M_In, M_Out, Inner, Final (C));
+      end;
+   end Lemma_Final;
 
 end Foundation_Spark.HMAC.SHA256_Impl;

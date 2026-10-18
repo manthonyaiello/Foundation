@@ -21,6 +21,7 @@
 
 with Foundation_Spark.HMAC.SHA256;
 with Foundation_Spark.SHA2.SHA256_Bytes;
+with Foundation_Spark.SHA2.SHA256_Stream;
 
 package Foundation_Spark.HMAC.SHA256_Impl with
   SPARK_Mode
@@ -90,5 +91,146 @@ is
    --  @param Key The key, of any length below 2 ** 61 bytes.
    --  @param Text The message, of fewer than Max_Text bytes.
    --  @return The 32-byte MAC.
+
+   --  The incremental interface: Init with the key, Update with the text
+   --  in any number of pieces, and Final. As in SHA2.SHA256_Stream, a
+   --  context does not hold its key or text (GNAT 16 has no ghost record
+   --  components), so Init and Update are specified on contexts, and the
+   --  ghost lemmas Lemma_Update and Lemma_Final carry the key and the text
+   --  to the spec: call Lemma_Update after each Update, and Lemma_Final
+   --  before Final.
+
+   type Context is private;
+   --  An HMAC-SHA-256 computation in progress: the inner SHA-256 context,
+   --  fed K0 xor ipad and the text so far, and K0 xor opad for Final.
+
+   function Count (C : Context) return SHA2.SHA256_Bytes.Byte_Index;
+   --  The number of bytes the inner hash has absorbed: the 64 of K0 xor
+   --  ipad, and then the text's.
+   --  @param C The context.
+   --  @return Its byte count.
+
+   function Models
+     (C : Context; Key : Byte_Array; M : Byte_Array) return Boolean
+   with
+     Ghost,
+     Pre => Key'Length < SHA2.SHA256_Bytes.Max_Bytes;
+   --  C is HMAC-SHA-256 under Key after the text M: its inner hash has
+   --  absorbed K0 xor ipad and then M, and it holds K0 xor opad.
+   --  @param C The context.
+   --  @param Key The key.
+   --  @param M The text absorbed so far.
+   --  @return Whether C is that computation.
+
+   function Absorbed
+     (C0 : Context; Data : Byte_Array; C1 : Context) return Boolean
+   with
+     Ghost,
+     Pre => Data'Length < SHA2.SHA256_Bytes.Max_Bytes;
+   --  C1 is C0 after the bytes Data.
+   --  @param C0 The context before.
+   --  @param Data The bytes absorbed.
+   --  @param C1 The context after.
+   --  @return Whether C1 is C0 after Data.
+
+   procedure Init (C : out Context; Key : Byte_Array) with
+     Pre  => Key'Length < SHA2.SHA256_Bytes.Max_Bytes,
+     Post =>
+       Models (C, Key, SHA2.SHA256_Stream.Empty) and then Count (C) = 64;
+   --  Starts HMAC-SHA-256 under Key: K0 (Init_Key), and an inner SHA-256
+   --  context fed K0 xor ipad.
+   --  @param C The context started.
+   --  @param Key The key, of any length below 2 ** 61 bytes.
+
+   procedure Update (C : in out Context; Data : Byte_Array) with
+     Pre  =>
+       Count (C) < SHA2.SHA256_Bytes.Max_Bytes
+       and then Data'Length < SHA2.SHA256_Bytes.Max_Bytes - Count (C),
+     Post =>
+       Absorbed (C'Old, Data, C)
+       and then Count (C) = Count (C'Old) + Data'Length;
+   --  Absorbs the next bytes of the text.
+   --  @param C The context.
+   --  @param Data The bytes.
+
+   function Finished (C : Context; D : Digest) return Boolean with
+     Ghost,
+     Pre => Count (C) < SHA2.SHA256_Bytes.Max_Bytes;
+   --  D is the outer hash of C: SHA-256 of C's K0 xor opad followed by
+   --  the digest of C's inner context.
+   --  @param C The context.
+   --  @param D A digest.
+   --  @return Whether D is C's outer hash.
+
+   function Final (C : Context) return Digest with
+     Pre  => Count (C) < SHA2.SHA256_Bytes.Max_Bytes,
+     Post => Finished (C, Final'Result);
+   --  The MAC of the text absorbed so far: the outer SHA-256 of K0 xor
+   --  opad and the inner digest. C is not changed.
+   --  @param C The context.
+   --  @return The 32-byte MAC.
+
+   procedure Lemma_Update
+     (C0   : Context;
+      Data : Byte_Array;
+      C1   : Context;
+      Key  : Byte_Array;
+      M    : Byte_Array;
+      M2   : Byte_Array)
+   with
+     Ghost,
+     Pre  =>
+       Key'Length < SHA2.SHA256_Bytes.Max_Bytes
+       and then Data'Length < SHA2.SHA256_Bytes.Max_Bytes
+       and then M2'Length < Max_Text
+       and then Models (C0, Key, M)
+       and then Absorbed (C0, Data, C1)
+       and then M2'Length = M'Length + Data'Length
+       and then
+         (for all I in 0 .. SHA2.SHA256_Bytes.Byte_Index (M'Length) - 1 =>
+            M2 (M2'First + I) = M (M'First + I))
+       and then
+         (for all I in 0 .. SHA2.SHA256_Bytes.Byte_Index (Data'Length) - 1 =>
+            M2 (M2'First + SHA2.SHA256_Bytes.Byte_Index (M'Length) + I)
+            = Data (Data'First + I)),
+     Post => Models (C1, Key, M2);
+   --  Update extends the text: a context for M, after Data, is one for
+   --  M2, which is M then Data.
+   --  @param C0 The context before Update.
+   --  @param Data The bytes Update absorbed.
+   --  @param C1 The context after.
+   --  @param Key The key.
+   --  @param M The text before.
+   --  @param M2 M then Data.
+
+   procedure Lemma_Final (C : Context; Key : Byte_Array; M : Byte_Array) with
+     Ghost,
+     Pre  =>
+       Key'Length < SHA2.SHA256_Bytes.Max_Bytes and then Models (C, Key, M),
+     Post =>
+       M'Length < Max_Text
+       and then Count (C) < SHA2.SHA256_Bytes.Max_Bytes
+       and then
+         SHA2.SHA256_Bytes.Bits_Of (Final (C))
+         = HMAC.SHA256.HMAC
+             (To_Bytes (Key), SHA2.SHA256_Bytes.Bits_Of (M), 256);
+   --  Final of a context for Key and M is the spec's HMAC of them, on
+   --  the bits, at λ = 256.
+   --  @param C The context.
+   --  @param Key The key.
+   --  @param M The text it has absorbed.
+
+private
+
+   type Context is record
+      Inner : SHA2.SHA256_Stream.Context;
+      O_Pad : Key_Block;
+   end record;
+   --  The inner SHA-256 context, and K0 xor opad for the outer hash.
+   --  @field Inner The inner hash, fed K0 xor ipad and then the text.
+   --  @field O_Pad K0 xor opad.
+
+   function Count (C : Context) return SHA2.SHA256_Bytes.Byte_Index is
+     (SHA2.SHA256_Stream.Count (C.Inner));
 
 end Foundation_Spark.HMAC.SHA256_Impl;
