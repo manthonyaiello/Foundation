@@ -12,4 +12,5 @@
 # export shims (M0.3). Any other entry is a hole: it is reported as one in the
 # PR that adds it, and the issue it serves stays open.
 #
-# Empty: the scaffold has no site outside the proof.
+foreign-binding  | src/ffi/foundation_spark-ffi-aes_gf28.ads         | - | The ghost shims export GF28's spec functions with Convention C for Cryptol's FFI; gnatprove proves their bodies equal to the spec but cannot see the C caller, whose argument types Cryptol's C calling convention fixes (uint8_t for [8]) and spark/cryptol/SPARK/AES/GF28.cry declares.
+foreign-binding  | src/ffi/foundation_spark-ffi-aes_gf28_exports.ads | - | A non-ghost unit cannot call a ghost function, so the exports Cryptol looks up (spark_xTimes, spark_Dot) Import the ghost shims by their GNAT link names (___ghost_ prefix); gnatprove cannot see across that Import (it takes the imports' Global => null on trust, which the shims' own proved Globals match); the FFI library's --no-undefined link checks that the names resolve, and check-ffi.sh that they compute the spec.

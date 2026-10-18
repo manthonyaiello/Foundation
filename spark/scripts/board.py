@@ -206,10 +206,15 @@ def find_entity(spark, name):
     """
     want = name.lower()
     for unit, (_, doc) in sorted(spark.items()):
+        # A .spark file's "entities" also names entities its unit only
+        # refers to (a shim's callee in another unit). The unit that
+        # declares an entity is the one whose "spark" map has a status for
+        # it, so only those ids count (#4).
+        status = doc.get("spark", {})
         ids = {int(k) for k, v in doc.get("entities", {}).items()
-               if v.get("name", "").lower() == want}
+               if v.get("name", "").lower() == want
+               and (k in status or k.strip() in status)}
         if ids:
-            status = doc.get("spark", {})
             analyzed = all(status.get(" %d" % i, status.get(str(i))) != "no" for i in ids)
             return unit, ids, analyzed
     return None

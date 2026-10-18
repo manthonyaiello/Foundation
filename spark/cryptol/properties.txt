@@ -1,0 +1,21 @@
+# properties.txt -- the FFI properties, run by scripts/check-ffi.sh (#4).
+#
+# One line per property:
+#
+#     module file | property | function | mode | tests
+#
+# module file  Under spark/cryptol/, the module that states the property. It
+#              declares the SPARK exports as body-less foreign functions;
+#              check-ffi.sh links the FFI library beside it.
+# property     The property's name in that module.
+# function     The Cryptol declaration the property checks, qualified by its
+#              module as in scripts/board-rows.txt, which is how the board
+#              finds the result (AES::GF28::xTimes).
+# mode         exhaust (Cryptol's :exhaust) when the domain is at most 2^16
+#              values, check (:check, random testing) otherwise.
+# tests        For exhaust, the size of the domain: check-ffi.sh fails unless
+#              Cryptol reports exactly that many tests. For check, the number
+#              of random tests to run (Cryptol's tests setting).
+#
+SPARK/AES/GF28.cry | prop_xTimes | AES::GF28::xTimes | exhaust | 256
+SPARK/AES/GF28.cry | prop_Dot    | AES::GF28::(•)    | exhaust | 65536

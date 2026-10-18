@@ -10,6 +10,9 @@ Foundation algorithms, proved against the Cryptol specifications in
 - `src/aes/`, `src/sha2/` – per algorithm: a top spec layer that stays
   semantically close to the Cryptol, plus refinement layers proved
   against it
+- `src/ffi/` – the FFI export shims, see "The FFI harness"
+- `cryptol/` – our Cryptol: the modules that call the SPARK exports by
+  `foreign` and state the properties, and `properties.txt`
 
 ## Toolchain
 
@@ -23,6 +26,7 @@ $ alr -n build
 $ PROVE_JOBS=3 scripts/prove.sh                 # the whole crate
 $ PROVE_JOBS=3 scripts/prove.sh -u foundation_spark-aes-spec-gf28.ads
 $ scripts/board.py                               # the board, as markdown
+$ FFI_JOBS=3 scripts/check-ffi.sh                # every FFI property
 ```
 
 ## Proving
@@ -133,11 +137,129 @@ commit the SPARK side was built from (`git rev-parse --short HEAD`). The
 `function` matches the row. A function is FFI-checked when it has at least
 one property and every one passed all of its tests. The board shows "not
 run" while the file does not exist, and a property's commit when it is not
-the board's.
+the board's. A property that fails is logged with `passed` 0: Cryptol stops
+at the first counterexample and does not say how many tests passed before it.
+
+## The FFI harness
+
+The FFI check is the machine check that the spec layer says what the Cryptol
+says: the SPARK spec functions are exported through C, called from Cryptol by
+`foreign`, and compared with the NSA functions they mirror, with `:exhaust`
+or `:check`. It is testing, not proof.
+
+```console
+$ FFI_JOBS=3 scripts/check-ffi.sh             # build, run every property
+$ scripts/check-ffi.sh prop_Dot               # only these properties
+```
+
+It needs Cryptol 3.6 built with FFI support (`cryptol --version` says "FFI
+enabled") on `PATH`, or named by `CRYPTOL`, with z3 on `PATH` (Cryptol's type
+checker needs it), and bash 4. It sets
+`CRYPTOLPATH` to the repository root and `cryptol/`, so a property module
+imports `algorithms::AES::GF28` by its NSA name.
+
+**The pieces.**
+
+- `foundation_spark_ffi.gpr` builds the crate's sources with `-gnata`
+  (assertions and ghost code enabled: the spec layer is ghost and has to
+  execute) as `obj/ffi/lib/libfoundation_spark_ffi.so`, a shared,
+  encapsulated (libgnat linked in), auto-initializing (no `adainit` from
+  Cryptol) standalone library, linked with `--no-undefined`. Its
+  `Library_Interface` lists each shim and export unit.
+- `src/ffi/`: per Cryptol module, a ghost shim unit and an export unit
+  (below). Each file is a `foreign-binding` entry in
+  `scripts/trust-surface.txt`.
+- `cryptol/<path>/<File>.cry`: a module (`SPARK::AES::GF28`) that declares
+  the exports as `foreign spark_<Name>` **without a Cryptol body** and states
+  the properties (`spark_xTimes b == xTimes b`). Cryptol loads a module's
+  foreign implementations from `<File>.so` beside it; `check-ffi.sh` links
+  the library there (gitignored).
+- `cryptol/properties.txt`: module, property, function, mode, test count.
+- `scripts/check-ffi.sh`: builds, links, runs each property in its own
+  `cryptol -b`, writes `obj/ffi/ffi-results.txt` (format under "The board"),
+  and keeps each run's script and output in `obj/ffi/run/`.
+
+**Exporting a ghost function.** The spec layer is ghost, and Ada lets only
+ghost code call it, so the shim that calls it must be ghost. But GNAT 16.1
+links every ghost entity compiled with ghost code enabled under `___ghost_`
+followed by its external name, and `Link_Name` does not avoid it: a ghost
+`Export` with `External_Name => "spark_xTimes"` is the symbol
+`___ghost_spark_xTimes` (checked with `nm`). So each module has two units:
+
+- the **ghost shim** (`Foundation_Spark.FFI.AES_GF28`): ghost functions,
+  `Convention => C`, `External_Name => "spark_<Name>"`, whose postcondition
+  is the spec function, proved;
+- the **export** (`Foundation_Spark.FFI.AES_GF28_Exports`): ordinary
+  functions with the same `External_Name`, which is what Cryptol looks up.
+  Each calls its shim through an `Import` of
+  `Ghost_Link_Prefix & "spark_<Name>"` (`Foundation_Spark.FFI`), with
+  `Global => null`.
+
+This keeps the harness in Ada: no `objcopy` pass, no C, and Cryptol sees the
+plain names. It depends on GNAT's prefix, which is undocumented; if a later
+GNAT changes it, the `--no-undefined` link fails rather than the first call.
+The alternatives were renaming the symbol with `objcopy --redefine-sym` (a
+pass over gprbuild's objects, outside the GPR), a C wrapper (native source
+in a crate that has none), and declaring `foreign ___ghost_spark_xTimes` in
+the Cryptol (GNAT's detail in every property module).
+
+In the proof build (`foundation_spark.gpr`) ghost code is ignored: the shims
+are proved, and the static library carries the export units with their
+imports unresolved. Only the FFI library links them.
+
+**What a pass requires.** Cryptol 3.6 can report a run that never called
+SPARK without failing it, so `check-ffi.sh` passes a property only when:
+
+- `cryptol` exits 0, with no `ERROR`, counterexample or `[error]`;
+- the property's module printed `Loading dynamic library <File>.so`.
+  **A body-less `foreign` whose library is missing does not fail the
+  load.** Seen with Cryptol 3.6.0: the module loads with
+  `[warning] Could not load all foreign implementations for module
+  SPARK::AES::GF28 ... Fallback cryptol implementations will be used if
+  available`; each call is then an evaluation error (`No foreign
+  implementation is loaded`), `:exhaust` reports `ERROR`, and `cryptol -b`
+  exits 1. The body-less declaration still matters: with a body, the
+  missing library would make the property compare the Cryptol with itself,
+  and pass;
+- no module outside `cryptol/` loaded a dynamic library. NSA's `foreign`
+  declarations with Cryptol bodies (`AES::Cipher`, `AES::KeyExpansion`,
+  `Keccak::StepMappings`) fall back to those bodies on Linux, because the
+  repository's `.so` files are symlinks into the unbuilt `rust/*/target/`
+  and dangle. That is what the properties want: SPARK against the Cryptol.
+  If someone builds the Rust, the comparison would silently become SPARK
+  against Rust, so `check-ffi.sh` fails instead;
+- Cryptol reports `Passed N tests.` with N the planned count, and `Q.E.D.`
+  for `:exhaust`.
+
+`:set evalForeign=always` would make a missing library a load error, but it
+applies to every module loaded, NSA's included, which would then require the
+Rust.
+
+**Passing bit sequences.** Cryptol's C calling convention passes `[K]` only
+for a constant `K <= 64` (as `uint8_t` .. `uint64_t`), and sequences of such
+words (`[n][8]` as `uint8_t *`, with each size variable passed first as
+`size_t`). An arbitrary-length `[l]` is rejected ("Type unsupported for
+FFI"), and so is a fixed `[100]`. So a function over `[l]` (SHA-2's `hash`,
+#15) is checked through a byte-packing wrapper on the Cryptol side, for
+example `foreign spark_hash : {l} (fin l) => [l /^ 8][8] -> [32][8]`, which
+is the C `void spark_hash (size_t l, uint8_t *in, uint8_t *out)`. Cryptol's
+other convention, `foreign abstract`, does accept `{l} (fin l) => [l]`: the
+callee receives `l`, then the bits as little-endian 64-bit digits through
+the `CryValExporter` callbacks of `cry_ffi.h` (a C stub summing the bits
+agreed with Cryptol on `[8]`, `[16]`, `[200]` and `[1000]`). Using it from
+Ada means binding those callback records, which is more trust surface than
+the wrapper.
+
+**CI** runs `check-ffi.sh` in its own job (`FFI (Cryptol, linux x86_64)`,
+`.github/workflows/spark-ci.yml`) on `ubuntu-24.04`, x86_64: Cryptol has no
+arm64 Linux release. It installs the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers`
+release, checked against its sha256 (the release without solvers does not
+start: Cryptol's type checker needs z3), and the same Alire toolchain.
 
 ## Gates
 
-CI (`.github/workflows/spark-ci.yml`) runs three gates, in this order. Each
+CI (`.github/workflows/spark-ci.yml`) runs three gates, in this order, and
+the FFI job after the docs gate ("The FFI harness"). Each
 is a script here that runs the same way locally:
 
 - `scripts/check-trust-surface.sh`: every site in `src/` that gnatprove does
@@ -155,4 +277,7 @@ is a script here that runs the same way locally:
   entity of a tracked unit that gnatprove skipped (a generic instance
   without `pragma SPARK_Mode (On)` is skipped whole, and gnatprove still says
   "Success"), unless the trust manifest lists a `spark-mode-off` site in that
-  unit, and a tracked unit with no entity analyzed.
+  unit, and a tracked unit with no entity analyzed. An imported subprogram
+  (an FFI export unit's `Import` of its ghost shim) has no body and is
+  reported skipped; it is allowed when its file is a `foreign-binding`
+  entry and its declaration carries `Import`.

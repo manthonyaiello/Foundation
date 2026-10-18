@@ -5,6 +5,7 @@ name: SPARK CI
 # only the spark-* workflows run.
 #
 #     trust --> docs --> prove
+#                    \--> ffi
 #
 # trust  The trust-surface gate: every site gnatprove does not prove is listed,
 #        with a justification, in spark/scripts/trust-surface.txt. git and awk
@@ -15,11 +16,16 @@ name: SPARK CI
 #        its committed level, nothing unproved outside the (empty)
 #        spark/scripts/proof-xfail.txt, no warning. Warm from the proof cache;
 #        PRs restore it and never save it, and only main saves.
+# ffi    The FFI check (#4): spark/scripts/check-ffi.sh builds the crate as a
+#        shared library with ghost code enabled and runs every property in
+#        spark/cryptol/properties.txt against the NSA Cryptol.
 #
-# The FFI job is added by M0.3 (#4), and the SAW job by E4.
+# The SAW job is added by E4.
 #
 # Runners are ubuntu-24.04-arm: the same architecture as the campaign's own
-# machine, so CI runs the same gnatprove and prover builds as local runs.
+# machine, so CI runs the same gnatprove and prover builds as local runs. The
+# exception is ffi, on ubuntu-24.04 (x86_64): Cryptol has no arm64 Linux
+# release, and the campaign machine's Cryptol is a source build.
 on:
   push:
     branches: [main]
@@ -104,3 +110,53 @@ jobs:
     with:
       restore: true
       save: ${{ github.ref == 'refs/heads/main' }}
+
+  ffi:
+    name: FFI (Cryptol, linux x86_64)
+    needs: docs
+    runs-on: ubuntu-24.04
+    env:
+      CRYPTOL_VERSION: 3.6.0
+      CRYPTOL_TARBALL: cryptol-3.6.0-ubuntu-24.04-X64-with-solvers.tar.gz
+      # sha256 of the release asset, checked before it is unpacked.
+      CRYPTOL_SHA256: 621860aa1dedc037e8fc8355bef3edf023e41e78efb7177146126f5a87309962
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Alire
+        uses: ./.github/actions/setup-alire-spark
+
+      # The release build with solvers: Cryptol's type checker needs z3 to
+      # start at all ("z3 is required to run Cryptol"), though :exhaust and
+      # :check prove nothing. check-ffi.sh refuses a cryptol whose --version
+      # lacks "FFI enabled".
+      - name: Install Cryptol
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/$CRYPTOL_TARBALL" \
+            "https://github.com/GaloisInc/cryptol/releases/download/$CRYPTOL_VERSION/$CRYPTOL_TARBALL"
+          echo "$CRYPTOL_SHA256  $RUNNER_TEMP/$CRYPTOL_TARBALL" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/cryptol"
+          tar -xzf "$RUNNER_TEMP/$CRYPTOL_TARBALL" -C "$RUNNER_TEMP/cryptol" --strip-components=1
+          echo "$RUNNER_TEMP/cryptol/bin" >> "$GITHUB_PATH"
+
+      - name: Cryptol version
+        run: cryptol --version
+
+      # check-ffi.sh needs the Alire workspace (config GPRs, sparklib).
+      - name: Build
+        working-directory: spark
+        run: alr -n build
+
+      - name: Check FFI properties
+        run: spark/scripts/check-ffi.sh
+
+      - name: Upload FFI log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spark-ffi
+          path: |
+            spark/obj/ffi/ffi-results.txt
+            spark/obj/ffi/run
+          if-no-files-found: ignore

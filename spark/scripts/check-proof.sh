@@ -175,6 +175,50 @@ SKIPPED="$(
     }' "$OUT"
 )"
 
+# An imported subprogram (an FFI export unit's Import of its ghost shim, #4)
+# has no body to analyze, and gnatprove lists it as "skipped; body is
+# SPARK_Mode => Off". It is allowed when its unit is a foreign-binding entry
+# in trust-surface.txt and its declaration, from the reported line to the
+# semicolon that ends it, carries Import. A real SPARK_Mode => Off in such a unit is
+# still caught: the trust gate requires its own spark-mode-off entry, and
+# its entities are not Imports.
+FOREIGN_FILES="$(
+  { grep -vE '^[[:space:]]*#|^[[:space:]]*$' scripts/trust-surface.txt 2>/dev/null || true; } \
+  | awk -F'|' '{ k = $1; gsub(/[ \t]/, "", k); p = $2; gsub(/[ \t]/, "", p)
+                 if (k == "foreign-binding") print p }' \
+  | sort -u
+)"
+is_foreign_import() {
+  local line="$1" unit loc file n path
+  case "$line" in *"skipped; body is SPARK_Mode => Off") ;; *) return 1 ;; esac
+  unit="${line%%:*}"
+  loc="$(printf '%s\n' "$line" | sed -nE 's/.* at ([^ :]+):([0-9]+) skipped.*/\1:\2/p')"
+  file="${loc%%:*}"; n="${loc##*:}"
+  [ -n "$file" ] && [ -n "$n" ] || return 1
+  [ "${file%.ad[sb]}" = "$unit" ] || return 1
+  path="$(printf '%s\n' "$FOREIGN_FILES" | grep -E "(^|/)${file//./\\.}\$" | head -n 1)"
+  [ -n "$path" ] && [ -f "$path" ] || return 1
+  # The declaration ends at the first semicolon outside parentheses (a
+  # parameter list has its own).
+  awk -v n="$n" 'NR >= n { s = tolower($0); sub(/--.*$/, "", s)
+                          for (i = 1; i <= length(s); i++) {
+                            ch = substr(s, i, 1)
+                            if (ch == "(") d++
+                            else if (ch == ")") d--
+                            else if (ch == ";" && d == 0) { text = text " " substr(s, 1, i); done = 1; exit }
+                          }
+                          text = text " " s }
+                 END { exit (done && text ~ /[^a-z0-9_]import[^a-z0-9_]/ ? 0 : 1) }' "$path"
+}
+if [ -n "$SKIPPED" ]; then
+  KEPT=""
+  while IFS= read -r l; do
+    [ -z "$l" ] && continue
+    is_foreign_import "$l" || KEPT="$KEPT$l"$'\n'
+  done <<< "$SKIPPED"
+  SKIPPED="$(printf '%s' "$KEPT" | sed '/^$/d')"
+fi
+
 if [ -n "$SKIPPED" ]; then
   echo "" >&2
   echo "!! PROOF INCOMPLETE -- entities of tracked units that gnatprove did not analyze:" >&2
