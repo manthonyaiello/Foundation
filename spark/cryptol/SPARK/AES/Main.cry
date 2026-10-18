@@ -20,11 +20,14 @@
  * each (Cryptol passes {k} as a leading size_t), and so are the spec's
  * AES128, AES192 and AES256 instances, through an export each.
  *
- * The executable AES has no Encrypt of its own: AES.Impl stops at the key
- * schedule and the block ciphers, which SPARK::AES::KeyExpansion and
- * SPARK::AES::Cipher export. Composed as Main.cry composes KeyExpansion and
- * Cipher (implEncrypt, implDecrypt), they are checked against AES`{k}'s
- * Encrypt and Decrypt here, and they carry the bulk of the random testing:
+ * The executable AES's own Encrypt and Decrypt (AES.Impl.Main, exported as
+ * spark_Impl_Encrypt and spark_Impl_Decrypt) take the key and the block as
+ * bytes too, and are checked here at each key size (execEncrypt,
+ * execDecrypt) at about 100 tests, and on the known answers. They are
+ * Expand_Key then Encrypt_Block or Decrypt_Block, which SPARK::AES::KeyExpansion
+ * and SPARK::AES::Cipher export. Composed as Main.cry composes KeyExpansion and
+ * Cipher (implEncrypt, implDecrypt), those are checked against AES`{k}'s
+ * Encrypt and Decrypt here too, and they carry the bulk of the random testing:
  * Expand_Key and Encrypt_Block are proved equal to the spec's KeyExpansion
  * and Cipher, so their samples check the spec's faithfulness too, while the
  * spec's Encrypt and Decrypt execute the ghost KeyExpansion, whose W is
@@ -337,6 +340,118 @@ property prop_FIPS197_C =
  /\ fips197C`{256} key256 out256
  /\ sparkEncrypt`{256} key256 fips197CPlain == out256
  /\ sparkDecrypt`{256} key256 out256 == fips197CPlain
+  where
+    key128 = 0x000102030405060708090a0b0c0d0e0f
+    key192 = 0x000102030405060708090a0b0c0d0e0f1011121314151617
+    key256 = 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+    out128 = 0x69c4e0d86a7b0430d8cdb78070b4c55a
+    out192 = 0xdda97ca4864cdfe06eaf70a0ec0d7191
+    out256 = 0x8ea2b7ca516745bfeafc49904b496089
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Encrypt: the executable AES.Impl.Main.Encrypt,
+ * Main.cry's AES`{k}.Encrypt over bytes.
+ */
+foreign spark_Impl_Encrypt : {k} (Key k) => [k / 8][8] -> [16][8] -> [16][8]
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Decrypt: the executable AES.Impl.Main.Decrypt,
+ * Main.cry's AES`{k}.Decrypt over bytes.
+ */
+foreign spark_Impl_Decrypt : {k} (Key k) => [k / 8][8] -> [16][8] -> [16][8]
+
+/** The executable Encrypt at key size k, on bits: split, call, join. */
+execEncrypt : {k} (Key k) => [k] -> [128] -> [128]
+execEncrypt key in = join (spark_Impl_Encrypt`{k} (split key) (split in))
+
+/** The executable Decrypt at key size k, on bits: split, call, join. */
+execDecrypt : {k} (Key k) => [k] -> [128] -> [128]
+execDecrypt key in = join (spark_Impl_Decrypt`{k} (split key) (split in))
+
+/** The executable Encrypt is Main.cry's AES`{k}.Encrypt. */
+prop_Exec_Encrypt : {k} (Key k) => [k] -> [128] -> Bit
+prop_Exec_Encrypt key in = execEncrypt`{k} key in == AES`{k}.Encrypt key in
+
+/** The executable Decrypt is Main.cry's AES`{k}.Decrypt. */
+prop_Exec_Decrypt : {k} (Key k) => [k] -> [128] -> Bit
+prop_Exec_Decrypt key in = execDecrypt`{k} key in == AES`{k}.Decrypt key in
+
+/** prop_Exec_Encrypt at k = 128. */
+prop_Exec_Encrypt128 : [128] -> [128] -> Bit
+property prop_Exec_Encrypt128 = prop_Exec_Encrypt`{128}
+
+/** prop_Exec_Encrypt at k = 192. */
+prop_Exec_Encrypt192 : [192] -> [128] -> Bit
+property prop_Exec_Encrypt192 = prop_Exec_Encrypt`{192}
+
+/** prop_Exec_Encrypt at k = 256. */
+prop_Exec_Encrypt256 : [256] -> [128] -> Bit
+property prop_Exec_Encrypt256 = prop_Exec_Encrypt`{256}
+
+/** prop_Exec_Decrypt at k = 128. */
+prop_Exec_Decrypt128 : [128] -> [128] -> Bit
+property prop_Exec_Decrypt128 = prop_Exec_Decrypt`{128}
+
+/** prop_Exec_Decrypt at k = 192. */
+prop_Exec_Decrypt192 : [192] -> [128] -> Bit
+property prop_Exec_Decrypt192 = prop_Exec_Decrypt`{192}
+
+/** prop_Exec_Decrypt at k = 256. */
+prop_Exec_Decrypt256 : [256] -> [128] -> Bit
+property prop_Exec_Decrypt256 = prop_Exec_Decrypt`{256}
+
+/**
+ * Tests.cry's AES128Example, AES192Example and AES256Example [AES Test
+ * Vectors] through the executable Encrypt and Decrypt, as
+ * prop_Impl_AESExamples does through Expand_Key and the block ciphers. The
+ * vectors are copied from Tests.cry.
+ */
+property prop_Exec_AESExamples =
+    map (execEncrypt`{128} key128) plain  == cipher128
+ /\ map (execDecrypt`{128} key128) cipher128 == plain
+ /\ map (execEncrypt`{192} key192) plain  == cipher192
+ /\ map (execDecrypt`{192} key192) cipher192 == plain
+ /\ map (execEncrypt`{256} key256) plain  == cipher256
+ /\ map (execDecrypt`{256} key256) cipher256 == plain
+  where
+    key128    = 0x2b7e151628aed2a6abf7158809cf4f3c
+    key192    = 0x8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+    key256    = 0x603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+    plain     = [ 0x6bc1bee22e409f96e93d7e117393172a
+                , 0xae2d8a571e03ac9c9eb76fac45af8e51
+                , 0x30c81c46a35ce411e5fbc1191a0a52ef
+                , 0xf69f2445df4f9b17ad2b417be66c3710
+                ]
+    cipher128 = [ 0x3ad77bb40d7a3660a89ecaf32466ef97
+                , 0xf5d3d58503b9699de785895a96fdbaaf
+                , 0x43b1cd7f598ece23881b00e3ed030688
+                , 0x7b0c785e27e8ad3f8223207104725dd4
+                ]
+    cipher192 = [ 0xbd334f1d6e45f25ff712a214571fa5cc
+                , 0x974104846d0ad3ad7734ecb3ecee4eef
+                , 0xef7afd2270e2e60adce0ba2face6444e
+                , 0x9a4b41ba738d6c72fb16691603c18e0e
+                ]
+    cipher256 = [ 0xf3eed1bdb5d2a03c064b5a7e3db181f8
+                , 0x591ccb10d410ed26dc5ba74a31362870
+                , 0xb6ed21b99ca6f4f9f153e7b1beafed1d
+                , 0x23304b7a39f9f3ff067d8d8f9e24ecc7
+                ]
+
+/**
+ * FIPS-PUB-197 Appendix C.1 to C.3 through the executable Encrypt and
+ * Decrypt, and through Main.cry's AES (fips197C).
+ */
+property prop_Exec_FIPS197_C =
+    fips197C`{128} key128 out128
+ /\ execEncrypt`{128} key128 fips197CPlain == out128
+ /\ execDecrypt`{128} key128 out128 == fips197CPlain
+ /\ fips197C`{192} key192 out192
+ /\ execEncrypt`{192} key192 fips197CPlain == out192
+ /\ execDecrypt`{192} key192 out192 == fips197CPlain
+ /\ fips197C`{256} key256 out256
+ /\ execEncrypt`{256} key256 fips197CPlain == out256
+ /\ execDecrypt`{256} key256 out256 == fips197CPlain
   where
     key128 = 0x000102030405060708090a0b0c0d0e0f
     key192 = 0x000102030405060708090a0b0c0d0e0f1011121314151617

@@ -2,6 +2,7 @@
 --  on the caller's prefix of its buffers.
 
 with Foundation_Spark.AES.Impl;
+with Foundation_Spark.AES.Impl.Main;
 
 package body Foundation_Spark.FFI.AES_Impl with
   SPARK_Mode
@@ -36,5 +37,25 @@ is
       AES.Impl.Decrypt_Block_Prime
         (Key_Size (K), Round_Keys_Of (K, W), Output);
    end Decrypt_Block_Prime;
+
+   procedure Encrypt
+     (K : C_Size; Key : Key_Bytes; Input : Block; Output : out Block) is
+   begin
+      Output :=
+        AES.Impl.Main.Encrypt
+          (Key_Size (K),
+           AES.Impl.Main.Key_Bytes (Key (0 .. Key_Size (K) / 8 - 1)),
+           Input);
+   end Encrypt;
+
+   procedure Decrypt
+     (K : C_Size; Key : Key_Bytes; Input : Block; Output : out Block) is
+   begin
+      Output :=
+        AES.Impl.Main.Decrypt
+          (Key_Size (K),
+           AES.Impl.Main.Key_Bytes (Key (0 .. Key_Size (K) / 8 - 1)),
+           Input);
+   end Decrypt;
 
 end Foundation_Spark.FFI.AES_Impl;

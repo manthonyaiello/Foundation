@@ -25,8 +25,10 @@
 
 # AES (#11) fills the impl column of every AES row below but Main's: the
 # entities of Foundation_Spark.AES.Impl, each with a postcondition of equality
-# with the row's spec entity. Main.cry's Encrypt and Decrypt are over bits,
-# and the implementation over bytes stops at Cipher and InvCipher. Expand_Key,
+# with the row's spec entity. Main.cry's Encrypt and Decrypt are over bits;
+# their impl entities are AES.Impl.Main's Encrypt and Decrypt over bytes,
+# whose postconditions state that the bits of the result are the spec's
+# Encrypt or Decrypt of the bits of the key and the block. Expand_Key,
 # Encrypt_Block, Decrypt_Block and Decrypt_Block_Prime are also exported and
 # FFI-checked (FFI.AES_Impl), against the KeyExpansion, Cipher, InvCipher and
 # InvCipher' rows' functions and, composed, against Main's Encrypt and
@@ -69,8 +71,8 @@ AES::KeyExpansion::SubWord    | Foundation_Spark.AES.Spec.KeyExpansion.SubWord  
 AES::Cipher::Cipher           | Foundation_Spark.AES.Spec.Cipher.Cipher             | Foundation_Spark.AES.Impl.Encrypt_Block
 AES::Cipher::InvCipher        | Foundation_Spark.AES.Spec.Cipher.InvCipher          | Foundation_Spark.AES.Impl.Decrypt_Block
 AES::Cipher::InvCipher'       | Foundation_Spark.AES.Spec.Cipher.InvCipher_Prime    | Foundation_Spark.AES.Impl.Decrypt_Block_Prime
-AES::Main::Encrypt            | Foundation_Spark.AES.Spec.Main.Encrypt              | -
-AES::Main::Decrypt            | Foundation_Spark.AES.Spec.Main.Decrypt              | -
+AES::Main::Encrypt            | Foundation_Spark.AES.Spec.Main.Encrypt              | Foundation_Spark.AES.Impl.Main.Encrypt
+AES::Main::Decrypt            | Foundation_Spark.AES.Spec.Main.Decrypt              | Foundation_Spark.AES.Impl.Main.Decrypt
 
 # SHA-2 (#14): Functions.cry and Main.cry's step, through the SHA-256
 # instance of the generic Main (Ch and Maj are its instance of Logical).
