@@ -13,6 +13,16 @@
  * checked at each key size k = 128, 192 and 256 through one SPARK export:
  * Cryptol passes {k} to it as a leading size_t.
  *
+ * The executable key schedule, AES.Impl.Expand_Key, is exported too
+ * (spark_Expand_Key, from Foundation_Spark.FFI.AES_Impl) and checked
+ * against the same KeyExpansion. It is proved equal to the spec's
+ * KeyExpansion, so its samples check the spec's faithfulness too, and they
+ * carry the bulk of the random testing: the ghost spec's KeyExpansion,
+ * executed, is exponential in the recursion of its W (about 80 ms a key at
+ * k = 128), so its own properties run a handful of tests, enough to run
+ * its export path at each key size (spark/README.md, "Targeted, not
+ * volume").
+ *
  * algorithms::AES::KeyExpansion declares KeyExpansion foreign, with a
  * Cryptol body and a Rust library that this repository does not build.
  * check-ffi.sh fails if that library is ever loaded, so these properties
@@ -49,6 +59,13 @@ foreign spark_Rcon : [8] -> AESWord
  * key size {k}.
  */
 foreign spark_KeyExpansion : {k} (Key k) => [Nk k]AESWord -> [Nr k + 1]Block
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Expand_Key: the executable
+ * AES.Impl.Expand_Key, proved equal to the spec's KeyExpansion
+ * (algorithms/AES/KeyExpansion.cry, KeyExpansion), for the key size {k}.
+ */
+foreign spark_Expand_Key : {k} (Key k) => [Nk k]AESWord -> [Nr k + 1]Block
 
 /** The SPARK RotWord is KeyExpansion.cry's RotWord. */
 prop_RotWord : AESWord -> Bit
@@ -109,4 +126,38 @@ property prop_Example192KeyExpansion =
 property prop_Example256KeyExpansion =
     prop_KeyExpansion`{256}
       (split (split 0x603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4))
+ /\ Example256KeyExpansion
+
+/** The executable Expand_Key is KeyExpansion.cry's KeyExpansion, at k. */
+prop_Expand_Key : {k} (Key k) => [Nk k]AESWord -> Bit
+prop_Expand_Key key = spark_Expand_Key`{k} key == KeyExpansion`{k} key
+
+/** prop_Expand_Key at k = 128. */
+prop_Expand_Key128 : [Nk 128]AESWord -> Bit
+property prop_Expand_Key128 = prop_Expand_Key`{128}
+
+/** prop_Expand_Key at k = 192. */
+prop_Expand_Key192 : [Nk 192]AESWord -> Bit
+property prop_Expand_Key192 = prop_Expand_Key`{192}
+
+/** prop_Expand_Key at k = 256. */
+prop_Expand_Key256 : [Nk 256]AESWord -> Bit
+property prop_Expand_Key256 = prop_Expand_Key`{256}
+
+/**
+ * Tests.cry's Example128KeyExpansion, Example192KeyExpansion and
+ * Example256KeyExpansion [FIPS-PUB-197 Appendix A.1 to A.3] through the
+ * executable Expand_Key, as prop_Example128KeyExpansion does through the
+ * spec: on each of Tests.cry's keys (copied here), Expand_Key is
+ * KeyExpansion.cry's KeyExpansion, and Tests.cry's properties (imported)
+ * hold of that.
+ */
+property prop_Expand_Key_FIPS =
+    prop_Expand_Key`{128} (split (split 0x2b7e151628aed2a6abf7158809cf4f3c))
+ /\ prop_Expand_Key`{192}
+      (split (split 0x8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b))
+ /\ prop_Expand_Key`{256}
+      (split (split 0x603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4))
+ /\ Example128KeyExpansion
+ /\ Example192KeyExpansion
  /\ Example256KeyExpansion

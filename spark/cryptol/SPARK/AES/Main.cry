@@ -19,11 +19,25 @@
  * checked at each key size k = 128, 192 and 256 through one SPARK export
  * each (Cryptol passes {k} as a leading size_t), and so are the spec's
  * AES128, AES192 and AES256 instances, through an export each.
+ *
+ * The executable AES has no Encrypt of its own: AES.Impl stops at the key
+ * schedule and the block ciphers, which SPARK::AES::KeyExpansion and
+ * SPARK::AES::Cipher export. Composed as Main.cry composes KeyExpansion and
+ * Cipher (implEncrypt, implDecrypt), they are checked against AES`{k}'s
+ * Encrypt and Decrypt here, and they carry the bulk of the random testing:
+ * Expand_Key and Encrypt_Block are proved equal to the spec's KeyExpansion
+ * and Cipher, so their samples check the spec's faithfulness too, while the
+ * spec's Encrypt and Decrypt execute the ghost KeyExpansion, whose W is
+ * exponential when executed. The spec's own properties run a handful of
+ * tests at each key size, enough to run their export path, and the known
+ * answers (spark/README.md, "Targeted, not volume").
  */
 module SPARK::AES::Main where
 
 import algorithms::AES::Types
 import algorithms::AES::Main
+import SPARK::AES::KeyExpansion (spark_Expand_Key)
+import SPARK::AES::Cipher (spark_Encrypt_Block, spark_Decrypt_Block)
 
 /**
  * Foundation_Spark.FFI.AES_Main.Encrypt: the SPARK spec's Encrypt
@@ -62,6 +76,23 @@ sparkEncrypt key in = join (spark_Encrypt`{k} (split key) (split in))
 /** The SPARK Decrypt at key size k, on bits: split, call, join. */
 sparkDecrypt : {k} (Key k) => [k] -> [128] -> [128]
 sparkDecrypt key in = join (spark_Decrypt`{k} (split key) (split in))
+
+/**
+ * The executable AES's encryption at key size k, on bits, composed as
+ * Main.cry's AES`{k}.Encrypt composes KeyExpansion and Cipher: Expand_Key
+ * of the key's words, then Encrypt_Block of the block.
+ */
+implEncrypt : {k} (Key k) => [k] -> [128] -> [128]
+implEncrypt key in =
+  join (spark_Encrypt_Block`{k} (spark_Expand_Key`{k} (split (split key))) (split in))
+
+/**
+ * The executable AES's decryption at key size k, on bits, composed as
+ * Main.cry's AES`{k}.Decrypt: Expand_Key, then Decrypt_Block.
+ */
+implDecrypt : {k} (Key k) => [k] -> [128] -> [128]
+implDecrypt key in =
+  join (spark_Decrypt_Block`{k} (spark_Expand_Key`{k} (split (split key))) (split in))
 
 /** The SPARK Encrypt is Main.cry's AES`{k}.Encrypt. */
 prop_Encrypt : {k} (Key k) => [k] -> [128] -> Bit
@@ -185,3 +216,131 @@ property prop_AES256Example =
              , 0xb6ed21b99ca6f4f9f153e7b1beafed1d
              , 0x23304b7a39f9f3ff067d8d8f9e24ecc7
              ]
+
+/** The executable Expand_Key and Encrypt_Block are AES`{k}.Encrypt. */
+prop_Impl_Encrypt : {k} (Key k) => [k] -> [128] -> Bit
+prop_Impl_Encrypt key in = implEncrypt`{k} key in == AES`{k}.Encrypt key in
+
+/** The executable Expand_Key and Decrypt_Block are AES`{k}.Decrypt. */
+prop_Impl_Decrypt : {k} (Key k) => [k] -> [128] -> Bit
+prop_Impl_Decrypt key in = implDecrypt`{k} key in == AES`{k}.Decrypt key in
+
+/** prop_Impl_Encrypt at k = 128. */
+prop_Impl_Encrypt128 : [128] -> [128] -> Bit
+property prop_Impl_Encrypt128 = prop_Impl_Encrypt`{128}
+
+/** prop_Impl_Encrypt at k = 192. */
+prop_Impl_Encrypt192 : [192] -> [128] -> Bit
+property prop_Impl_Encrypt192 = prop_Impl_Encrypt`{192}
+
+/** prop_Impl_Encrypt at k = 256. */
+prop_Impl_Encrypt256 : [256] -> [128] -> Bit
+property prop_Impl_Encrypt256 = prop_Impl_Encrypt`{256}
+
+/** prop_Impl_Decrypt at k = 128. */
+prop_Impl_Decrypt128 : [128] -> [128] -> Bit
+property prop_Impl_Decrypt128 = prop_Impl_Decrypt`{128}
+
+/** prop_Impl_Decrypt at k = 192. */
+prop_Impl_Decrypt192 : [192] -> [128] -> Bit
+property prop_Impl_Decrypt192 = prop_Impl_Decrypt`{192}
+
+/** prop_Impl_Decrypt at k = 256. */
+prop_Impl_Decrypt256 : [256] -> [128] -> Bit
+property prop_Impl_Decrypt256 = prop_Impl_Decrypt`{256}
+
+/**
+ * Tests.cry's AES128Example, AES192Example and AES256Example [AES Test
+ * Vectors] through the executable AES, as prop_AES128Example and its
+ * siblings do through the spec. The vectors are copied from Tests.cry.
+ */
+property prop_Impl_AESExamples =
+    map (implEncrypt`{128} key128) plain  == cipher128
+ /\ map (implDecrypt`{128} key128) cipher128 == plain
+ /\ map (implEncrypt`{192} key192) plain  == cipher192
+ /\ map (implDecrypt`{192} key192) cipher192 == plain
+ /\ map (implEncrypt`{256} key256) plain  == cipher256
+ /\ map (implDecrypt`{256} key256) cipher256 == plain
+  where
+    key128    = 0x2b7e151628aed2a6abf7158809cf4f3c
+    key192    = 0x8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+    key256    = 0x603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+    plain     = [ 0x6bc1bee22e409f96e93d7e117393172a
+                , 0xae2d8a571e03ac9c9eb76fac45af8e51
+                , 0x30c81c46a35ce411e5fbc1191a0a52ef
+                , 0xf69f2445df4f9b17ad2b417be66c3710
+                ]
+    cipher128 = [ 0x3ad77bb40d7a3660a89ecaf32466ef97
+                , 0xf5d3d58503b9699de785895a96fdbaaf
+                , 0x43b1cd7f598ece23881b00e3ed030688
+                , 0x7b0c785e27e8ad3f8223207104725dd4
+                ]
+    cipher192 = [ 0xbd334f1d6e45f25ff712a214571fa5cc
+                , 0x974104846d0ad3ad7734ecb3ecee4eef
+                , 0xef7afd2270e2e60adce0ba2face6444e
+                , 0x9a4b41ba738d6c72fb16691603c18e0e
+                ]
+    cipher256 = [ 0xf3eed1bdb5d2a03c064b5a7e3db181f8
+                , 0x591ccb10d410ed26dc5ba74a31362870
+                , 0xb6ed21b99ca6f4f9f153e7b1beafed1d
+                , 0x23304b7a39f9f3ff067d8d8f9e24ecc7
+                ]
+
+/**
+ * FIPS-PUB-197's Appendix C examples, C.1 (AES-128), C.2 (AES-192) and
+ * C.3 (AES-256): the key 00 01 02 .. of k / 8 bytes and the plaintext
+ * 00 11 22 .. ff, copied from the standard (Tests.cry has no Appendix C).
+ * Each is checked through Main.cry's own AES`{k} first, so a vector copied
+ * wrong fails here and not in the SPARK.
+ */
+fips197C : {k} (Key k) => [k] -> [128] -> Bit
+fips197C key out = AES`{k}.Encrypt key fips197CPlain == out
+                /\ AES`{k}.Decrypt key out == fips197CPlain
+
+/** The plaintext of every FIPS-PUB-197 Appendix C example. */
+fips197CPlain : [128]
+fips197CPlain = 0x00112233445566778899aabbccddeeff
+
+/**
+ * FIPS-PUB-197 Appendix C.1 to C.3 through the executable AES
+ * (implEncrypt, implDecrypt) and through Main.cry's AES.
+ */
+property prop_Impl_FIPS197_C =
+    fips197C`{128} key128 out128
+ /\ implEncrypt`{128} key128 fips197CPlain == out128
+ /\ implDecrypt`{128} key128 out128 == fips197CPlain
+ /\ fips197C`{192} key192 out192
+ /\ implEncrypt`{192} key192 fips197CPlain == out192
+ /\ implDecrypt`{192} key192 out192 == fips197CPlain
+ /\ fips197C`{256} key256 out256
+ /\ implEncrypt`{256} key256 fips197CPlain == out256
+ /\ implDecrypt`{256} key256 out256 == fips197CPlain
+  where
+    key128 = 0x000102030405060708090a0b0c0d0e0f
+    key192 = 0x000102030405060708090a0b0c0d0e0f1011121314151617
+    key256 = 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+    out128 = 0x69c4e0d86a7b0430d8cdb78070b4c55a
+    out192 = 0xdda97ca4864cdfe06eaf70a0ec0d7191
+    out256 = 0x8ea2b7ca516745bfeafc49904b496089
+
+/**
+ * FIPS-PUB-197 Appendix C.1 to C.3 through the spec's Encrypt and Decrypt
+ * (sparkEncrypt, sparkDecrypt), and through Main.cry's AES.
+ */
+property prop_FIPS197_C =
+    fips197C`{128} key128 out128
+ /\ sparkEncrypt`{128} key128 fips197CPlain == out128
+ /\ sparkDecrypt`{128} key128 out128 == fips197CPlain
+ /\ fips197C`{192} key192 out192
+ /\ sparkEncrypt`{192} key192 fips197CPlain == out192
+ /\ sparkDecrypt`{192} key192 out192 == fips197CPlain
+ /\ fips197C`{256} key256 out256
+ /\ sparkEncrypt`{256} key256 fips197CPlain == out256
+ /\ sparkDecrypt`{256} key256 out256 == fips197CPlain
+  where
+    key128 = 0x000102030405060708090a0b0c0d0e0f
+    key192 = 0x000102030405060708090a0b0c0d0e0f1011121314151617
+    key256 = 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+    out128 = 0x69c4e0d86a7b0430d8cdb78070b4c55a
+    out192 = 0xdda97ca4864cdfe06eaf70a0ec0d7191
+    out256 = 0x8ea2b7ca516745bfeafc49904b496089

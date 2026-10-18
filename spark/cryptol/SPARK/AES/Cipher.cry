@@ -13,6 +13,16 @@
  * checked at each key size k = 128, 192 and 256, through one SPARK export
  * each: Cryptol passes {k} to it as a leading size_t.
  *
+ * The executable ciphers, AES.Impl.Encrypt_Block, Decrypt_Block and
+ * Decrypt_Block_Prime, are exported too (spark_Encrypt_Block,
+ * spark_Decrypt_Block and spark_Decrypt_Block_Prime, from
+ * Foundation_Spark.FFI.AES_Impl) and checked against the same Cipher,
+ * InvCipher and InvCipher'. Each is proved equal to its spec function, so
+ * their samples check the spec's faithfulness too, and they carry the bulk
+ * of the random testing at each key size; the spec's own ciphers run a
+ * handful of tests each, enough to run their export path (spark/README.md,
+ * "Targeted, not volume").
+ *
  * algorithms::AES::Cipher declares Cipher and InvCipher foreign, with a
  * Cryptol body and a Rust library that this repository does not build.
  * check-ffi.sh fails if that library is ever loaded, so these properties
@@ -68,6 +78,27 @@ foreign spark_InvCipher : {k} (Key k) => [Nr k + 1]Block -> Block -> Block
 
 /** Foundation_Spark.FFI.AES_Cipher.InvCipher_Prime: Cipher.cry's InvCipher'. */
 foreign spark_InvCipher_Prime : {k} (Key k) => [Nr k + 1]Block -> Block -> Block
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Encrypt_Block: the executable
+ * AES.Impl.Encrypt_Block, proved equal to the spec's Cipher (Cipher.cry's
+ * Cipher).
+ */
+foreign spark_Encrypt_Block : {k} (Key k) => [Nr k + 1]Block -> Block -> Block
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Decrypt_Block: the executable
+ * AES.Impl.Decrypt_Block, proved equal to the spec's InvCipher (Cipher.cry's
+ * InvCipher).
+ */
+foreign spark_Decrypt_Block : {k} (Key k) => [Nr k + 1]Block -> Block -> Block
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Decrypt_Block_Prime: the executable
+ * AES.Impl.Decrypt_Block_Prime, proved equal to the spec's InvCipher_Prime
+ * (Cipher.cry's InvCipher').
+ */
+foreign spark_Decrypt_Block_Prime : {k} (Key k) => [Nr k + 1]Block -> Block -> Block
 
 /** The SPARK SubBytes is Cipher.cry's SubBytes. */
 prop_SubBytes : Block -> Bit
@@ -177,6 +208,77 @@ property prop_InvCipher'256 = prop_InvCipher'`{256}
 property prop_CipherExample =
     spark_Cipher`{128}    key input == output
  /\ spark_InvCipher`{128} key output == input
+  where
+    input  = split 0x3243f6a8885a308d313198a2e0370734
+    key    = KeyExpansion`{128} (split (split 0x2b7e151628aed2a6abf7158809cf4f3c))
+    output = split 0x3925841d02dc09fbdc118597196a0b32
+
+/**
+ * The executable Encrypt_Block is Cipher.cry's Cipher at key size k, on
+ * random round keys (any [Nr k + 1]Block, as for prop_Cipher) and random
+ * blocks.
+ */
+prop_Encrypt_Block : {k} (Key k) => [Nr k + 1]Block -> Block -> Bit
+prop_Encrypt_Block w in = spark_Encrypt_Block`{k} w in == Cipher`{k} w in
+
+/** The executable Decrypt_Block is Cipher.cry's InvCipher, at key size k. */
+prop_Decrypt_Block : {k} (Key k) => [Nr k + 1]Block -> Block -> Bit
+prop_Decrypt_Block w in = spark_Decrypt_Block`{k} w in == InvCipher`{k} w in
+
+/**
+ * The executable Decrypt_Block_Prime is Cipher.cry's InvCipher', at key
+ * size k.
+ */
+prop_Decrypt_Block_Prime : {k} (Key k) => [Nr k + 1]Block -> Block -> Bit
+prop_Decrypt_Block_Prime w in =
+  spark_Decrypt_Block_Prime`{k} w in == InvCipher'`{k} w in
+
+/** prop_Encrypt_Block at k = 128. */
+prop_Encrypt_Block128 : [Nr 128 + 1]Block -> Block -> Bit
+property prop_Encrypt_Block128 = prop_Encrypt_Block`{128}
+
+/** prop_Encrypt_Block at k = 192. */
+prop_Encrypt_Block192 : [Nr 192 + 1]Block -> Block -> Bit
+property prop_Encrypt_Block192 = prop_Encrypt_Block`{192}
+
+/** prop_Encrypt_Block at k = 256. */
+prop_Encrypt_Block256 : [Nr 256 + 1]Block -> Block -> Bit
+property prop_Encrypt_Block256 = prop_Encrypt_Block`{256}
+
+/** prop_Decrypt_Block at k = 128. */
+prop_Decrypt_Block128 : [Nr 128 + 1]Block -> Block -> Bit
+property prop_Decrypt_Block128 = prop_Decrypt_Block`{128}
+
+/** prop_Decrypt_Block at k = 192. */
+prop_Decrypt_Block192 : [Nr 192 + 1]Block -> Block -> Bit
+property prop_Decrypt_Block192 = prop_Decrypt_Block`{192}
+
+/** prop_Decrypt_Block at k = 256. */
+prop_Decrypt_Block256 : [Nr 256 + 1]Block -> Block -> Bit
+property prop_Decrypt_Block256 = prop_Decrypt_Block`{256}
+
+/** prop_Decrypt_Block_Prime at k = 128. */
+prop_Decrypt_Block_Prime128 : [Nr 128 + 1]Block -> Block -> Bit
+property prop_Decrypt_Block_Prime128 = prop_Decrypt_Block_Prime`{128}
+
+/** prop_Decrypt_Block_Prime at k = 192. */
+prop_Decrypt_Block_Prime192 : [Nr 192 + 1]Block -> Block -> Bit
+property prop_Decrypt_Block_Prime192 = prop_Decrypt_Block_Prime`{192}
+
+/** prop_Decrypt_Block_Prime at k = 256. */
+prop_Decrypt_Block_Prime256 : [Nr 256 + 1]Block -> Block -> Bit
+property prop_Decrypt_Block_Prime256 = prop_Decrypt_Block_Prime`{256}
+
+/**
+ * Tests.cry's CipherExample [FIPS-PUB-197 Appendix B] through the
+ * executable Encrypt_Block, Decrypt_Block and Decrypt_Block_Prime, as
+ * prop_CipherExample does through the spec. The vectors are copied from
+ * Tests.cry; the round keys are KeyExpansion`{128} of its key.
+ */
+property prop_Block_CipherExample =
+    spark_Encrypt_Block`{128}       key input  == output
+ /\ spark_Decrypt_Block`{128}       key output == input
+ /\ spark_Decrypt_Block_Prime`{128} key output == input
   where
     input  = split 0x3243f6a8885a308d313198a2e0370734
     key    = KeyExpansion`{128} (split (split 0x2b7e151628aed2a6abf7158809cf4f3c))
