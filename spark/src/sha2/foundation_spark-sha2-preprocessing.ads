@@ -1,7 +1,9 @@
 --  Secure Hash Algorithm preprocessing [FIPS-PUB-180-4 Section 5],
---  mirroring algorithms/SHA2/Preprocessing.cry. For now only the SHA-256
---  initial hash value; pad and parse come with M2.2 (#15), and the other
---  initial hash values are not used by SHA-256.
+--  mirroring algorithms/SHA2/Preprocessing.cry: the SHA-256 initial hash
+--  value. `pad` and `parse` (Preprocessing.cry:14 and :47) are in the
+--  generic Main, at the word size `hash` applies them at, because `parse`
+--  produces Main's words. The other initial hash values are not used by
+--  SHA-256.
 
 package Foundation_Spark.SHA2.Preprocessing with
   SPARK_Mode,
