@@ -67,3 +67,26 @@ SPARK/AES/Main.cry         | prop_AES256_Decrypt         | AES::Main::Decrypt   
 SPARK/AES/Main.cry         | prop_AES128Example          | AES::Main::Encrypt              | exhaust | 1
 SPARK/AES/Main.cry         | prop_AES192Example          | AES::Main::Encrypt              | exhaust | 1
 SPARK/AES/Main.cry         | prop_AES256Example          | AES::Main::Encrypt              | exhaust | 1
+SPARK/SHA2/Functions.cry     | prop_Ch                  | SHA2::Functions::Ch                  | check   | 10000
+SPARK/SHA2/Functions.cry     | prop_Maj                 | SHA2::Functions::Maj                 | check   | 10000
+SPARK/SHA2/Functions.cry     | prop_SIGMA_256_0         | SHA2::Functions::SIGMA_256_0         | check   | 10000
+SPARK/SHA2/Functions.cry     | prop_SIGMA_256_1         | SHA2::Functions::SIGMA_256_1         | check   | 10000
+SPARK/SHA2/Functions.cry     | prop_sigma_256_0         | SHA2::Functions::sigma_256_0         | check   | 10000
+SPARK/SHA2/Functions.cry     | prop_sigma_256_1         | SHA2::Functions::sigma_256_1         | check   | 10000
+SPARK/SHA2/Functions.cry     | prop_K_256               | SHA2::Functions::K_256               | exhaust | 1
+SPARK/SHA2/Preprocessing.cry | prop_H0_256              | SHA2::Preprocessing::H0_256          | exhaust | 1
+SPARK/SHA2/Preprocessing.cry | prop_pad                 | SHA2::Preprocessing::pad (SHA-256)   | check   | 100
+SPARK/SHA2/Preprocessing.cry | prop_parse               | SHA2::Preprocessing::parse (SHA-256) | check   | 100
+SPARK/SHA2/SHA256.cry        | prop_step                | SHA2::Main::step (SHA-256)           | check   | 100
+SPARK/SHA2/SHA256.cry        | prop_Compress            | SHA2::Main::step (SHA-256)           | check   | 1000
+SPARK/SHA2/SHA256.cry        | prop_hash                | SHA2::Main::hash (SHA-256)           | check   | 5
+SPARK/SHA2/SHA256.cry        | prop_hash_bits           | SHA2::Main::hash (SHA-256)           | check   | 5
+SPARK/SHA2/SHA256.cry        | prop_hash_FIPS           | SHA2::Main::hash (SHA-256)           | exhaust | 1
+SPARK/SHA2/SHA256.cry        | prop_Hash_Bytes          | SHA2::Main::hash (SHA-256, bytes)    | check   | 5
+SPARK/SHA2/SHA256.cry        | prop_Hash_Bytes_FIPS     | SHA2::Main::hash (SHA-256, bytes)    | exhaust | 1
+SPARK/SHA2/SHA256.cry        | prop_Stream_Hash         | SHA2::Main::hash (SHA-256, bytes)    | check   | 100
+SPARK/SHA2/SHA256.cry        | prop_Stream_Hash_long    | SHA2::Main::hash (SHA-256, bytes)    | check   | 10
+SPARK/SHA2/SHA256.cry        | prop_Stream_Hash_FIPS    | SHA2::Main::hash (SHA-256, bytes)    | exhaust | 1
+SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked      | SHA2::Main::hash (SHA-256, bytes)    | check   | 100
+SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked_long | SHA2::Main::hash (SHA-256, bytes)    | check   | 10
+SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked_FIPS | SHA2::Main::hash (SHA-256, bytes)    | check   | 100

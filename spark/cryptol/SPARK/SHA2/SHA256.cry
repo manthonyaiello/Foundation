@@ -1,0 +1,336 @@
+/*
+ * The SPARK SHA-256, checked against algorithms/SHA2/SHA256.cry (SHA2's
+ * Main at SHA-256's parameters) through Cryptol's FFI:
+ *
+ *  - the spec layer's step and hash (the SHA2.SHA256 instance of the
+ *    generic Main), and Hash_Bytes, its byte-level refinement, which are
+ *    ghost and reached through ghost shims;
+ *  - the executable SHA256_Stream: Compress, the one-shot Hash, and Init,
+ *    Update on each chunk of a random chunking, and Final.
+ *
+ * The foreign functions are the C exports of the SPARK crate's FFI library,
+ * which spark/scripts/check-ffi.sh links here as SHA256.so. They have no
+ * Cryptol body on purpose (see SPARK/AES/GF28.cry).
+ *
+ * step is not exported by algorithms::SHA2::SHA256: SHA256.cry instantiates
+ * Main privately, as SHA256. This module instantiates Main with the same
+ * parameters, copied from SHA256.cry, as Main256, and compares the SPARK step
+ * with Main256::step. hash is compared with SHA256.cry's own hash
+ * (SHA256::hash below), which is that instance's hash.
+ *
+ * hash takes an [l] of any length, which Cryptol's C calling convention
+ * cannot pass (spark/README.md, "Passing bit sequences"). The foreign
+ * functions take bytes instead: spark_hash takes [l /^ 8][8] with l passed
+ * first, the message split into bytes after padding it to whole bytes with
+ * zero bits that the SPARK shim does not read (it takes the first l bits
+ * back), so the bit-level spec is checked at lengths that are not whole
+ * bytes too. The others take [n][8] and are compared with
+ * SHA256::hash (join M). The [256] digest comes back as [32][8].
+ *
+ * The testing is targeted. A length is a type, so each property names the
+ * lengths it covers: the padding boundaries 0, 1, 55, 56, 63, 64, 65, 119,
+ * 120, 127 and 128 bytes (55 is the longest message whose padding fits one
+ * block, 119 two), the FIPS 180-4 examples, and a fixed list of longer
+ * lengths drawn at random once (Python's
+ * random.Random(20261018).sample(range(301, 4001), 10)). The random
+ * contents are a :check over the message bytes. The executable functions,
+ * proved equal to the spec (Compress = Step; Hash and Hash_Chunked =
+ * Hash_Bytes, and so = SHA256.Hash on the bits), carry the larger samples;
+ * the ghost spec functions are checked directly at a handful of tests.
+ */
+module SPARK::SHA2::SHA256 where
+
+import algorithms::SHA2::SHA256 as SHA256
+import algorithms::SHA2::Preprocessing (H0_256)
+import algorithms::SHA2::Functions ( SIGMA_256_0
+                                   , SIGMA_256_1
+                                   , sigma_256_0
+                                   , sigma_256_1
+                                   , K_256)
+
+/** algorithms::SHA2::Main at SHA256.cry's parameters, as SHA256.cry has it. */
+import algorithms::SHA2::Main as Main256 where
+  type d = 256
+  type w = 32
+  type Klen = 64
+
+  H0 = H0_256
+  K = K_256
+
+  SIGMA_0 = SIGMA_256_0
+  SIGMA_1 = SIGMA_256_1
+  sigma_0 = sigma_256_0
+  sigma_1 = sigma_256_1
+
+/** Foundation_Spark.FFI.SHA2_SHA256.Step: the SPARK spec's SHA256.Step. */
+foreign spark_step : [8][32] -> [16][32] -> [8][32]
+
+/**
+ * Foundation_Spark.FFI.SHA2_SHA256_Stream.Compress: the executable
+ * SHA256_Stream.Compress, proved equal to SHA256.Step.
+ */
+foreign spark_Compress : [8][32] -> [16][32] -> [8][32]
+
+/**
+ * Foundation_Spark.FFI.SHA2_SHA256.Hash: the SPARK spec's SHA256.Hash over
+ * bits, the message passed as bytes.
+ */
+foreign spark_hash : {l} (fin l, 64 >= width l) => [l /^ 8][8] -> [32][8]
+
+/**
+ * Foundation_Spark.FFI.SHA2_SHA256.Hash_Bytes: the SPARK byte-level
+ * SHA256_Bytes.Hash_Bytes.
+ */
+foreign spark_Hash_Bytes : {n} (fin n, 61 >= width n) => [n][8] -> [32][8]
+
+/**
+ * Foundation_Spark.FFI.SHA2_SHA256_Stream.Hash: the executable
+ * SHA256_Stream.Hash.
+ */
+foreign spark_Stream_Hash : {n} (fin n, 61 >= width n) => [n][8] -> [32][8]
+
+/**
+ * Foundation_Spark.FFI.SHA2_SHA256_Stream.Hash_Chunked: the executable
+ * SHA256_Stream's Init, Update on each chunk, Final. The [c][64] are the
+ * ends of the chunks, in order and at most n; a last chunk runs to n.
+ */
+foreign spark_Stream_Hash_Chunked :
+  {n, c} (fin n, 61 >= width n, fin c, 64 >= c) =>
+    [n][8] -> [c][64] -> [32][8]
+
+/** An [l] as bytes: split (M # zero), the last byte padded with zeros. */
+toBytes : {l} (fin l) => [l] -> [l /^ 8][8]
+toBytes M = split (M # (zero : [8 * (l /^ 8) - l]))
+
+/** The longest of the fixed longer lengths, in bytes. */
+type LongBytes = 3837
+
+/** The number of cut points in a random chunking. */
+type Cuts = 12
+
+/** Random cut points as the ends of a chunking of n bytes: sorted, <= n. */
+chunking : {n} (fin n, 61 >= width n) => [Cuts][64] -> [Cuts][64]
+chunking xs = sort [ x % (`n + 1) | x <- xs ]
+
+// ---------------------------------------------------------------- step
+
+/** The SPARK spec's step is Main.cry's step at SHA256.cry's parameters. */
+prop_step : [8][32] -> [16][32] -> Bit
+property prop_step H M = spark_step H M == Main256::step H M
+
+/** The executable Compress is Main.cry's step at SHA256.cry's parameters. */
+prop_Compress : [8][32] -> [16][32] -> Bit
+property prop_Compress H M = spark_Compress H M == Main256::step H M
+
+// ---------------------------------------------------------------- hash (bits)
+
+/**
+ * The SPARK SHA256.Hash on an [l]: split into bytes, call, join. The
+ * length is given explicitly: [l /^ 8][8] does not determine l.
+ */
+sparkHash : {l} (fin l, 64 >= width l) => [l] -> [256]
+sparkHash M = join (spark_hash`{l} (toBytes M))
+
+/** The SPARK SHA256.Hash is SHA256::hash on an [l]. */
+hashBits : {l} (fin l, 64 >= width l) => [l] -> Bit
+hashBits M = sparkHash M == SHA256::hash M
+
+/**
+ * The SPARK SHA256.Hash is SHA256::hash at the boundary lengths 0, 1, 55,
+ * 56, 63, 64, 65, 119, 120, 127 and 128 bytes, on random contents.
+ */
+prop_hash : [128][8] -> Bit
+property prop_hash ms =
+     hashBits (join (take`{0} ms))
+  /\ hashBits (join (take`{1} ms))
+  /\ hashBits (join (take`{55} ms))
+  /\ hashBits (join (take`{56} ms))
+  /\ hashBits (join (take`{63} ms))
+  /\ hashBits (join (take`{64} ms))
+  /\ hashBits (join (take`{65} ms))
+  /\ hashBits (join (take`{119} ms))
+  /\ hashBits (join (take`{120} ms))
+  /\ hashBits (join (take`{127} ms))
+  /\ hashBits (join (take`{128} ms))
+
+/**
+ * The SPARK SHA256.Hash is SHA256::hash at bit lengths that are not whole
+ * bytes, around the padding boundaries (a message of 447 bits is the
+ * longest whose padding fits one block): 1, 7, 9, 439, 440, 441, 447, 449,
+ * 455, 505, 511, 513 and 1017 bits, on random contents.
+ */
+prop_hash_bits : [1017] -> Bit
+property prop_hash_bits m =
+     hashBits (take`{1} m)
+  /\ hashBits (take`{7} m)
+  /\ hashBits (take`{9} m)
+  /\ hashBits (take`{439} m)
+  /\ hashBits (take`{440} m)
+  /\ hashBits (take`{441} m)
+  /\ hashBits (take`{447} m)
+  /\ hashBits (take`{449} m)
+  /\ hashBits (take`{455} m)
+  /\ hashBits (take`{505} m)
+  /\ hashBits (take`{511} m)
+  /\ hashBits (take`{513} m)
+  /\ hashBits (take`{1017} m)
+
+/**
+ * The SPARK SHA256.Hash gives the published FIPS 180-4 digests, and so
+ * does SHA256::hash.
+ */
+property prop_hash_FIPS =
+     SHA256::hash (join ([] : [0][8])) == digestEmpty
+  /\ SHA256::hash (join fipsAbc) == digestAbc
+  /\ SHA256::hash (join fips448) == digest448
+  /\ SHA256::hash (join fips896) == digest896
+  /\ sparkHash (join ([] : [0][8])) == digestEmpty
+  /\ sparkHash (join fipsAbc) == digestAbc
+  /\ sparkHash (join fips448) == digest448
+  /\ sparkHash (join fips896) == digest896
+
+// ---------------------------------------------------------------- Hash_Bytes
+
+/** The SPARK SHA256_Bytes.Hash_Bytes is SHA256::hash on whole bytes. */
+hashBytes : {n} (fin n, 61 >= width n) => [n][8] -> Bit
+hashBytes M = join (spark_Hash_Bytes M) == SHA256::hash (join M)
+
+/** The SPARK Hash_Bytes is SHA256::hash at the boundary lengths. */
+prop_Hash_Bytes : [128][8] -> Bit
+property prop_Hash_Bytes ms =
+     hashBytes (take`{0} ms)
+  /\ hashBytes (take`{1} ms)
+  /\ hashBytes (take`{55} ms)
+  /\ hashBytes (take`{56} ms)
+  /\ hashBytes (take`{63} ms)
+  /\ hashBytes (take`{64} ms)
+  /\ hashBytes (take`{65} ms)
+  /\ hashBytes (take`{119} ms)
+  /\ hashBytes (take`{120} ms)
+  /\ hashBytes (take`{127} ms)
+  /\ hashBytes (take`{128} ms)
+
+/** The SPARK Hash_Bytes gives the FIPS 180-4 digests. */
+property prop_Hash_Bytes_FIPS =
+     join (spark_Hash_Bytes`{0} []) == digestEmpty
+  /\ join (spark_Hash_Bytes fipsAbc) == digestAbc
+  /\ join (spark_Hash_Bytes fips448) == digest448
+  /\ join (spark_Hash_Bytes fips896) == digest896
+
+// ---------------------------------------------------------------- SHA256_Stream
+
+/** The executable SHA256_Stream.Hash is SHA256::hash on whole bytes. */
+streamHash : {n} (fin n, 61 >= width n) => [n][8] -> Bit
+streamHash M = join (spark_Stream_Hash M) == SHA256::hash (join M)
+
+/** The executable SHA256_Stream.Hash is SHA256::hash at the boundary lengths. */
+prop_Stream_Hash : [128][8] -> Bit
+property prop_Stream_Hash ms =
+     streamHash (take`{0} ms)
+  /\ streamHash (take`{1} ms)
+  /\ streamHash (take`{55} ms)
+  /\ streamHash (take`{56} ms)
+  /\ streamHash (take`{63} ms)
+  /\ streamHash (take`{64} ms)
+  /\ streamHash (take`{65} ms)
+  /\ streamHash (take`{119} ms)
+  /\ streamHash (take`{120} ms)
+  /\ streamHash (take`{127} ms)
+  /\ streamHash (take`{128} ms)
+
+/** The executable SHA256_Stream.Hash at the fixed longer lengths. */
+prop_Stream_Hash_long : [LongBytes][8] -> Bit
+property prop_Stream_Hash_long ms =
+     streamHash (take`{562} ms)
+  /\ streamHash (take`{1123} ms)
+  /\ streamHash (take`{1650} ms)
+  /\ streamHash (take`{2174} ms)
+  /\ streamHash (take`{2358} ms)
+  /\ streamHash (take`{2533} ms)
+  /\ streamHash (take`{3499} ms)
+  /\ streamHash (take`{3508} ms)
+  /\ streamHash (take`{3810} ms)
+  /\ streamHash (take`{3837} ms)
+
+/** The executable SHA256_Stream.Hash gives the FIPS 180-4 digests. */
+property prop_Stream_Hash_FIPS =
+     join (spark_Stream_Hash`{0} []) == digestEmpty
+  /\ join (spark_Stream_Hash fipsAbc) == digestAbc
+  /\ join (spark_Stream_Hash fips448) == digest448
+  /\ join (spark_Stream_Hash fips896) == digest896
+
+/**
+ * SHA256_Stream's Init, Update on each chunk, Final, with the chunking
+ * given by 12 random cut points (13 chunks, any of them possibly empty), is
+ * SHA256::hash on whole bytes.
+ */
+streamChunked : {n} (fin n, 61 >= width n) => [n][8] -> [Cuts][64] -> Bit
+streamChunked M xs =
+  join (spark_Stream_Hash_Chunked M (chunking`{n} xs)) == SHA256::hash (join M)
+
+/** The chunked SHA256_Stream at the boundary lengths, each cut at random. */
+prop_Stream_Chunked : [128][8] -> [11][Cuts][64] -> Bit
+property prop_Stream_Chunked ms xss =
+     streamChunked (take`{0} ms) (xss @ 0)
+  /\ streamChunked (take`{1} ms) (xss @ 1)
+  /\ streamChunked (take`{55} ms) (xss @ 2)
+  /\ streamChunked (take`{56} ms) (xss @ 3)
+  /\ streamChunked (take`{63} ms) (xss @ 4)
+  /\ streamChunked (take`{64} ms) (xss @ 5)
+  /\ streamChunked (take`{65} ms) (xss @ 6)
+  /\ streamChunked (take`{119} ms) (xss @ 7)
+  /\ streamChunked (take`{120} ms) (xss @ 8)
+  /\ streamChunked (take`{127} ms) (xss @ 9)
+  /\ streamChunked (take`{128} ms) (xss @ 10)
+
+/** The chunked SHA256_Stream at the fixed longer lengths, cut at random. */
+prop_Stream_Chunked_long : [LongBytes][8] -> [10][Cuts][64] -> Bit
+property prop_Stream_Chunked_long ms xss =
+     streamChunked (take`{562} ms) (xss @ 0)
+  /\ streamChunked (take`{1123} ms) (xss @ 1)
+  /\ streamChunked (take`{1650} ms) (xss @ 2)
+  /\ streamChunked (take`{2174} ms) (xss @ 3)
+  /\ streamChunked (take`{2358} ms) (xss @ 4)
+  /\ streamChunked (take`{2533} ms) (xss @ 5)
+  /\ streamChunked (take`{3499} ms) (xss @ 6)
+  /\ streamChunked (take`{3508} ms) (xss @ 7)
+  /\ streamChunked (take`{3810} ms) (xss @ 8)
+  /\ streamChunked (take`{3837} ms) (xss @ 9)
+
+/** The chunked SHA256_Stream gives the FIPS 180-4 digests, cut at random. */
+prop_Stream_Chunked_FIPS : [4][Cuts][64] -> Bit
+property prop_Stream_Chunked_FIPS xss =
+     join (spark_Stream_Hash_Chunked`{0} [] (chunking`{0} (xss @ 0))) == digestEmpty
+  /\ join (spark_Stream_Hash_Chunked fipsAbc (chunking`{3} (xss @ 1))) == digestAbc
+  /\ join (spark_Stream_Hash_Chunked fips448 (chunking`{56} (xss @ 2))) == digest448
+  /\ join (spark_Stream_Hash_Chunked fips896 (chunking`{112} (xss @ 3))) == digest896
+
+// ---------------------------------------------------------------- FIPS 180-4
+
+/** The FIPS 180-4 SHA-256 example message "abc" [FIPS 180-4 Appendix B.1]. */
+fipsAbc : [3][8]
+fipsAbc = "abc"
+
+/** The 448-bit example message [FIPS 180-4 Appendix B.2]. */
+fips448 : [56][8]
+fips448 = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+
+/** The 896-bit example message [NIST CSOR SHA-256 examples]. */
+fips896 : [112][8]
+fips896 = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"
+
+/** The published digest of "" (the empty message). */
+digestEmpty : [256]
+digestEmpty = 0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+/** The published digest of "abc". */
+digestAbc : [256]
+digestAbc = 0xba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+
+/** The published digest of the 448-bit example. */
+digest448 : [256]
+digest448 = 0x248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1
+
+/** The published digest of the 896-bit example. */
+digest896 : [256]
+digest896 = 0xcf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1

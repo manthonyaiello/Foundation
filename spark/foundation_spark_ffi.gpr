@@ -56,13 +56,46 @@ project Foundation_Spark_FFI is
       "Foundation_Spark.FFI.AES_KeyExpansion",
       "Foundation_Spark.FFI.AES_KeyExpansion_Exports",
       "Foundation_Spark.FFI.AES_Main",
-      "Foundation_Spark.FFI.AES_Main_Exports");
+      "Foundation_Spark.FFI.AES_Main_Exports",
+      "Foundation_Spark.SHA2",
+      "Foundation_Spark.SHA2.Notation",
+      "Foundation_Spark.SHA2.Functions",
+      "Foundation_Spark.SHA2.Preprocessing",
+      "Foundation_Spark.SHA2.Main",
+      "Foundation_Spark.SHA2.SHA256",
+      "Foundation_Spark.SHA2.SHA256_Bytes",
+      "Foundation_Spark.SHA2.SHA256_Blocks",
+      "Foundation_Spark.SHA2.SHA256_Stream",
+      "Foundation_Spark.FFI.SHA2_Types",
+      "Foundation_Spark.FFI.SHA2_Functions",
+      "Foundation_Spark.FFI.SHA2_Functions_Exports",
+      "Foundation_Spark.FFI.SHA2_Preprocessing",
+      "Foundation_Spark.FFI.SHA2_Preprocessing_Exports",
+      "Foundation_Spark.FFI.SHA2_SHA256",
+      "Foundation_Spark.FFI.SHA2_SHA256_Exports",
+      "Foundation_Spark.FFI.SHA2_SHA256_Stream");
 
    for Library_Options use ("-Wl,--no-undefined");
 
    package Compiler is
       for Default_Switches ("Ada") use
         Foundation_Spark_Config.Ada_Compiler_Switches & ("-gnata");
+
+      --  The executable implementations, and the units that export them,
+      --  are built as a client builds them: ghost code and assertions
+      --  ignored. They call no ghost code (each PR that added them checked
+      --  that the crate builds and runs with ghost code ignored), and
+      --  their contracts and invariants, executed, would run the ghost spec
+      --  inside every Update: Models folds Step over the whole message so
+      --  far, so the checks would grow with the square of the length. The
+      --  check then runs the code that ships, and the ghost spec it is
+      --  proved against runs only in the shims. No unit built with -gnata
+      --  refers to their ghost entities, so nothing is left unresolved
+      --  (--no-undefined).
+      for Switches ("foundation_spark-sha2-sha256_stream.adb") use
+        Foundation_Spark_Config.Ada_Compiler_Switches;
+      for Switches ("foundation_spark-ffi-sha2_sha256_stream.adb") use
+        Foundation_Spark_Config.Ada_Compiler_Switches;
    end Compiler;
 
 end Foundation_Spark_FFI;
