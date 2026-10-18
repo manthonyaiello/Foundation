@@ -232,5 +232,8 @@ private
 
    function Count (C : Context) return SHA2.SHA256_Bytes.Byte_Index is
      (SHA2.SHA256_Stream.Count (C.Inner));
+   --  The inner context's byte count.
+   --  @param C The context.
+   --  @return Its byte count.
 
 end Foundation_Spark.HMAC.SHA256_Impl;

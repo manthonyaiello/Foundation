@@ -89,6 +89,9 @@ SHA2::Main::hash (SHA-256, bytes) | Foundation_Spark.SHA2.SHA256_Bytes.Hash_Byte
 
 # HMAC (#19): HMAC/Main.cry's HMAC and HMAC_init (private in the Cryptol),
 # through the SHA-256 instance of the generic Main, as packaging/Hash.cry
-# instantiates them for SHA256.cry. M3.2 (#20) fills in the implementation.
-HMAC::Main::HMAC (SHA-256)      | Foundation_Spark.HMAC.SHA256.HMAC                 | -
-HMAC::Main::HMAC_init (SHA-256) | Foundation_Spark.HMAC.SHA256.HMAC_init            | -
+# instantiates them for SHA256.cry. M3.2 (#20) fills in the implementation:
+# SHA256_Impl.HMAC_SHA256 (bytes, λ = 256, over two SHA256_Stream contexts)
+# and SHA256_Impl.Init_Key (K0), each proved equal to the spec on the bits.
+# The incremental Init/Update/Final is the same function and adds no row.
+HMAC::Main::HMAC (SHA-256)      | Foundation_Spark.HMAC.SHA256.HMAC                 | Foundation_Spark.HMAC.SHA256_Impl.HMAC_SHA256
+HMAC::Main::HMAC_init (SHA-256) | Foundation_Spark.HMAC.SHA256.HMAC_init            | Foundation_Spark.HMAC.SHA256_Impl.Init_Key
