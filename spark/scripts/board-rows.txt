@@ -66,3 +66,9 @@ SHA2::Functions::SIGMA_256_1  | Foundation_Spark.SHA2.Functions.SIGMA_256_1     
 SHA2::Functions::sigma_256_0  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0   | -
 SHA2::Functions::sigma_256_1  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1   | -
 SHA2::Main::step (SHA-256)    | Foundation_Spark.SHA2.SHA256.Step                   | -
+
+# SHA-2 (#15): Preprocessing.cry's pad and parse (stated in the generic Main,
+# whose formals fix w) and Main.cry's hash, through the SHA-256 instance.
+SHA2::Preprocessing::pad (SHA-256)   | Foundation_Spark.SHA2.SHA256.Pad     | -
+SHA2::Preprocessing::parse (SHA-256) | Foundation_Spark.SHA2.SHA256.Parse   | -
+SHA2::Main::hash (SHA-256)    | Foundation_Spark.SHA2.SHA256.Hash                   | -
