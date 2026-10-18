@@ -154,7 +154,8 @@ $ scripts/check-ffi.sh prop_Dot               # only these properties
 ```
 
 It needs Cryptol 3.6 built with FFI support (`cryptol --version` says "FFI
-enabled") on `PATH`, or named by `CRYPTOL`, and bash 4. It sets
+enabled") on `PATH`, or named by `CRYPTOL`, with z3 on `PATH` (Cryptol's type
+checker needs it), and bash 4. It sets
 `CRYPTOLPATH` to the repository root and `cryptol/`, so a property module
 imports `algorithms::AES::GF28` by its NSA name.
 
@@ -252,8 +253,9 @@ the wrapper.
 
 **CI** runs `check-ffi.sh` in its own job (`FFI (Cryptol, linux x86_64)`,
 `.github/workflows/spark-ci.yml`) on `ubuntu-24.04`, x86_64: Cryptol has no
-arm64 Linux release. It installs the `cryptol-3.6.0-ubuntu-24.04-X64`
-release, checked against its sha256, and the same Alire toolchain.
+arm64 Linux release. It installs the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers`
+release, checked against its sha256 (the release without solvers does not
+start: Cryptol's type checker needs z3), and the same Alire toolchain.
 
 ## Gates
 
@@ -276,4 +278,7 @@ is a script here that runs the same way locally:
   entity of a tracked unit that gnatprove skipped (a generic instance
   without `pragma SPARK_Mode (On)` is skipped whole, and gnatprove still says
   "Success"), unless the trust manifest lists a `spark-mode-off` site in that
-  unit, and a tracked unit with no entity analyzed.
+  unit, and a tracked unit with no entity analyzed. An imported subprogram
+  (an FFI export unit's `Import` of its ghost shim) has no body and is
+  reported skipped; it is allowed when its file is a `foreign-binding`
+  entry and its declaration carries `Import`.
