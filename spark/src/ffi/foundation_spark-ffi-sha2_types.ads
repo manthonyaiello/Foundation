@@ -59,6 +59,9 @@ is
    --  The C buffer of a [n][8], typed at Max_Buffer_Bytes bytes. Only the
    --  first n are the caller's.
 
+   subtype Key_Block_Bytes is SHA2.SHA256_Bytes.Byte_Array (0 .. 63);
+   --  The C buffer of a [64][8]: HMAC's B-byte key K0 at SHA-256.
+
    Max_Buffer_Blocks : constant := Max_Buffer_Bytes / 64;
    --  The most 16-word blocks a Block_Buffer may hold.
 

@@ -90,3 +90,16 @@ SPARK/SHA2/SHA256.cry        | prop_Stream_Hash_FIPS    | SHA2::Main::hash (SHA-
 SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked      | SHA2::Main::hash (SHA-256, bytes)    | check   | 100
 SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked_long | SHA2::Main::hash (SHA-256, bytes)    | check   | 3
 SPARK/SHA2/SHA256.cry        | prop_Stream_Chunked_FIPS | SHA2::Main::hash (SHA-256, bytes)    | check   | 100
+SPARK/HMAC/SHA256.cry        | prop_HMAC_texts            | HMAC::Main::HMAC (SHA-256)           | check   | 3
+SPARK/HMAC/SHA256.cry        | prop_HMAC_keys             | HMAC::Main::HMAC (SHA-256)           | check   | 5
+SPARK/HMAC/SHA256.cry        | prop_HMAC_bits             | HMAC::Main::HMAC (SHA-256)           | check   | 5
+SPARK/HMAC/SHA256.cry        | prop_HMAC_RFC4231          | HMAC::Main::HMAC (SHA-256)           | exhaust | 1
+SPARK/HMAC/SHA256.cry        | prop_HMAC_init             | HMAC::Main::HMAC_init (SHA-256)      | check   | 5
+SPARK/HMAC/SHA256.cry        | prop_HMAC_SHA256_texts     | HMAC::Main::HMAC (SHA-256)           | check   | 30
+SPARK/HMAC/SHA256.cry        | prop_HMAC_SHA256_keys      | HMAC::Main::HMAC (SHA-256)           | check   | 30
+SPARK/HMAC/SHA256.cry        | prop_HMAC_SHA256_long      | HMAC::Main::HMAC (SHA-256)           | check   | 3
+SPARK/HMAC/SHA256.cry        | prop_HMAC_SHA256_RFC4231   | HMAC::Main::HMAC (SHA-256)           | exhaust | 1
+SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked          | HMAC::Main::HMAC (SHA-256)           | check   | 30
+SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked_long     | HMAC::Main::HMAC (SHA-256)           | check   | 3
+SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked_RFC4231  | HMAC::Main::HMAC (SHA-256)           | check   | 100
+SPARK/HMAC/SHA256.cry        | prop_Init_Key              | HMAC::Main::HMAC_init (SHA-256)      | check   | 100
