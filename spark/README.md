@@ -309,7 +309,9 @@ share.
   against `Main.cry`'s `AES` in the same property.
 - **Targeted, not volume.** Executed, the ghost `KeyExpansion` is
   exponential in its `W` recursion: a ghost `KeyExpansion`, `Encrypt` or
-  `Decrypt` property took 72–83 s per 1,000 tests at k = 128 in CI. So the
+  `Decrypt` property took 96–109 s per 1,000 tests at k = 128 in CI on
+  `1a2e0af` (28–54 s at k = 192 and 256), and the 27 such properties
+  1,095 s of the FFI job's 27 minutes. So the
   random samples (1,000 per property, per key size) are drawn on the
   executables, which are proved equal to the spec (`Expand_Key =
   KeyExpansion`, `Encrypt_Block = Cipher`, `Decrypt_Block = InvCipher`,
