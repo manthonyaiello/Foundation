@@ -143,6 +143,9 @@ on_exit() {
   exit "$status"
 }
 trap on_exit EXIT
+# Name the command that stopped the run: set -e alone exits silently.
+set -E
+trap 'echo "!! line $LINENO: \`$BASH_COMMAND\` failed (exit $?)" >&2' ERR
 
 begin() { CURRENT="$1"; CURRENT_T0="$(date +%s)"; log "phase $1"; }
 end() {
@@ -193,7 +196,8 @@ ensure_libs() {
   for f in "$dir"/bin/*; do
     if [ ! -f "$f" ] || [ ! -x "$f" ]; then continue; fi
     file_is_elf "$f" || continue
-    missing="$missing$(ldd "$f" 2>/dev/null | awk '/not found/ { print $1 }')"$'\n'
+    # ldd exits 1 on a static executable; that is not a missing library.
+    missing="$missing$( { ldd "$f" 2>/dev/null || true; } | awk '/not found/ { print $1 }')"$'\n'
   done
   missing="$(printf '%s' "$missing" | sed '/^$/d' | sort -u)"
   [ -z "$missing" ] && return 0
