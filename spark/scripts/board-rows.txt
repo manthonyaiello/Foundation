@@ -72,3 +72,10 @@ SHA2::Main::step (SHA-256)    | Foundation_Spark.SHA2.SHA256.Step               
 SHA2::Preprocessing::pad (SHA-256)   | Foundation_Spark.SHA2.SHA256.Pad     | -
 SHA2::Preprocessing::parse (SHA-256) | Foundation_Spark.SHA2.SHA256.Parse   | -
 SHA2::Main::hash (SHA-256)    | Foundation_Spark.SHA2.SHA256.Hash                   | -
+
+# SHA-2 (#16): the byte-level refinement of hash at SHA-256. Hash_Bytes is not
+# a Cryptol declaration: it is SHA256::hash over a message of whole bytes,
+# proved equal to SHA256.Hash on their bits (Lemma_Hash_Bytes). Its FFI check
+# is against SHA256::hash through a byte-packing wrapper; M2.4 (#17) fills in
+# the implementation.
+SHA2::Main::hash (SHA-256, bytes) | Foundation_Spark.SHA2.SHA256_Bytes.Hash_Bytes | -
