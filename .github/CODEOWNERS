@@ -19,6 +19,13 @@
 /spark/scripts/proof-xfail.txt              @manthonyaiello
 /spark/scripts/check-proof.sh               @manthonyaiello
 /spark/scripts/prove.sh                     @manthonyaiello
+
+# A unit listed here is not proved by the default gate: an entry is a claim
+# that a proof was run elsewhere, at the recorded commit.
+/spark/scripts/proof-slow.txt               @manthonyaiello
+/spark/scripts/slow_proofs.py               @manthonyaiello
+/spark/scripts/prove-slow.sh                @manthonyaiello
+/spark/scripts/test-slow-proofs.sh          @manthonyaiello
 /spark/scripts/board.py                     @manthonyaiello
 /spark/scripts/board-rows.txt               @manthonyaiello
 

@@ -50,7 +50,11 @@ jobs:
     needs: guard
     if: needs.guard.outputs.run == 'true'
     uses: ./.github/workflows/spark-prove.yml
+    # Like the PR gate, this cold run skips the slow units listed in
+    # spark/scripts/proof-slow.txt (check-proof.sh does), and fails if one's
+    # recorded proof is stale. Cold, so its bound is twice the PR job's.
     with:
       purge: true
       restore: false
       save: true
+      timeout: 60

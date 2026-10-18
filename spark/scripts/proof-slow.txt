@@ -1,0 +1,24 @@
+# proof-slow.txt -- units proved on demand, not by the default proof gate.
+#
+# A unit whose proof is too slow for the default gate (check-proof.sh, CI's
+# prove job) is proved by scripts/prove-slow.sh instead, locally or by the
+# "SPARK prove slow units" workflow. The default gate skips it, prints its
+# entry's commit, and FAILS when its inputs no longer match the fingerprint
+# below: the recorded proof is then not this tree's. README "Slow proofs".
+#
+# A unit is slow when one of its files carries the marker comment
+#     --  Slow proof: proved on demand (scripts/proof-slow.txt).
+# and this file must list exactly the marked units.
+#
+# Entries are written by scripts/prove-slow.sh after a successful proof
+# (scripts/slow_proofs.py record), never by hand, except `reason`:
+#
+#   unit <file under spark/, the one with the unit's Proof_Switches>
+#     reason      why it is slow (measured)
+#     commit      the commit it was proved at
+#     date        the date of that proof (UTC)
+#     level       the committed level it was proved at (the GPR's)
+#     checks      checks proved / total, from its .spark
+#     fingerprint sha256 over the input lines, sorted by name
+#     input       <sha256, 16 hex> <name>     one per input, computed by
+#                                             scripts/slow_proofs.py

@@ -14,6 +14,9 @@ remembering it. It reads, relative to spark/:
   scripts/board-rows.txt       the rows: function -> spec entity, impl entity
   obj/ffi/ffi-results.txt      the FFI log written by scripts/check-ffi.sh
                                (M0.3); "not run" while it does not exist
+  scripts/proof-slow.txt       the units proved on demand: their recorded
+                               proofs, checked against their fingerprints
+                               (README "Slow proofs")
 
 and prints the board as markdown (default) or JSON. Python 3 standard library
 only. The formats of board-rows.txt and the FFI log are in spark/README.md
@@ -274,14 +277,72 @@ def holes_of(cells):
     return h
 
 
+def slow_units(root):
+    """{unit: its proof-slow.txt record}, with whether its fingerprint is current.
+
+    A slow unit is proved on demand (scripts/prove-slow.sh), not by the
+    default gate, so the board reports its recorded proof, not a .spark file
+    (README "Slow proofs"). "current" is None when the fingerprint cannot be
+    computed here (no gnatprove for its version lines).
+    """
+    sys.dont_write_bytecode = True  # no __pycache__ in scripts/
+    import slow_proofs  # scripts/slow_proofs.py, beside this file
+    try:
+        entries = slow_proofs.read_manifest(slow_proofs.manifest_path(root))
+    except slow_proofs.ManifestError as e:
+        print("board.py: %s" % e, file=sys.stderr)
+        return {}
+    try:
+        tools = slow_proofs.tool_versions(root)
+    except slow_proofs.ManifestError:
+        tools = None
+    out = {}
+    for rel, e in entries:
+        unit = os.path.splitext(os.path.basename(rel))[0]
+        current = None
+        if tools is not None:
+            try:
+                cur, _ = slow_proofs.compute_inputs(root, rel, tools=tools)
+                current = slow_proofs.fingerprint(cur) == e["fingerprint"]
+            except slow_proofs.ManifestError:
+                current = False
+        out[unit] = {"file": rel, "commit": e["commit"], "date": e["date"],
+                     "level": e["level"], "checks": e["checks"], "current": current,
+                     "name": unit.replace("-", ".").lower()}
+    return out
+
+
+def slow_unit_of(slow, name):
+    """The slow unit that declares entity NAME (by its qualified name), or None."""
+    n = name.lower()
+    for unit, s in slow.items():
+        if n == s["name"] or n.startswith(s["name"] + "."):
+            return unit
+    return None
+
+
+def slow_cell(slow, unit, name):
+    """A row's cell for an entity of a slow unit: its recorded proof."""
+    s = slow[unit]
+    return {"entity": name, "found": True, "unit": unit, "slow": s,
+            "level": s["level"], "analyzed": True, "checks": None,
+            "unit_checks": None, "unit_holes": None, "unit_output": "slow"}
+
+
 def build(args):
     """Assemble the whole board as one JSON-ready dictionary."""
     root = args.root
     units = tracked_units(root)
-    spark = read_spark(root)
+    slow = slow_units(root)
+    # A slow unit's .spark, if one is on disk, is not the default gate's: its
+    # recorded proof is reported instead.
+    spark = {u: v for u, v in read_spark(root).items() if u not in slow}
     manifest = [(f[0], f[1]) for _, f in table_lines(os.path.join(root, args.manifest))
                 if len(f) >= 2]
     urows = unit_rows(root, units, spark, manifest)
+    for u in urows:
+        if u["unit"] in slow:
+            u.update(output="slow", slow=slow[u["unit"]])
     by_name = {u["unit"]: u for u in urows}
     ffi = read_ffi(os.path.join(root, args.ffi_log))
     head = git(root, "rev-parse", "HEAD")
@@ -290,13 +351,20 @@ def build(args):
     for _, f in table_lines(os.path.join(root, args.rows)):
         if len(f) != 3:
             continue
-        spec = entity_cell(spark, by_name, f[1])
-        impl = entity_cell(spark, by_name, f[2])
+        cells = []
+        for name in (f[1], f[2]):
+            su = slow_unit_of(slow, name) if name not in ("", "-") else None
+            cells.append(slow_cell(slow, su, name) if su
+                         else entity_cell(spark, by_name, name))
+        spec, impl = cells
         props = None if ffi is None else ffi.get(f[0], [])
         holes = holes_of([spec, impl])
-        impl_proved = bool(impl.get("found") and impl.get("analyzed")
-                           and impl["checks"]["unproved"] == 0
-                           and impl["unit_checks"]["unproved"] == 0)
+        if impl.get("slow"):
+            impl_proved = impl["slow"]["current"] is True
+        else:
+            impl_proved = bool(impl.get("found") and impl.get("analyzed")
+                               and impl["checks"]["unproved"] == 0
+                               and impl["unit_checks"]["unproved"] == 0)
         ffi_ok = bool(props) and all(p["passed"] == p["run"] > 0 for p in props)
         rows.append({
             "function": f[0],
@@ -347,8 +415,20 @@ def fmt_checks(c):
     return s
 
 
+def fmt_slow(s):
+    """A slow unit's recorded proof, or STALE when its fingerprint changed."""
+    at = "proved at %s (on demand)" % s["commit"][:7]
+    if s["current"] is False:
+        return "**STALE** (slow: %s; its inputs changed since)" % at
+    if s["current"] is None:
+        return "slow: %s; fingerprint not checked (no gnatprove)" % at
+    return "slow: %s" % at
+
+
 def fmt_entity(cell, head):
     """The spec or impl cell of a function row."""
+    if cell.get("slow"):
+        return fmt_slow(cell["slow"])
     if cell["entity"] is None:
         return "not yet"
     if not cell["found"]:
@@ -418,15 +498,24 @@ def markdown(b):
         if e and e["skipped"]:
             ents += " (**%d skipped**)" % len(e["skipped"])
         c = u["checks"]
+        s = u.get("slow")
         out.append("| " + " | ".join(
-            ["`%s`" % u["unit"], str(u["level"]), ents, fmt_checks(c),
+            ["`%s`" % u["unit"], str(u["level"]), ents,
+             "%s (recorded)" % s["checks"] if s else fmt_checks(c),
              "-" if c is None else str(c["unproved"])]
-            + [str(u["holes"][k]) for k in HOLE_KINDS] + [u["output"]]) + " |")
+            + [str(u["holes"][k]) for k in HOLE_KINDS]
+            + [fmt_slow(s) if s else u["output"]]) + " |")
     t = b["totals"]
     out += ["", "Totals: %d units, %d checks: %d proved, %d justified, %d unproved. "
             "Holes: %s." % (t["units"], t["checks"], t["proved"], t["justified"],
                             t["unproved"],
                             ", ".join("%d %s" % (t[k], HOLE_TITLES[k]) for k in HOLE_KINDS))]
+    slow = [u for u in b["units"] if u.get("slow")]
+    if slow:
+        out += ["", "Slow units (proved on demand by `scripts/prove-slow.sh`, not by the "
+                "default gate; not in the totals above): " + "; ".join(
+                    "`%s` %s checks, %s" % (u["unit"], u["slow"]["checks"], fmt_slow(u["slow"]))
+                    for u in slow) + "."]
     return "\n".join(out) + "\n"
 
 

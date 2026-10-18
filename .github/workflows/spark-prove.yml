@@ -5,9 +5,13 @@ name: SPARK prove
 # file-based cache. gnatprove reasons about the source, not the target, so one
 # Linux run is authoritative.
 #
-# Callers differ only in three booleans:
-#   * spark-ci.yml                   restore: true, save on main  (warm)
-#   * spark-proof-cache-refresh.yml  purge: true, save: true      (daily cold)
+# Callers differ only in three booleans and a timeout:
+#   * spark-ci.yml                   restore: true, save on main  (warm, 30 min)
+#   * spark-proof-cache-refresh.yml  purge: true, save: true      (daily cold, 60 min)
+#
+# Both skip the slow units, as check-proof.sh does (spark/README.md "Slow
+# proofs"): they are proved on demand by spark-prove-slow.yml, whose results
+# never enter this cache.
 #
 # Saving is the trust decision. A PR restores the cache main published and
 # never writes one, so a branch cannot poison the cache main trusts; the
@@ -27,6 +31,10 @@ on:
         description: Publish the populated cache under this commit's key.
         type: boolean
         default: false
+      timeout:
+        description: The prove job's timeout-minutes.
+        type: number
+        default: 30
 
 # No `permissions:` block on purpose (memcp issue #13): a reusable workflow's
 # scopes are validated against the caller's grant, not capped by it, so asking
@@ -38,6 +46,10 @@ jobs:
   prove:
     name: Prove (SPARK, linux arm64)
     runs-on: ubuntu-24.04-arm
+    # Bounded: the default gate skips the slow units (spark/scripts/
+    # proof-slow.txt, proved on demand by spark-prove-slow.yml), so a run that
+    # reaches this limit has a unit that belongs there, or a regression.
+    timeout-minutes: ${{ inputs.timeout }}
     env:
       CACHE_DIR: ${{ github.workspace }}/spark/.gnatprove-cache
     steps:
