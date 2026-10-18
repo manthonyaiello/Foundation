@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+#
+# check-ffi.sh -- run every FFI property: the SPARK spec layer against the
+# NSA Cryptol, through Cryptol's foreign function interface (issue #4).
+#
+# 1. Builds the FFI library (foundation_spark_ffi.gpr: the crate with ghost
+#    code and assertions enabled, as a shared, encapsulated, auto-initializing
+#    standalone library).
+# 2. Links it beside every module under cryptol/ as <File>.so (<File>.dylib
+#    on macOS), which is where Cryptol looks for a module's foreign
+#    implementations. The links are build output (gitignored).
+# 3. Runs each property of cryptol/properties.txt in its own `cryptol -b`,
+#    with :exhaust or :check, and writes obj/ffi/ffi-results.txt (the FFI log
+#    that scripts/board.py reads; format in README "The board").
+#
+# A property passes only when ALL of these hold, because Cryptol 3.6 can
+# report a run that never called SPARK without failing it:
+#
+#   * cryptol exits 0, and its output has no ERROR and no counterexample;
+#   * the property's module loaded its library: "Loading module <M>" is
+#     followed by "Loading dynamic library <File>.so". A body-less foreign
+#     whose library is missing does NOT stop the module from loading:
+#     Cryptol warns ("Could not load all foreign implementations") and only
+#     the calls fail;
+#   * no module outside cryptol/ loaded a dynamic library. NSA's foreign
+#     declarations with Cryptol bodies (AES::Cipher, AES::KeyExpansion,
+#     Keccak::StepMappings) fall back to their Cryptol bodies when their
+#     Rust library is absent, as it is in this repository (the .so files are
+#     symlinks into unbuilt rust/*/target/). That fallback is what we want:
+#     the properties compare SPARK with the Cryptol. If someone builds the
+#     Rust, the comparison would silently become SPARK against Rust, so a
+#     library loaded by any other module fails the run;
+#   * Cryptol reports "Passed N tests" with N the property's planned count
+#     (for :exhaust, the size of the domain), and Q.E.D. for :exhaust.
+#
+# A failing property is logged with passed = 0: Cryptol stops at the first
+# counterexample and does not say how many tests passed before it.
+#
+# Usage (from anywhere; needs the Alire workspace, i.e. `alr -n build` once):
+#   scripts/check-ffi.sh                 build, run every property
+#   scripts/check-ffi.sh PROPERTY ...    build, run only these properties
+#                                        (the log then holds only these)
+#
+# Env:
+#   CRYPTOL     the cryptol binary (default: cryptol). It must report
+#               "FFI enabled" in `cryptol --version`.
+#   FFI_JOBS    gprbuild -j (default: nproc). On a shared machine, set it.
+#   ALR         the alr binary (default: alr).
+#
+# Exit status: 0 when every property passed, 1 when one failed, 2 on a usage
+# or setup error.
+#
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="$(cd "$ROOT/.." && pwd)"
+cd "$ROOT"
+
+ALR="${ALR:-alr}"
+CRYPTOL="${CRYPTOL:-cryptol}"
+JOBS="${FFI_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)}"
+
+PROPS="cryptol/properties.txt"
+OUT="obj/ffi"
+RUN="$OUT/run"
+LOG="$OUT/ffi-results.txt"
+
+case "$(uname -s)" in
+  Darwin) EXT=dylib ;;
+  *)      EXT=so ;;
+esac
+LIB="$OUT/lib/libfoundation_spark_ffi.$EXT"
+
+die() { echo "check-ffi.sh: $*" >&2; exit 2; }
+trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; printf '%s' "${s%"${s##*[![:space:]]}"}"; }
+
+command -v "$CRYPTOL" >/dev/null 2>&1 || die "cryptol not found (set CRYPTOL)"
+"$CRYPTOL" --version | grep -q "FFI enabled" \
+  || die "$CRYPTOL was built without FFI support"
+[ -f "$PROPS" ] || die "missing $PROPS"
+
+# --- 1. the library ------------------------------------------------------------
+
+echo ">> building the FFI library (foundation_spark_ffi.gpr, -j$JOBS)"
+"$ALR" -n exec -- gprbuild -p -q -j"$JOBS" -P foundation_spark_ffi.gpr
+[ -f "$LIB" ] || die "the build did not produce $LIB"
+
+# --- 2. the links ---------------------------------------------------------------
+
+# Our modules: every .cry under cryptol/, by its module name. Each gets the
+# library beside it, and only these may load one.
+declare -A OURS=()
+while IFS= read -r cry; do
+  mod="$(sed -nE 's/^[[:space:]]*module[[:space:]]+([A-Za-z0-9_:]+)[[:space:]]+where.*/\1/p' "$cry" | head -n 1)"
+  [ -n "$mod" ] || die "$cry declares no module"
+  OURS["$mod"]="$(basename "$cry" .cry)"
+  dir="$(dirname "$cry")"
+  ln -sfn "$(realpath --relative-to="$dir" "$LIB")" "$dir/$(basename "$cry" .cry).$EXT"
+done < <(find cryptol -name '*.cry' | sort)
+
+# --- 3. the properties -------------------------------------------------------------
+
+mkdir -p "$RUN"
+COMMIT="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if [ -n "$(git -C "$ROOT" status --porcelain -- . 2>/dev/null)" ]; then
+  echo "!! the tree has uncommitted changes: the log names $COMMIT, but the library was built from the working tree" >&2
+fi
+
+export CRYPTOLPATH="$REPO:$ROOT/cryptol"
+
+{
+  echo "# FFI log written by scripts/check-ffi.sh at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "# $("$CRYPTOL" --version | head -n 1), library $LIB"
+  echo "# property | function | mode | run | passed | commit"
+} > "$LOG"
+
+want=("$@")
+fail=0
+ran=0
+
+# Checks the output of one run (file $1) of property $2 from module $3, whose
+# library file is $4, planned as $5 tests in mode $6. Prints what is wrong and
+# returns 1, or prints the number of tests that passed and returns 0.
+judge() {
+  local out="$1" prop="$2" mod="$3" lib="$4" n="$5" mode="$6" bad=0 passed
+  awk -v mod="$mod" -v lib="$lib" '
+    BEGIN { split("", ours) }
+    FNR == NR { ours[$0] = 1; next }
+    /^Loading module / { cur = $3; if (cur == mod) seen = 1; next }
+    /Could not load all foreign implementations for module / {
+      m = $0; sub(/.*for module /, "", m); sub(/:.*$/, "", m)
+      if (m in ours) { print "module " m " did not load its foreign implementations"; bad = 1 }
+      next
+    }
+    /^Loading dynamic library / {
+      if (!(cur in ours)) { print "module " cur " (not ours) loaded " $4; bad = 1 }
+      if (cur == mod && $4 == lib) loaded = 1
+      next
+    }
+    END {
+      if (!seen)   { print "module " mod " was not loaded"; bad = 1 }
+      if (!loaded) { print "module " mod " did not load its library " lib; bad = 1 }
+      exit bad
+    }
+  ' <(printf '%s\n' "${!OURS[@]}") "$out" || bad=1
+  if grep -qE 'ERROR|Counterexample|\[error\]' "$out"; then
+    grep -E 'ERROR|Counterexample|\[error\]' "$out" | head -n 5
+    bad=1
+  fi
+  passed="$(sed -nE 's/.*Passed ([0-9]+) tests\..*/\1/p' "$out" | tail -n 1)"
+  if [ "$passed" != "$n" ]; then
+    echo "expected \"Passed $n tests.\", got ${passed:-none}"
+    bad=1
+  fi
+  if [ "$mode" = exhaust ] && ! grep -q '^Q\.E\.D\.' "$out"; then
+    echo "no Q.E.D. from :exhaust"
+    bad=1
+  fi
+  [ "$bad" -eq 0 ] || return 1
+  echo "$passed"
+}
+
+while IFS='|' read -r file prop func mode n; do
+  file="$(trim "$file")"; prop="$(trim "$prop")"; func="$(trim "$func")"
+  mode="$(trim "$mode")"; n="$(trim "$n")"
+  case "$file" in ''|'#'*) continue ;; esac
+  if [ "${#want[@]}" -gt 0 ] && [[ ! " ${want[*]} " == *" $prop "* ]]; then
+    continue
+  fi
+  [ -f "cryptol/$file" ] || die "$PROPS: no module cryptol/$file"
+  case "$mode" in exhaust|check) ;; *) die "$PROPS: $prop: mode must be exhaust or check" ;; esac
+  [[ "$n" =~ ^[0-9]+$ ]] || die "$PROPS: $prop: tests must be a number"
+  mod="$(sed -nE 's/^[[:space:]]*module[[:space:]]+([A-Za-z0-9_:]+)[[:space:]]+where.*/\1/p' "cryptol/$file" | head -n 1)"
+
+  script="$RUN/$prop.icry"
+  {
+    [ "$mode" = check ] && echo ":set tests=$n"
+    echo ":load $ROOT/cryptol/$file"
+    echo ":$mode $prop"
+  } > "$script"
+
+  echo ">> $prop ($func): :$mode, $n tests"
+  status=0
+  (cd "$REPO" && "$CRYPTOL" -b "$ROOT/$script") > "$RUN/$prop.out" 2>&1 || status=$?
+  ran=$((ran + 1))
+
+  verdict=0
+  result="$(judge "$RUN/$prop.out" "$prop" "$mod" "$(basename "$file" .cry).$EXT" "$n" "$mode")" || verdict=1
+  if [ "$status" -ne 0 ]; then
+    result="cryptol exited $status"$'\n'"$result"
+    verdict=1
+  fi
+
+  if [ "$verdict" -eq 0 ]; then
+    echo "   PASS  $prop: :$mode $result/$n"
+    echo "$prop | $func | $mode | $n | $result | $COMMIT" >> "$LOG"
+  else
+    fail=1
+    echo "   FAIL  $prop: :$mode (output: spark/$RUN/$prop.out)"
+    printf '%s\n' "$result" | sed '/^$/d; s/^/         /'
+    echo "$prop | $func | $mode | $n | 0 | $COMMIT" >> "$LOG"
+  fi
+done < "$PROPS"
+
+[ "$ran" -gt 0 ] || die "no property ran"
+
+if [ -n "${GITHUB_STEP_SUMMARY-}" ]; then
+  {
+    echo "### FFI properties"
+    echo
+    echo '```'
+    grep -v '^#' "$LOG"
+    echo '```'
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "!! FFI CHECK FAILED -- log: spark/$LOG"
+  exit 1
+fi
+echo ">> FFI OK -- $ran propert$( [ "$ran" -eq 1 ] && echo y || echo ies ) passed. Log: spark/$LOG"
