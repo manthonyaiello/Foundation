@@ -26,7 +26,11 @@
 # AES (#11) fills the impl column of every AES row below but Main's: the
 # entities of Foundation_Spark.AES.Impl, each with a postcondition of equality
 # with the row's spec entity. Main.cry's Encrypt and Decrypt are over bits,
-# and the implementation over bytes stops at Cipher and InvCipher.
+# and the implementation over bytes stops at Cipher and InvCipher. Expand_Key,
+# Encrypt_Block, Decrypt_Block and Decrypt_Block_Prime are also exported and
+# FFI-checked (FFI.AES_Impl), against the KeyExpansion, Cipher, InvCipher and
+# InvCipher' rows' functions and, composed, against Main's Encrypt and
+# Decrypt; their properties count towards those rows' FFI column.
 
 # AES (#8): GF28.cry, SBox.cry and Cipher.cry's round transformations.
 # SBox and InvSBox are constant tables, so their entity is the SBox package.

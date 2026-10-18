@@ -290,6 +290,39 @@ share.
   key and conjoins `Tests.cry`'s own `Example<n>KeyExpansion`, so the long
   expected schedules are not copied. Each is a closed `Bit`, run with
   `:exhaust` (1 test).
+- **The executable AES** (`AES.Impl`, #11) is not ghost: its exports
+  (`FFI.AES_Impl`: `spark_Expand_Key`, `spark_Encrypt_Block`,
+  `spark_Decrypt_Block`, `spark_Decrypt_Block_Prime`) call `Expand_Key`
+  and the block ciphers directly, with no ghost shim, in the C shapes of
+  `AES_Types`, and `foundation_spark_ffi.gpr` builds them without
+  `-gnata`, as for SHA-256 below. `KeyExpansion.cry` and `Cipher.cry`
+  declare them and check them against `KeyExpansion` and `Cipher`,
+  `InvCipher` and `InvCipher'` at k = 128, 192 and 256; `Main.cry` composes
+  `Expand_Key` with `Encrypt_Block` or `Decrypt_Block` as `Main.cry`'s
+  `AES` composes `KeyExpansion` with `Cipher` (`implEncrypt`,
+  `implDecrypt`) and checks that against `AES`{k}.Encrypt` and `Decrypt`.
+  The known answers go through them too: FIPS-197 Appendix A
+  (`prop_Expand_Key_FIPS`), Appendix B (`prop_Block_CipherExample`),
+  `Tests.cry`'s `AES<n>Example` (`prop_Impl_AESExamples`), and Appendix C.1
+  to C.3 (`prop_Impl_FIPS197_C`, and `prop_FIPS197_C` through the spec),
+  which `Tests.cry` does not have: copied from the standard, and checked
+  against `Main.cry`'s `AES` in the same property.
+- **Targeted, not volume.** Executed, the ghost `KeyExpansion` is
+  exponential in its `W` recursion: a ghost `KeyExpansion`, `Encrypt` or
+  `Decrypt` property took 96–109 s per 1,000 tests at k = 128 in CI on
+  `1a2e0af` (28–54 s at k = 192 and 256), and the 27 such properties
+  1,095 s of the FFI job's 27 minutes. So the
+  random samples (1,000 per property, per key size) are drawn on the
+  executables, which are proved equal to the spec (`Expand_Key =
+  KeyExpansion`, `Encrypt_Block = Cipher`, `Decrypt_Block = InvCipher`,
+  `Decrypt_Block_Prime = InvCipher'`), and so check the spec's faithfulness
+  through the proofs. The ghost spec's whole-cipher, `KeyExpansion` and
+  `Encrypt`/`Decrypt` properties run 5 tests each, at each key size, which
+  runs each export path, and the known answers above go through the spec
+  too. The byte-level properties (`•`, `xTimes`, `SBox`, `InvSBox`,
+  `Rcon` exhaustively, the round transformations at 10,000) are unchanged.
+  A long run at large N is deferred: N is per property in
+  `properties.txt`.
 
 **SHA-256** (`SPARK/SHA2/{Functions,Preprocessing,SHA256}.cry`) follows the
 same recipe: ghost shim and export units `FFI.SHA2_<Module>` and
