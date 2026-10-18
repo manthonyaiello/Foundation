@@ -9,7 +9,8 @@
 
 ## Board
 
-<!-- Before -> after, per function: spec, FFI-checked, impl proved, SAW.
+<!-- `spark/scripts/board.py` output, before -> after, per function: spec,
+     FFI-checked, impl proved, SAW.
      Hole counts, zero stated as zero: unproved, assumes, justifications,
      SPARK_Mode Off, warning suppressions. -->
 

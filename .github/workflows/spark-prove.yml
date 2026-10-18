@@ -134,6 +134,12 @@ jobs:
           echo "proof cache: $before entries before, $after after; ${secs}s"
           exit "$status"
 
+      # The board (spark/scripts/board.py), counted from this run's .spark
+      # files, in the job summary. It reports and does not gate.
+      - name: Board
+        if: always()
+        run: python3 spark/scripts/board.py >> "$GITHUB_STEP_SUMMARY"
+
       # Only where writing is safe: pushes to main, and the cold refresh.
       - name: Save proof cache
         if: inputs.save
