@@ -1,0 +1,99 @@
+/*
+ * The SPARK spec layer's SHA-256 preprocessing, checked against
+ * algorithms/SHA2/Preprocessing.cry through Cryptol's FFI: the initial hash
+ * value H0_256, and pad and parse at SHA-256's {m, w} = {512, 32}, where
+ * algorithms/SHA2/Main.cry's hash applies them.
+ *
+ * The foreign functions are the C exports of the SPARK crate's FFI library,
+ * which spark/scripts/check-ffi.sh links here as Preprocessing.so. They have
+ * no Cryptol body on purpose (see SPARK/AES/GF28.cry).
+ *
+ * pad takes an [l] of any length, which Cryptol's C calling convention
+ * cannot pass (spark/README.md, "Passing bit sequences"). The foreign
+ * function takes it as bytes, [l /^ 8][8] with l passed first, and the
+ * property packs it with Cryptol's own split, after padding it to whole
+ * bytes with zero bits that the SPARK shim does not read (it takes the first
+ * l bits back). The padded message, 64 * N bytes, is joined back. parse
+ * takes its [N * 512] as [N * 64][8] the same way.
+ *
+ * A length is a type, so each property names the lengths it covers: pad at
+ * the padding boundaries, parse at every N = 0 .. 8 blocks (by recursion
+ * on N, parseUpTo), on random contents.
+ */
+module SPARK::SHA2::Preprocessing where
+
+import algorithms::SHA2::Preprocessing
+
+/** Foundation_Spark.FFI.SHA2_Preprocessing.H0_256, as a function of (). */
+foreign spark_H0_256 : () -> [8][32]
+
+/**
+ * Foundation_Spark.FFI.SHA2_Preprocessing.Pad: the SPARK spec's Pad at
+ * SHA-256, over bytes.
+ */
+foreign spark_pad :
+  {l} (fin l, 64 >= width l) => [l /^ 8][8] -> [64 * ((65 + l) /^ 512)][8]
+
+/**
+ * Foundation_Spark.FFI.SHA2_Preprocessing.Parse: the SPARK spec's Parse at
+ * SHA-256, over bytes.
+ */
+foreign spark_parse : {N} (fin N) => [N * 64][8] -> [N][16][32]
+
+/** An [l] as bytes: split (M # zero), the last byte padded with zeros. */
+toBytes : {l} (fin l) => [l] -> [l /^ 8][8]
+toBytes M = split (M # (zero : [8 * (l /^ 8) - l]))
+
+/** The SPARK H0_256 is Preprocessing.cry's (a closed Bit: one test). */
+property prop_H0_256 = spark_H0_256 () == H0_256
+
+/** The SPARK pad is Preprocessing.cry's pad`{512, 32} on an [l]. */
+padAt : {l} (fin l, 64 >= width l) => [l] -> Bit
+padAt M = join (spark_pad`{l} (toBytes M)) == pad`{512, 32, l, (l + 65) %^ 512} M
+
+/**
+ * The SPARK pad is Preprocessing.cry's pad`{512, 32} at the boundary
+ * lengths of SHA256.cry's hash (0, 1, 55, 56, 63, 64, 65, 119, 120, 127
+ * and 128 bytes) and at bit lengths that are not whole bytes around them
+ * (447 bits is the longest message whose padding fits one block), on
+ * random contents.
+ */
+prop_pad : [1024] -> Bit
+property prop_pad m =
+     padAt (take`{0} m)
+  /\ padAt (take`{1} m)
+  /\ padAt (take`{7} m)
+  /\ padAt (take`{8} m)
+  /\ padAt (take`{9} m)
+  /\ padAt (take`{439} m)
+  /\ padAt (take`{440} m)
+  /\ padAt (take`{441} m)
+  /\ padAt (take`{447} m)
+  /\ padAt (take`{448} m)
+  /\ padAt (take`{449} m)
+  /\ padAt (take`{455} m)
+  /\ padAt (take`{504} m)
+  /\ padAt (take`{505} m)
+  /\ padAt (take`{511} m)
+  /\ padAt (take`{512} m)
+  /\ padAt (take`{513} m)
+  /\ padAt (take`{520} m)
+  /\ padAt (take`{952} m)
+  /\ padAt (take`{960} m)
+  /\ padAt (take`{1016} m)
+  /\ padAt (take`{1017} m)
+  /\ padAt (take`{1024} m)
+
+/** The SPARK parse is Preprocessing.cry's parse`{32, N} at N blocks. */
+parseAt : {N} (fin N, N <= 8) => [9][8 * 512] -> Bit
+parseAt ps = spark_parse`{N} (split P) == parse`{32, N} P
+  where P = take`{N * 512} (ps @ `N)
+
+/** parseAt at every N <= n. */
+parseUpTo : {n} (fin n, n <= 8) => [9][8 * 512] -> Bit
+parseUpTo ps = if `n == (0 : Integer) then parseAt`{0} ps
+               else parseAt`{n} ps /\ parseUpTo`{max 1 n - 1} ps
+
+/** The SPARK parse is Preprocessing.cry's parse`{32, N} at N = 0 .. 8. */
+prop_parse : [9][8 * 512] -> Bit
+property prop_parse = parseUpTo`{8}

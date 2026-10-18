@@ -1,0 +1,69 @@
+/*
+ * The SPARK spec layer's SHA-2 functions at SHA-256's word size, checked
+ * against algorithms/SHA2/Functions.cry through Cryptol's FFI.
+ *
+ * The foreign functions are the C exports of the SPARK crate's FFI library
+ * (spark/foundation_spark_ffi.gpr), which spark/scripts/check-ffi.sh links
+ * here as Functions.so. They have no Cryptol body on purpose (see
+ * SPARK/AES/GF28.cry).
+ *
+ * Ch and Maj are polymorphic in the Cryptol; SHA-256 uses them at [32], and
+ * the SPARK spec's SHA256 instance has them there (Logical). The domains
+ * are 2^^96 for Ch and Maj and 2^^32 for the four SIGMA/sigma functions,
+ * so each is a :check, with the test count stated in
+ * spark/cryptol/properties.txt. K_256 is a constant: one test.
+ */
+module SPARK::SHA2::Functions where
+
+import algorithms::SHA2::Functions
+
+/** Foundation_Spark.FFI.SHA2_Functions.Ch: the SPARK spec's Ch at [32]. */
+foreign spark_Ch : [32] -> [32] -> [32] -> [32]
+
+/** Foundation_Spark.FFI.SHA2_Functions.Maj: the SPARK spec's Maj at [32]. */
+foreign spark_Maj : [32] -> [32] -> [32] -> [32]
+
+/** Foundation_Spark.FFI.SHA2_Functions.SIGMA_256_0. */
+foreign spark_SIGMA_256_0 : [32] -> [32]
+
+/** Foundation_Spark.FFI.SHA2_Functions.SIGMA_256_1. */
+foreign spark_SIGMA_256_1 : [32] -> [32]
+
+/** Foundation_Spark.FFI.SHA2_Functions.Small_Sigma_256_0: sigma_256_0. */
+foreign spark_sigma_256_0 : [32] -> [32]
+
+/** Foundation_Spark.FFI.SHA2_Functions.Small_Sigma_256_1: sigma_256_1. */
+foreign spark_sigma_256_1 : [32] -> [32]
+
+/**
+ * Foundation_Spark.FFI.SHA2_Functions.K_256: the SPARK spec's K_256. A
+ * foreign function needs an argument, so the constant is a function of ().
+ */
+foreign spark_K_256 : () -> [64][32]
+
+/** The SPARK Ch is Functions.cry's Ch at [32]. */
+prop_Ch : [32] -> [32] -> [32] -> Bit
+property prop_Ch x y z = spark_Ch x y z == Ch (x, y, z)
+
+/** The SPARK Maj is Functions.cry's Maj at [32]. */
+prop_Maj : [32] -> [32] -> [32] -> Bit
+property prop_Maj x y z = spark_Maj x y z == Maj (x, y, z)
+
+/** The SPARK SIGMA_256_0 is Functions.cry's. */
+prop_SIGMA_256_0 : [32] -> Bit
+property prop_SIGMA_256_0 x = spark_SIGMA_256_0 x == SIGMA_256_0 x
+
+/** The SPARK SIGMA_256_1 is Functions.cry's. */
+prop_SIGMA_256_1 : [32] -> Bit
+property prop_SIGMA_256_1 x = spark_SIGMA_256_1 x == SIGMA_256_1 x
+
+/** The SPARK Small_Sigma_256_0 is Functions.cry's sigma_256_0. */
+prop_sigma_256_0 : [32] -> Bit
+property prop_sigma_256_0 x = spark_sigma_256_0 x == sigma_256_0 x
+
+/** The SPARK Small_Sigma_256_1 is Functions.cry's sigma_256_1. */
+prop_sigma_256_1 : [32] -> Bit
+property prop_sigma_256_1 x = spark_sigma_256_1 x == sigma_256_1 x
+
+/** The SPARK K_256 is Functions.cry's K_256 (a closed Bit: one test). */
+property prop_K_256 = spark_K_256 () == K_256

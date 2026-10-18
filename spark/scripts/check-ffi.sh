@@ -82,7 +82,7 @@ command -v "$CRYPTOL" >/dev/null 2>&1 || die "cryptol not found (set CRYPTOL)"
 # --- 1. the library ------------------------------------------------------------
 
 echo ">> building the FFI library (foundation_spark_ffi.gpr, -j$JOBS)"
-"$ALR" -n exec -- gprbuild -p -q -j"$JOBS" -P foundation_spark_ffi.gpr
+"$ALR" -n exec -- gprbuild -p -q -s -j"$JOBS" -P foundation_spark_ffi.gpr
 [ -f "$LIB" ] || die "the build did not produce $LIB"
 
 # --- 2. the links ---------------------------------------------------------------
@@ -181,8 +181,10 @@ while IFS='|' read -r file prop func mode n; do
 
   echo ">> $prop ($func): :$mode, $n tests"
   status=0
+  t0=$SECONDS
   (cd "$REPO" && "$CRYPTOL" -b "$ROOT/$script") > "$RUN/$prop.out" 2>&1 || status=$?
   ran=$((ran + 1))
+  secs=$((SECONDS - t0))
 
   verdict=0
   result="$(judge "$RUN/$prop.out" "$prop" "$mod" "$(basename "$file" .cry).$EXT" "$n" "$mode")" || verdict=1
@@ -192,11 +194,11 @@ while IFS='|' read -r file prop func mode n; do
   fi
 
   if [ "$verdict" -eq 0 ]; then
-    echo "   PASS  $prop: :$mode $result/$n"
+    echo "   PASS  $prop: :$mode $result/$n (${secs} s)"
     echo "$prop | $func | $mode | $n | $result | $COMMIT" >> "$LOG"
   else
     fail=1
-    echo "   FAIL  $prop: :$mode (output: spark/$RUN/$prop.out)"
+    echo "   FAIL  $prop: :$mode (${secs} s; output: spark/$RUN/$prop.out)"
     printf '%s\n' "$result" | sed '/^$/d; s/^/         /'
     echo "$prop | $func | $mode | $n | 0 | $COMMIT" >> "$LOG"
   fi

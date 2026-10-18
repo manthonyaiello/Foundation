@@ -291,6 +291,68 @@ share.
   expected schedules are not copied. Each is a closed `Bit`, run with
   `:exhaust` (1 test).
 
+**SHA-256** (`SPARK/SHA2/{Functions,Preprocessing,SHA256}.cry`) follows the
+same recipe: ghost shim and export units `FFI.SHA2_<Module>` and
+`FFI.SHA2_<Module>_Exports`, with the C shapes in `FFI.SHA2_Types`.
+
+- **Messages of any length.** A message is `[l]`, which the C convention
+  cannot pass, and its length is a type. The foreign functions take bytes,
+  with the length first: ``foreign spark_hash : {l} (fin l, 64 >= width l)
+  => [l /^ 8][8] -> [32][8]`` is `void spark_hash (size_t l, uint8_t *m,
+  uint8_t *out)`. The property passes `split (M # zero)`, the message padded
+  to whole bytes with zero bits, and the shim takes the first `l` bits back
+  (`SHA2_Types.Join_Bits`), so the bit-level spec is checked at bit lengths
+  that are not whole bytes too. The byte-level functions take `[n][8]` and
+  are compared with `SHA256::hash (join M)`. A buffer whose length depends
+  on the type is typed at a fixed maximum (`Byte_Buffer`, 2^24 bytes;
+  `Block_Buffer`; `Cut_Buffer`, 64 cut points) and only the caller's prefix
+  is read or written.
+- **Pass the length explicitly.** `[l /^ 8][8]` does not determine `l`:
+  ``spark_hash (split M)`` on a 24-bit `M` type-checks with `l = 17`, and
+  hashes the first 17 bits. Every call names `l` (``spark_hash`{l}``).
+- **Targeted, not volume.** A length is a type, so a property names the
+  lengths it covers. They are the padding boundaries, 0, 1, 55, 56, 63,
+  64, 65, 119, 120, 127 and 128 bytes (55 bytes is the longest message
+  whose padding fits one block, 119 two), bit lengths around them that are
+  not whole bytes, the FIPS 180-4 examples, and a fixed list of longer
+  lengths drawn at random once. `:check` draws the contents. The executable
+  functions, which are proved equal to the spec (`Compress = Step`, and
+  `Hash` and `Hash_Chunked = Hash_Bytes`, and so `= SHA256.Hash` on the
+  bits by `Lemma_Hash_Bytes`), carry the samples of about 100. The ghost
+  spec functions are checked directly at a handful of tests, so that their
+  own export path runs too, and through the proofs at the rest. A long run
+  at large N is deferred; N is per property in `properties.txt`, so raising
+  it is a one-field change. (`parse` is checked at every N = 0 .. 8 blocks
+  by a recursion on the type, `parseUpTo`: ``parseUpTo`{n}`` checks `n` and
+  calls ``parseUpTo`{max 1 n - 1}``. Cryptol 3.6 accepts this polymorphic
+  recursion.)
+- **Cost.** Measured on aarch64 with `:time`, a call of the ghost spec's
+  `Hash` costs about 2 ms per block (1.8 ms for one block, 10.6 ms for
+  five), far less than the call count of `W`'s four-way recursion
+  suggests (why was not investigated). Cryptol's own `SHA256::hash` costs about 6 ms per block
+  (30 ms for five), so the reference side, not the spec, sets the time of
+  a hash property. The executable `SHA256_Stream.Hash` takes about 20 us
+  for five blocks.
+- **`step` and the constants.** `algorithms::SHA2::SHA256` instantiates
+  `Main` privately and exports only `hash` (and `HMAC`, `PBKDF2`). The
+  module instantiates `Main` again with `SHA256.cry`'s parameters, copied,
+  and compares the SPARK `step` with that. `K_256` and `H0_256` are
+  constants, so their foreign functions take `()`.
+- **The executable SHA-256** (`SHA256_Stream`) is not ghost: its exports
+  (`FFI.SHA2_SHA256_Stream`) call `Hash` and `Hash_Chunked` (Init, Update on
+  each chunk, Final) directly, with no ghost shim. A chunking is `[c][64]`,
+  the ends of the chunks, which the property draws at random and makes valid
+  (mod `n + 1`, then `sort`). `foundation_spark_ffi.gpr` builds these units
+  without `-gnata`, as a client builds them: executed, their contracts and
+  invariants would run the ghost spec in every `Update` (`Models` folds
+  `Step` over the whole message so far): one test of every length 0..300
+  bytes did not finish in ten minutes. No unit built with `-gnata` refers to their
+  ghost entities, so the link still resolves. `check-ffi.sh` builds with
+  `gprbuild -s`, so that a change of switches recompiles.
+- **Known answers.** The FIPS 180-4 examples (`""`, `"abc"`, the 448- and
+  896-bit messages) go through each SPARK function, against the published
+  digests, and through `SHA256::hash`.
+
 **CI** runs `check-ffi.sh` in its own job (`FFI (Cryptol, linux x86_64)`,
 `.github/workflows/spark-ci.yml`) on `ubuntu-24.04`, x86_64: Cryptol has no
 arm64 Linux release. It installs the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers`
