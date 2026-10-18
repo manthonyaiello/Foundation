@@ -1,0 +1,35 @@
+/*
+ * The SPARK spec layer's S-boxes, checked against algorithms/AES/SBox.cry
+ * through Cryptol's FFI.
+ *
+ * The foreign functions are the C exports of the SPARK crate's FFI library
+ * (spark/foundation_spark_ffi.gpr), which spark/scripts/check-ffi.sh links
+ * here as SBox.so. They have no Cryptol body on purpose (see GF28.cry).
+ */
+module SPARK::AES::SBox where
+
+import algorithms::AES::SBox
+
+/**
+ * Foundation_Spark.FFI.AES_SBox.SBox: the SPARK spec's SBox table, read
+ * at a byte (algorithms/AES/SBox.cry, SBox).
+ */
+foreign spark_SBox : [8] -> [8]
+
+/**
+ * Foundation_Spark.FFI.AES_SBox.InvSBox: the SPARK spec's InvSBox table,
+ * read at a byte (algorithms/AES/SBox.cry, InvSBox).
+ */
+foreign spark_InvSBox : [8] -> [8]
+
+/**
+ * The SPARK SBox is SBox.cry's SBox at every byte (256 tests).
+ */
+prop_SBox : [8] -> Bit
+property prop_SBox b = spark_SBox b == SBox @ b
+
+/**
+ * The SPARK InvSBox is SBox.cry's InvSBox at every byte (256 tests).
+ */
+prop_InvSBox : [8] -> Bit
+property prop_InvSBox b = spark_InvSBox b == InvSBox @ b

@@ -1,0 +1,187 @@
+/*
+ * The SPARK spec layer's AES Encrypt and Decrypt, checked against
+ * algorithms/AES/Main.cry through Cryptol's FFI.
+ *
+ * The foreign functions are the C exports of the SPARK crate's FFI library
+ * (spark/foundation_spark_ffi.gpr), which spark/scripts/check-ffi.sh links
+ * here as Main.so. They have no Cryptol body on purpose (see GF28.cry).
+ *
+ * Main.cry's Encrypt and Decrypt take a [k] key and a [128] block, which
+ * Cryptol's C calling convention cannot pass (spark/README.md, "Passing bit
+ * sequences"). The foreign functions take them as bytes instead, and the
+ * properties convert with Cryptol's own split and join: a SPARK function is
+ * called as join (spark_Encrypt`{k} (split key) (split in)). The SPARK
+ * shim joins the bytes back into the spec's bit sequences, so the check
+ * covers that conversion too.
+ *
+ * The domains are 2^(k + 128), so each property is a :check, with the test
+ * count stated in spark/cryptol/properties.txt. Encrypt and Decrypt are
+ * checked at each key size k = 128, 192 and 256 through one SPARK export
+ * each (Cryptol passes {k} as a leading size_t), and so are the spec's
+ * AES128, AES192 and AES256 instances, through an export each.
+ */
+module SPARK::AES::Main where
+
+import algorithms::AES::Types
+import algorithms::AES::Main
+
+/**
+ * Foundation_Spark.FFI.AES_Main.Encrypt: the SPARK spec's Encrypt
+ * (algorithms/AES/Main.cry, AES`{k}.Encrypt), over bytes.
+ */
+foreign spark_Encrypt : {k} (Key k) => [k / 8][8] -> [16][8] -> [16][8]
+
+/**
+ * Foundation_Spark.FFI.AES_Main.Decrypt: the SPARK spec's Decrypt
+ * (algorithms/AES/Main.cry, AES`{k}.Decrypt), over bytes.
+ */
+foreign spark_Decrypt : {k} (Key k) => [k / 8][8] -> [16][8] -> [16][8]
+
+/** Foundation_Spark.FFI.AES_Main.AES128_Encrypt: AES128.Encrypt, over bytes. */
+foreign spark_AES128_Encrypt : [16][8] -> [16][8] -> [16][8]
+
+/** Foundation_Spark.FFI.AES_Main.AES128_Decrypt: AES128.Decrypt, over bytes. */
+foreign spark_AES128_Decrypt : [16][8] -> [16][8] -> [16][8]
+
+/** Foundation_Spark.FFI.AES_Main.AES192_Encrypt: AES192.Encrypt, over bytes. */
+foreign spark_AES192_Encrypt : [24][8] -> [16][8] -> [16][8]
+
+/** Foundation_Spark.FFI.AES_Main.AES192_Decrypt: AES192.Decrypt, over bytes. */
+foreign spark_AES192_Decrypt : [24][8] -> [16][8] -> [16][8]
+
+/** Foundation_Spark.FFI.AES_Main.AES256_Encrypt: AES256.Encrypt, over bytes. */
+foreign spark_AES256_Encrypt : [32][8] -> [16][8] -> [16][8]
+
+/** Foundation_Spark.FFI.AES_Main.AES256_Decrypt: AES256.Decrypt, over bytes. */
+foreign spark_AES256_Decrypt : [32][8] -> [16][8] -> [16][8]
+
+/** The SPARK Encrypt at key size k, on bits: split, call, join. */
+sparkEncrypt : {k} (Key k) => [k] -> [128] -> [128]
+sparkEncrypt key in = join (spark_Encrypt`{k} (split key) (split in))
+
+/** The SPARK Decrypt at key size k, on bits: split, call, join. */
+sparkDecrypt : {k} (Key k) => [k] -> [128] -> [128]
+sparkDecrypt key in = join (spark_Decrypt`{k} (split key) (split in))
+
+/** The SPARK Encrypt is Main.cry's AES`{k}.Encrypt. */
+prop_Encrypt : {k} (Key k) => [k] -> [128] -> Bit
+prop_Encrypt key in = sparkEncrypt`{k} key in == AES`{k}.Encrypt key in
+
+/** The SPARK Decrypt is Main.cry's AES`{k}.Decrypt. */
+prop_Decrypt : {k} (Key k) => [k] -> [128] -> Bit
+prop_Decrypt key in = sparkDecrypt`{k} key in == AES`{k}.Decrypt key in
+
+/** prop_Encrypt at k = 128. */
+prop_Encrypt128 : [128] -> [128] -> Bit
+property prop_Encrypt128 = prop_Encrypt`{128}
+
+/** prop_Encrypt at k = 192. */
+prop_Encrypt192 : [192] -> [128] -> Bit
+property prop_Encrypt192 = prop_Encrypt`{192}
+
+/** prop_Encrypt at k = 256. */
+prop_Encrypt256 : [256] -> [128] -> Bit
+property prop_Encrypt256 = prop_Encrypt`{256}
+
+/** prop_Decrypt at k = 128. */
+prop_Decrypt128 : [128] -> [128] -> Bit
+property prop_Decrypt128 = prop_Decrypt`{128}
+
+/** prop_Decrypt at k = 192. */
+prop_Decrypt192 : [192] -> [128] -> Bit
+property prop_Decrypt192 = prop_Decrypt`{192}
+
+/** prop_Decrypt at k = 256. */
+prop_Decrypt256 : [256] -> [128] -> Bit
+property prop_Decrypt256 = prop_Decrypt`{256}
+
+/** The SPARK AES128.Encrypt is Main.cry's AES128.Encrypt. */
+prop_AES128_Encrypt : [128] -> [128] -> Bit
+property prop_AES128_Encrypt key in =
+  join (spark_AES128_Encrypt (split key) (split in)) == AES128.Encrypt key in
+
+/** The SPARK AES128.Decrypt is Main.cry's AES128.Decrypt. */
+prop_AES128_Decrypt : [128] -> [128] -> Bit
+property prop_AES128_Decrypt key in =
+  join (spark_AES128_Decrypt (split key) (split in)) == AES128.Decrypt key in
+
+/** The SPARK AES192.Encrypt is Main.cry's AES192.Encrypt. */
+prop_AES192_Encrypt : [192] -> [128] -> Bit
+property prop_AES192_Encrypt key in =
+  join (spark_AES192_Encrypt (split key) (split in)) == AES192.Encrypt key in
+
+/** The SPARK AES192.Decrypt is Main.cry's AES192.Decrypt. */
+prop_AES192_Decrypt : [192] -> [128] -> Bit
+property prop_AES192_Decrypt key in =
+  join (spark_AES192_Decrypt (split key) (split in)) == AES192.Decrypt key in
+
+/** The SPARK AES256.Encrypt is Main.cry's AES256.Encrypt. */
+prop_AES256_Encrypt : [256] -> [128] -> Bit
+property prop_AES256_Encrypt key in =
+  join (spark_AES256_Encrypt (split key) (split in)) == AES256.Encrypt key in
+
+/** The SPARK AES256.Decrypt is Main.cry's AES256.Decrypt. */
+prop_AES256_Decrypt : [256] -> [128] -> Bit
+property prop_AES256_Decrypt key in =
+  join (spark_AES256_Decrypt (split key) (split in)) == AES256.Decrypt key in
+
+/**
+ * algorithms/AES/Tests.cry's AES128Example [AES Test Vectors], through the
+ * SPARK Encrypt and Decrypt at k = 128. The vectors are copied from
+ * Tests.cry.
+ */
+property prop_AES128Example =
+    map (sparkEncrypt`{128} key) plain  == cipher
+ /\ map (sparkDecrypt`{128} key) cipher == plain
+  where
+    key    = 0x2b7e151628aed2a6abf7158809cf4f3c
+    plain  = [ 0x6bc1bee22e409f96e93d7e117393172a
+             , 0xae2d8a571e03ac9c9eb76fac45af8e51
+             , 0x30c81c46a35ce411e5fbc1191a0a52ef
+             , 0xf69f2445df4f9b17ad2b417be66c3710
+             ]
+    cipher = [ 0x3ad77bb40d7a3660a89ecaf32466ef97
+             , 0xf5d3d58503b9699de785895a96fdbaaf
+             , 0x43b1cd7f598ece23881b00e3ed030688
+             , 0x7b0c785e27e8ad3f8223207104725dd4
+             ]
+
+/**
+ * Tests.cry's AES192Example [AES Test Vectors], through the SPARK Encrypt
+ * and Decrypt at k = 192, as prop_AES128Example.
+ */
+property prop_AES192Example =
+    map (sparkEncrypt`{192} key) plain  == cipher
+ /\ map (sparkDecrypt`{192} key) cipher == plain
+  where
+    key    = 0x8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+    plain  = [ 0x6bc1bee22e409f96e93d7e117393172a
+             , 0xae2d8a571e03ac9c9eb76fac45af8e51
+             , 0x30c81c46a35ce411e5fbc1191a0a52ef
+             , 0xf69f2445df4f9b17ad2b417be66c3710
+             ]
+    cipher = [ 0xbd334f1d6e45f25ff712a214571fa5cc
+             , 0x974104846d0ad3ad7734ecb3ecee4eef
+             , 0xef7afd2270e2e60adce0ba2face6444e
+             , 0x9a4b41ba738d6c72fb16691603c18e0e
+             ]
+
+/**
+ * Tests.cry's AES256Example [AES Test Vectors], through the SPARK Encrypt
+ * and Decrypt at k = 256, as prop_AES128Example.
+ */
+property prop_AES256Example =
+    map (sparkEncrypt`{256} key) plain  == cipher
+ /\ map (sparkDecrypt`{256} key) cipher == plain
+  where
+    key    = 0x603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+    plain  = [ 0x6bc1bee22e409f96e93d7e117393172a
+             , 0xae2d8a571e03ac9c9eb76fac45af8e51
+             , 0x30c81c46a35ce411e5fbc1191a0a52ef
+             , 0xf69f2445df4f9b17ad2b417be66c3710
+             ]
+    cipher = [ 0xf3eed1bdb5d2a03c064b5a7e3db181f8
+             , 0x591ccb10d410ed26dc5ba74a31362870
+             , 0xb6ed21b99ca6f4f9f153e7b1beafed1d
+             , 0x23304b7a39f9f3ff067d8d8f9e24ecc7
+             ]
