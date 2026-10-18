@@ -87,7 +87,8 @@ is
         (for all B in Byte_Index (64 * Q - 8) .. Byte_Index (64 * Q - 1) =>
            Pad_Bytes (M) (B)
            = Length_Byte
-               (8 * Unsigned_64 (N_Bytes), Natural (B - Byte_Index (64 * Q - 8))));
+               (8 * Unsigned_64 (N_Bytes),
+                Natural (B - Byte_Index (64 * Q - 8))));
       pragma Assert
         (for all B in Byte_Index (64 * Q - 8) .. Byte_Index (64 * Q - 1) =>
            (for all T in 0 .. 7 =>
@@ -173,11 +174,14 @@ is
                Byte_Index (64 * I) + 4 * Byte_Index (J));
             pragma Assert
               (Parse_Bytes (Pad_Bytes (M), Nb) (I) (J)
-               = Word_At (Pad_Bytes (M), Byte_Index (64 * I) + 4 * Byte_Index (J)));
+               = Word_At
+                   (Pad_Bytes (M), Byte_Index (64 * I) + 4 * Byte_Index (J)));
             pragma Assert
               (SHA256.Parse (SHA256.Pad (Bits_Of (M)), Nb) (I) (J)
                = SHA256.Word_Of
-                   (SHA256.Pad (Bits_Of (M)), (16 * I + Bit_Index (J)) * 32, 32));
+                   (SHA256.Pad (Bits_Of (M)),
+                    (16 * I + Bit_Index (J)) * 32,
+                    32));
             pragma Loop_Invariant
               (for all J2 in 0 .. J =>
                  Parse_Bytes (Pad_Bytes (M), Nb) (I) (J2)

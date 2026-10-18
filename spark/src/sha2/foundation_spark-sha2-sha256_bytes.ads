@@ -162,10 +162,9 @@ is
    --  @param I The block's index.
    --  @return Block I.
 
-   function Parse_Bytes
-     (P : Byte_Array; N : Bit_Index) return SHA256.Block_Vector
-   is
-     ([for I in 0 .. N - 1 => Block_At (P, I)])
+   function Parse_Bytes (P : Byte_Array; N : Bit_Index)
+     return SHA256.Block_Vector
+   is ([for I in 0 .. N - 1 => Block_At (P, I)])
    with
      Ghost,
      Pre => P'First = 0 and then N <= 2 ** 62 and then P'Length = 64 * N;
