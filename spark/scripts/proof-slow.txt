@@ -22,3 +22,37 @@
 #     fingerprint sha256 over the input lines, sorted by name
 #     input       <sha256, 16 hex> <name>     one per input, computed by
 #                                             scripts/slow_proofs.py
+
+unit src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
+  reason      SBoxCorrect by a generated case enumeration over the 256 bytes (7,700 lines, level 4). Cold: 1h40m47s in CI (#41 at 09475b8); 1102 s of gnatprove on the campaign machine at 46c5799 (6 tokens)
+  commit      46c5799b6b770eca2daf3b11f7358869bdc90d40
+  date        2026-10-18
+  level       4
+  checks      2482/2482
+  fingerprint sha256:c16a15390963b9fab6f926a35fffeef32c95c173cddc99c5f9dfe667d22b74ad
+  input       ad09bcbb5ff17488 gpr: Proof_Switches ("Ada")
+  input       97881b83f6e39847 gpr: Proof_Switches ("foundation_spark-aes-spec-gf2.ads")
+  input       6b31396743fd59e2 gpr: Proof_Switches ("foundation_spark-aes-spec-properties-sbox_entries.adb")
+  input       3eaa6e154b2487e7 gpr: Prove level definitions
+  input       1311f37ae5258f62 scripts/gen-sbox-entries.py
+  input       d226a3424529069a src/aes/foundation_spark-aes-lemmas.adb
+  input       c001096ae0be1f2d src/aes/foundation_spark-aes-lemmas.ads
+  input       1445f27c011ec740 src/aes/foundation_spark-aes-spec-cipher.ads
+  input       2a8b5954e432b09b src/aes/foundation_spark-aes-spec-gf2.ads
+  input       7344617b51cf7327 src/aes/foundation_spark-aes-spec-gf28.ads
+  input       93af4f6592da175a src/aes/foundation_spark-aes-spec-keyexpansion.ads
+  input       ae76aeee86d1ede8 src/aes/foundation_spark-aes-spec-main.ads
+  input       4ae092a7cf3ea69a src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
+  input       d7f70065b4109258 src/aes/foundation_spark-aes-spec-properties-sbox_entries.ads
+  input       bf6418f29c778c2d src/aes/foundation_spark-aes-spec-properties.adb
+  input       3fb2ef19ced9f6d4 src/aes/foundation_spark-aes-spec-properties.ads
+  input       fb0ac536331acdec src/aes/foundation_spark-aes-spec-sbox.ads
+  input       1a4e06160b49b147 src/aes/foundation_spark-aes-spec-types.ads
+  input       7b4ee9d71433c9bc src/aes/foundation_spark-aes-spec.ads
+  input       17a5f08744da9620 src/aes/foundation_spark-aes.ads
+  input       57a3341a74660a95 src/foundation_spark.ads
+  input       71696c8d0667e537 tool: alt-ergo
+  input       be64e49d21ad3911 tool: cvc5
+  input       36c76d87c16060ac tool: gnatprove
+  input       6e8eef5ff967b3a6 tool: why3
+  input       293ce3508e39753b tool: z3

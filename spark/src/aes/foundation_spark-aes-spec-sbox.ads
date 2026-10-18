@@ -1,10 +1,13 @@
 --  The S-boxes, mirroring algorithms/AES/SBox.cry [FIPS-PUB-197 Sections
 --  5.1.1 and 5.3.2].
 --
---  The tables are SBox.cry's, entry for entry. The affine construction
---  that SBox.cry checks the S-box against (affine, SBoxCorrect) is M1.5's,
---  not stated here.
+--  The tables are SBox.cry's, entry for entry. SBoxPolynomial and the
+--  affine construction (affine) are SBox.cry's too: its property
+--  SBoxCorrect, stated and proved in Foundation_Spark.AES.Spec.Properties,
+--  checks the table against affine.
 
+with Foundation_Spark.AES.Spec.GF2;
+with Foundation_Spark.AES.Spec.GF28;
 with Foundation_Spark.AES.Spec.Types;
 
 package Foundation_Spark.AES.Spec.SBox with
@@ -84,5 +87,56 @@ is
       16#e1#, 16#69#, 16#14#, 16#63#, 16#55#, 16#21#, 16#0c#, 16#7d#];
    --  SBox.cry: InvSBox : [256][8]. The inverse S-box [FIPS-PUB-197
    --  Section 5.3.2 and Table 6], read as InvSBox (B) for InvSBox @ b.
+
+   use type Types.Byte;
+
+   SBoxPolynomial : constant GF2.Poly := 2#1_0001_1011#;
+   --  SBox.cry: SBoxPolynomial = <| x^^8 + x^^4 + x^^3 + x + 1 |> : [9],
+   --  the S-box irreducible polynomial [FIPS-PUB-197 Section 4.2].
+
+   function Reversed_Bit (B : Types.Byte; I : GF28.Bit_Index) return Boolean
+   is (GF28.Bit (B, 7 - I));
+   --  Cryptol's (reverse b) @ i on a [8].
+   --  @param B The byte.
+   --  @param I The Cryptol index into reverse b.
+   --  @return Bit 7 - I of B, in Cryptol's order.
+
+   function Affine_Bit (Inv : Types.Byte; I : GF28.Bit_Index) return Boolean
+   is (Reversed_Bit (Inv, I)
+       xor Reversed_Bit (Inv, (I + 4) mod 8)
+       xor Reversed_Bit (Inv, (I + 5) mod 8)
+       xor Reversed_Bit (Inv, (I + 6) mod 8)
+       xor Reversed_Bit (Inv, (I + 7) mod 8)
+       xor Reversed_Bit (16#63#, I));
+   --  SBox.cry, in affine: b'@i = b_@i ^ b_@((i+4) % 8) ^ b_@((i+5) % 8) ^
+   --  b_@((i+6) % 8) ^ b_@((i+7) % 8) ^ c@i, where b_ = reverse Inv and
+   --  c = reverse 0b01100011.
+   --  @param Inv The byte whose reverse is the Cryptol's b_.
+   --  @param I The Cryptol index i.
+   --  @return b'@i.
+
+   function Affine (B : Types.Byte) return Types.Byte
+   is ((if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 0) then 16#01#
+        else 0)
+       or (if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 1) then 16#02#
+           else 0)
+       or (if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 2) then 16#04#
+           else 0)
+       or (if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 3) then 16#08#
+           else 0)
+       or (if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 4) then 16#10#
+           else 0)
+       or (if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 5) then 16#20#
+           else 0)
+       or (if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 6) then 16#40#
+           else 0)
+       or (if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 7) then 16#80#
+           else 0));
+   --  SBox.cry: affine b = reverse b', where b_ = reverse (inverse b
+   --  SBoxPolynomial) and b' is Affine_Bit: the affine transformation
+   --  [FIPS-PUB-197 Section 5.1.1] of the inverse of B. Reversing b' puts
+   --  b'@i at Cryptol index 7 - i, which is the bit of value 2 ** i.
+   --  @param B The Cryptol's b.
+   --  @return affine b.
 
 end Foundation_Spark.AES.Spec.SBox;
