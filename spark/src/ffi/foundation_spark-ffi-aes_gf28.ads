@@ -8,14 +8,12 @@
 --  and AES_GF28_Exports gives it the name Cryptol looks up (see
 --  Foundation_Spark.FFI).
 --
---  Spec_xTimes and Spec_Dot name the spec functions the shims call. They
---  rename the stand-in Foundation_Spark.FFI.GF28 until M1.1's
---  Foundation_Spark.AES.Spec.GF28 is on the stack; pointing the shims at
---  that unit changes the with clause and the two renamings. (A package
---  renaming would make it one line, but gnatdoc 26 cannot document one.)
+--  Spec_xTimes and Spec_Dot name the spec functions the shims call, in
+--  M1.1's Foundation_Spark.AES.Spec.GF28. (Function renamings rather than
+--  a package renaming, which gnatdoc 26 cannot document.)
 
 with Interfaces;
-with Foundation_Spark.FFI.GF28;
+with Foundation_Spark.AES.Spec.GF28;
 
 package Foundation_Spark.FFI.AES_GF28 with
   SPARK_Mode,
@@ -28,13 +26,13 @@ is
    --  A Cryptol [8] in the C calling convention: uint8_t.
 
    function Spec_xTimes (B : C_Byte) return C_Byte
-     renames Foundation_Spark.FFI.GF28.xTimes;
+     renames Foundation_Spark.AES.Spec.GF28.xTimes;
    --  The spec function exported as spark_xTimes: GF28.cry's xTimes.
    --  @param B The byte.
    --  @return B • 0x02.
 
    function Spec_Dot (B, C : C_Byte) return C_Byte
-     renames Foundation_Spark.FFI.GF28.Dot;
+     renames Foundation_Spark.AES.Spec.GF28.Dot;
    --  The spec function exported as spark_Dot: GF28.cry's (•).
    --  @param B The first factor.
    --  @param C The second factor.

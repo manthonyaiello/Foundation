@@ -10,8 +10,7 @@ Foundation algorithms, proved against the Cryptol specifications in
 - `src/aes/`, `src/sha2/` – per algorithm: a top spec layer that stays
   semantically close to the Cryptol, plus refinement layers proved
   against it
-- `src/ffi/` – the FFI export shims (and, until M1.1 lands, a stand-in
-  GF(2^8) spec), see "The FFI harness"
+- `src/ffi/` – the FFI export shims, see "The FFI harness"
 - `cryptol/` – our Cryptol: the modules that call the SPARK exports by
   `foreign` and state the properties, and `properties.txt`
 

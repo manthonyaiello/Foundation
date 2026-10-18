@@ -38,7 +38,10 @@ project Foundation_Spark_FFI is
    for Library_Interface use
      ("Foundation_Spark",
       "Foundation_Spark.FFI",
-      "Foundation_Spark.FFI.GF28",
+      "Foundation_Spark.AES",
+      "Foundation_Spark.AES.Spec",
+      "Foundation_Spark.AES.Spec.Types",
+      "Foundation_Spark.AES.Spec.GF28",
       "Foundation_Spark.FFI.AES_GF28",
       "Foundation_Spark.FFI.AES_GF28_Exports");
 
