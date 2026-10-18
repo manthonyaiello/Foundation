@@ -1,6 +1,8 @@
 --  The exports Cryptol calls for SHA256.cry: each forwards to its
 --  ghost shim.
 
+with Interfaces;
+
 package body Foundation_Spark.FFI.SHA2_SHA256_Exports with
   SPARK_Mode
 is
@@ -19,6 +21,9 @@ is
       Output : out SHA2.SHA256_Bytes.Digest) is
    begin
       Ghost_Hash (L, M, Output);
+      --  DEMO (reverted in the next commit): flip the low bit of byte 0
+      --  of the digest, to show that the FFI check fails.
+      Output (0) := Interfaces."xor" (Output (0), 1);
    end Hash;
 
    procedure Hash_Bytes
