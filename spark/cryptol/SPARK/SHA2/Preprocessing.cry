@@ -19,6 +19,9 @@
  * A length is a type, so each property names the lengths it covers: pad at
  * the padding boundaries, parse at every N = 0 .. 8 blocks (by recursion
  * on N, parseUpTo), on random contents.
+ *
+ * The executable SHA256_Stream.Load_Block parses one block of bytes; it is
+ * checked against parse`{32, 1} of the block's bits (prop_Load_Block).
  */
 module SPARK::SHA2::Preprocessing where
 
@@ -39,6 +42,12 @@ foreign spark_pad :
  * SHA-256, over bytes.
  */
 foreign spark_parse : {N} (fin N) => [N * 64][8] -> [N][16][32]
+
+/**
+ * Foundation_Spark.FFI.SHA2_SHA256_Stream.Load_Block: the executable
+ * SHA256_Stream.Load_Block, which parses one block of bytes into words.
+ */
+foreign spark_Load_Block : [64][8] -> [16][32]
 
 /** An [l] as bytes: split (M # zero), the last byte padded with zeros. */
 toBytes : {l} (fin l) => [l] -> [l /^ 8][8]
@@ -97,3 +106,11 @@ parseUpTo ps = if `n == (0 : Integer) then parseAt`{0} ps
 /** The SPARK parse is Preprocessing.cry's parse`{32, N} at N = 0 .. 8. */
 prop_parse : [9][8 * 512] -> Bit
 property prop_parse = parseUpTo`{8}
+
+/**
+ * The executable Load_Block is Preprocessing.cry's parse`{32, 1} on the
+ * bits of its 64 bytes: the parse of one block, which the streaming hash
+ * applies to each block as it reaches it.
+ */
+prop_Load_Block : [64][8] -> Bit
+property prop_Load_Block bytes = spark_Load_Block bytes == (parse`{32, 1} (join bytes)) @ 0

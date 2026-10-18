@@ -204,4 +204,17 @@ is
    --  @param Nb The number of blocks in P.
    --  @param N The number of blocks folded.
 
+   procedure Lemma_Block_Parse (M : SHA256_Bytes.Byte_Array; F : Offset)
+   with
+     Pre  => M'Length >= 64 and then F >= M'First and then F <= M'Last - 63,
+     Post =>
+       Block_From (M, F)
+       = SHA256.Parse (SHA256_Bytes.Bits_Of (M (F .. F + 63)), 1) (0);
+   --  The 64 bytes of M from F, read as a block, are Preprocessing.cry's
+   --  `parse`{32, 1}` (Preprocessing.cry:47) of their bits: word J of the
+   --  block is the 32 bits that `split` cuts at 32 * J. Block_From is
+   --  `parse` one block at a time, on bytes.
+   --  @param M The bytes.
+   --  @param F The position of the block's first byte.
+
 end Foundation_Spark.SHA2.SHA256_Blocks;

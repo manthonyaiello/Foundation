@@ -4,6 +4,8 @@ is
 
    use SHA256_Bytes;
 
+   use type Interfaces.Unsigned_32;
+
    --------------------
    -- Lemma_Step_Ext --
    --------------------
@@ -104,5 +106,51 @@ is
             Block_From (P, 64 * Offset (N - 1)));
       end if;
    end Lemma_Foldl_Parse;
+
+   -----------------------
+   -- Lemma_Block_Parse --
+   -----------------------
+
+   procedure Lemma_Block_Parse (M : Byte_Array; F : Offset) is
+      S : constant Byte_Array := M (F .. F + 63);
+      P : constant Bits := Bits_Of (S);
+   begin
+      for J in 0 .. 15 loop
+         for K in 0 .. 3 loop
+            for T in 0 .. 7 loop
+               pragma Assert
+                 ((32 * Bit_Index (J) + 8 * Bit_Index (K) + Bit_Index (T)) / 8
+                  = 4 * Bit_Index (J) + Bit_Index (K));
+               pragma Assert
+                 ((32 * Bit_Index (J) + 8 * Bit_Index (K) + Bit_Index (T))
+                  mod 8 = Bit_Index (T));
+               pragma Assert
+                 (P (32 * Bit_Index (J) + 8 * Bit_Index (K) + Bit_Index (T))
+                  = Byte_Bit (S (F + 4 * Offset (J) + Offset (K)), T));
+               pragma Loop_Invariant
+                 (for all T2 in 0 .. T =>
+                    P (32 * Bit_Index (J) + 8 * Bit_Index (K)
+                       + Bit_Index (T2))
+                    = Byte_Bit (S (F + 4 * Offset (J) + Offset (K)), T2));
+            end loop;
+            pragma Loop_Invariant
+              (for all K2 in 0 .. K =>
+                 (for all T in 0 .. 7 =>
+                    P (32 * Bit_Index (J) + 8 * Bit_Index (K2)
+                       + Bit_Index (T))
+                    = Byte_Bit (S (F + 4 * Offset (J) + Offset (K2)), T)));
+         end loop;
+         Lemma_Word_Of_Bytes (P, 32 * Bit_Index (J), S, F + 4 * Offset (J));
+         pragma Assert
+           (SHA256.Parse (P, 1) (0) (J)
+            = SHA256.Word_Of (P, 32 * Bit_Index (J), 32));
+         pragma Assert
+           (Word_At (S, F + 4 * Offset (J))
+            = Word_At (M, F + 4 * Offset (J)));
+         pragma Loop_Invariant
+           (for all J2 in 0 .. J =>
+              Block_From (M, F) (J2) = SHA256.Parse (P, 1) (0) (J2));
+      end loop;
+   end Lemma_Block_Parse;
 
 end Foundation_Spark.SHA2.SHA256_Blocks;

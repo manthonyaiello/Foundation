@@ -3,7 +3,9 @@
 --  Hash, and Init, Update for each chunk of a chunking, and Final
 --  (SHA256_Stream.Hash_Chunked). They are checked against SHA256.cry's
 --  step (Main.cry's, at its parameters) and hash (SHA256::hash) by
---  spark/cryptol/SPARK/SHA2/SHA256.cry.
+--  spark/cryptol/SPARK/SHA2/SHA256.cry. Load_Block, the parse of one
+--  block, is checked against Preprocessing.cry's parse by
+--  spark/cryptol/SPARK/SHA2/Preprocessing.cry.
 --
 --  The implementation is not ghost, so these need no ghost shim: they call
 --  it directly, and their names are the ones Cryptol looks up. A message
@@ -40,6 +42,19 @@ is
    --  @param H The hash value.
    --  @param B The message block.
    --  @param Output The next hash value, written through Cryptol's output
+   --  pointer.
+
+   procedure Load_Block
+     (B : Key_Block_Bytes; Output : out SHA2.SHA256.Block)
+   with
+     Export,
+     Convention    => C,
+     External_Name => "spark_Load_Block";
+   --  Cryptol's foreign spark_Load_Block : [64][8] -> [16][32]. The
+   --  executable SHA256_Stream.Load_Block of B, proved equal to the spec's
+   --  Parse of B's bits at N = 1.
+   --  @param B The 64 bytes of a block.
+   --  @param Output The block's 16 words, written through Cryptol's output
    --  pointer.
 
    procedure Hash
