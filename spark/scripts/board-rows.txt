@@ -41,3 +41,10 @@ AES::Cipher::AddRoundKey      | Foundation_Spark.AES.Spec.Cipher.AddRoundKey    
 AES::Cipher::Round            | Foundation_Spark.AES.Spec.Cipher.Round              | -
 AES::Cipher::InvRound         | Foundation_Spark.AES.Spec.Cipher.InvRound           | -
 AES::Cipher::InvRound'        | Foundation_Spark.AES.Spec.Cipher.InvRound_Prime     | -
+
+# AES (#9): KeyExpansion.cry. Rcon is a constant table, so its entity is the
+# KeyExpansion package.
+AES::KeyExpansion::KeyExpansion | Foundation_Spark.AES.Spec.KeyExpansion.KeyExpansion | -
+AES::KeyExpansion::Rcon       | Foundation_Spark.AES.Spec.KeyExpansion              | -
+AES::KeyExpansion::RotWord    | Foundation_Spark.AES.Spec.KeyExpansion.RotWord      | -
+AES::KeyExpansion::SubWord    | Foundation_Spark.AES.Spec.KeyExpansion.SubWord      | -

@@ -67,9 +67,6 @@ project Foundation_Spark is
       --     for Proof_Switches ("<file>") use Level_3;
       for Proof_Switches ("Ada") use Level_2 & ("--counterexamples=on");
 
-      --  AES key schedule (#9): committed at level 2.
-      for Proof_Switches ("foundation_spark-aes-spec-keyexpansion.ads")
-        use Level_2;
    end Prove;
 
 end Foundation_Spark;
