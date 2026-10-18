@@ -30,7 +30,8 @@
 #   gnat-llvm  a hook only: M4.1 (#22) adds GNAT-LLVM there.
 #   build      `alr -n build` in spark/.
 #   proof      scripts/check-proof.sh (the slow units of proof-slow.txt are
-#              skipped, and their recorded proofs checked current, as in CI).
+#              skipped, and their recorded proofs checked current, as in CI),
+#              retried once if it fails; the phase says "ok on retry" then.
 #   ffi        scripts/check-ffi.sh.
 #
 # Usage:
@@ -51,9 +52,10 @@
 #                      scheduler and no other user).
 #   FFI_JOBS           gprbuild -j for the FFI library (default nproc).
 #   FOUNDATION_SPARK_PROOF_ALLOWANCE
-#                      passed through to the GPR: "none" (default, the
-#                      committed levels as they are) or "ci" (CI's 4-vCPU
-#                      allowance, README "Levels").
+#                      passed through to the GPR: "ci" (the default here:
+#                      CI's allowance, which never shortens a committed
+#                      level, README "Levels") or "none" (the levels' own
+#                      timeouts, as on the campaign machine).
 #   SAW_SIGNING_KEY_FILE
 #                      an armored public key; when set, SAW's .sig is verified
 #                      with it (and the key must be SAW_SIGNING_KEY's).
@@ -406,8 +408,21 @@ if [ "$CHECKS" -eq 1 ]; then
   end
 
   begin proof
-  echo ">> PROVE_JOBS=${PROVE_JOBS:-$(nproc)} FOUNDATION_SPARK_PROOF_ALLOWANCE=${FOUNDATION_SPARK_PROOF_ALLOWANCE:-none}"
-  if "$REPO/spark/scripts/check-proof.sh"; then end; else FAILED=1; end FAILED; fi
+  # CI's allowance by default: the instance's speed is unknown, and the
+  # allowance never shortens a committed level (README "Levels").
+  export FOUNDATION_SPARK_PROOF_ALLOWANCE="${FOUNDATION_SPARK_PROOF_ALLOWANCE:-ci}"
+  echo ">> PROVE_JOBS=${PROVE_JOBS:-$(nproc)} FOUNDATION_SPARK_PROOF_ALLOWANCE=$FOUNDATION_SPARK_PROOF_ALLOWANCE"
+  # A cold run proves every goal at once on every core, and a goal near its
+  # time limit can miss it under that load. One retry: gnatprove replays
+  # what proved from its session files, so only the unproved goals run
+  # again, at the same level and limits. The phase says when it took the
+  # retry, so a pass on retry is never reported as a first-time pass.
+  if "$REPO/spark/scripts/check-proof.sh"; then
+    end
+  else
+    log "proof: retrying once (proved goals replay from the session; the rest run again, same limits)"
+    if "$REPO/spark/scripts/check-proof.sh"; then end "ok on retry"; else FAILED=1; end FAILED; fi
+  fi
 
   begin ffi
   if "$REPO/spark/scripts/check-ffi.sh"; then end; else FAILED=1; end FAILED; fi

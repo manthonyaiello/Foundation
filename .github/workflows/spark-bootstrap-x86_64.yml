@@ -16,9 +16,8 @@ name: SPARK bootstrap x86_64
 #            instance.
 # lint       shellcheck.
 #
-# Both bootstrap jobs prove with FOUNDATION_SPARK_PROOF_ALLOWANCE=ci, the
-# allowance spark-prove.yml gives this class of 4-vCPU runner, and cold: no
-# proof cache. The instance runs at the committed levels as they are.
+# Both bootstrap jobs prove with FOUNDATION_SPARK_PROOF_ALLOWANCE=ci (the
+# script's default, and spark-prove.yml's), and cold: no proof cache.
 on:
   pull_request:
     paths:

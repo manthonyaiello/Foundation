@@ -582,7 +582,7 @@ timed at the end of the run:
 | `saw` | SAW 1.6, `ubuntu-24.04-X64-with-solvers` release |
 | `gnat-llvm` | a hook: M4.1 (#22) adds GNAT-LLVM there |
 | `build` | `alr -n build` |
-| `proof` | `scripts/check-proof.sh`, slow units skipped as in CI ("Slow proofs") |
+| `proof` | `scripts/check-proof.sh`, slow units skipped as in CI ("Slow proofs"), under CI's allowance (`FOUNDATION_SPARK_PROOF_ALLOWANCE=ci` unless set); retried once on failure, and then reported as "ok on retry" |
 | `ffi` | `scripts/check-ffi.sh` |
 
 Every version and release sha256 comes from `scripts/toolchain-pins.env`,
