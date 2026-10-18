@@ -27,6 +27,11 @@ trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/crate"
 cp -R "$ROOT/src" "$ROOT/scripts" "$ROOT/foundation_spark.gpr" "$T/crate/"
 C="$T/crate"
+# Start from no slow unit: the tree's own markers (and manifest) go.
+grep -rlE '^[[:space:]]*--[[:space:]]+Slow proof:' "$C/src" 2>/dev/null | while IFS= read -r f; do
+  grep -vE '^[[:space:]]*--[[:space:]]+Slow proof:' "$f" > "$f.unmarked"
+  mv "$f.unmarked" "$f"
+done
 git -C "$C" init -q
 git -C "$C" add -A src
 : > "$C/scripts/proof-slow.txt"
@@ -68,7 +73,7 @@ SP=(python3 "$C/scripts/slow_proofs.py")
 expect "empty manifest: check passes" 0 "" -- "${SP[@]}" check
 
 printf '\n--  Slow proof: proved on demand (scripts/proof-slow.txt).\n' >> "$C/$SLOW_FILE"
-expect "marked but not listed: fails" 2 "no entry for it" -- "${SP[@]}" check
+expect "marked but not listed: fails" 2 "unit $SLOW_UNIT carries the .* no entry for it" -- "${SP[@]}" check
 
 expect "record the entry" 0 "recorded" -- "${SP[@]}" record "$SLOW_FILE" \
   --commit 0123456789abcdef0123456789abcdef01234567 --date 2026-01-01 \
@@ -108,7 +113,7 @@ cp "$T/manifest.good" "$C/scripts/proof-slow.txt"
 
 cp "$C/$SLOW_FILE" "$T/slow.bak"
 grep -v 'Slow proof:' "$T/slow.bak" > "$C/$SLOW_FILE"
-expect "listed but not marked: fails" 2 "carries the" -- "${SP[@]}" check
+expect "listed but not marked: fails" 2 "but no file of unit $SLOW_UNIT carries" -- "${SP[@]}" check
 cp "$T/slow.bak" "$C/$SLOW_FILE"
 
 # --- the gate's exemptions (check-proof.sh on a synthetic gnatprove.out) -----------
