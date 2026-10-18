@@ -45,6 +45,7 @@ SPARK/AES/Cipher.cry       | prop_InvCipher'256          | AES::Cipher::InvCiphe
 SPARK/AES/Cipher.cry       | prop_CipherExample          | AES::Cipher::Cipher             | exhaust | 1
 SPARK/AES/KeyExpansion.cry | prop_RotWord                | AES::KeyExpansion::RotWord      | check   | 10000
 SPARK/AES/KeyExpansion.cry | prop_SubWord                | AES::KeyExpansion::SubWord      | check   | 10000
+SPARK/AES/KeyExpansion.cry | prop_Rcon                   | AES::KeyExpansion::Rcon         | exhaust | 256
 SPARK/AES/KeyExpansion.cry | prop_KeyExpansion128        | AES::KeyExpansion::KeyExpansion | check   | 1000
 SPARK/AES/KeyExpansion.cry | prop_KeyExpansion192        | AES::KeyExpansion::KeyExpansion | check   | 1000
 SPARK/AES/KeyExpansion.cry | prop_KeyExpansion256        | AES::KeyExpansion::KeyExpansion | check   | 1000

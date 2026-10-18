@@ -38,6 +38,12 @@ foreign spark_RotWord : AESWord -> AESWord
 foreign spark_SubWord : AESWord -> AESWord
 
 /**
+ * Foundation_Spark.FFI.AES_KeyExpansion.Rcon: the SPARK spec's Rcon table,
+ * read at an index in 1 .. 10 (algorithms/AES/KeyExpansion.cry, Rcon).
+ */
+foreign spark_Rcon : [8] -> AESWord
+
+/**
  * Foundation_Spark.FFI.AES_KeyExpansion.KeyExpansion: the SPARK spec's
  * KeyExpansion (algorithms/AES/KeyExpansion.cry, KeyExpansion), for the
  * key size {k}.
@@ -51,6 +57,15 @@ property prop_RotWord a = spark_RotWord a == RotWord a
 /** The SPARK SubWord is KeyExpansion.cry's SubWord. */
 prop_SubWord : AESWord -> Bit
 property prop_SubWord a = spark_SubWord a == SubWord a
+
+/**
+ * The SPARK Rcon is KeyExpansion.cry's Rcon at every index KeyExpansion
+ * reads, 1 .. 10. The Cryptol's element 0 is undefined, and the SPARK
+ * table has none, so the other indices are vacuous: ==> does not evaluate
+ * its right side when its left is False (:exhaust, 256 tests).
+ */
+prop_Rcon : [8] -> Bit
+property prop_Rcon i = (i >= 1 /\ i <= 10) ==> spark_Rcon i == Rcon @ i
 
 /** The SPARK KeyExpansion is KeyExpansion.cry's, at key size k. */
 prop_KeyExpansion : {k} (Key k) => [Nk k]AESWord -> Bit

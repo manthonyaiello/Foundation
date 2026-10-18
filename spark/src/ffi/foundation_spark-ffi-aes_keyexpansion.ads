@@ -1,6 +1,6 @@
---  The ghost shims for algorithms/AES/KeyExpansion.cry: the spec's RotWord,
---  SubWord and KeyExpansion, exported with Cryptol's C calling convention
---  (Foundation_Spark.FFI.AES_Types). They are checked by
+--  The ghost shims for algorithms/AES/KeyExpansion.cry: the spec's
+--  RotWord, SubWord, Rcon and KeyExpansion, exported with Cryptol's C
+--  calling convention (Foundation_Spark.FFI.AES_Types). They are checked by
 --  spark/cryptol/SPARK/AES/KeyExpansion.cry.
 --
 --  An AESWord result is written through Output, the pointer Cryptol passes
@@ -47,6 +47,19 @@ is
    --  KeyExpansion.cry's SubWord, as the spec states it.
    --  @param A The word.
    --  @param Output The spec's SubWord (A).
+
+   procedure Rcon (I : Byte; Output : out AESWord)
+   with
+     Export,
+     Convention    => C,
+     External_Name => "spark_Rcon",
+     Pre           => I in 1 .. 10,
+     Post          =>
+       Output = Foundation_Spark.AES.Spec.KeyExpansion.Rcon (Natural (I));
+   --  KeyExpansion.cry's Rcon @ i, as the spec states it, for the indices
+   --  KeyExpansion reads (1 .. 10; the Cryptol's element 0 is undefined).
+   --  @param I The index.
+   --  @param Output The spec's Rcon (I).
 
    procedure KeyExpansion
      (K : C_Size; Key : All_Key_Words; Output : in out All_Round_Keys)

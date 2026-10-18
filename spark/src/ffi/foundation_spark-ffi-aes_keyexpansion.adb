@@ -15,6 +15,11 @@ is
       Output := Foundation_Spark.AES.Spec.KeyExpansion.SubWord (A);
    end SubWord;
 
+   procedure Rcon (I : Byte; Output : out AESWord) is
+   begin
+      Output := Foundation_Spark.AES.Spec.KeyExpansion.Rcon (Natural (I));
+   end Rcon;
+
    procedure KeyExpansion
      (K : C_Size; Key : All_Key_Words; Output : in out All_Round_Keys) is
    begin

@@ -62,6 +62,28 @@ is
    --  @param A The word.
    --  @param Output The result, written through Cryptol's output pointer.
 
+   procedure Ghost_Rcon (I : Byte; Output : out AESWord)
+   with
+     Import,
+     Convention    => C,
+     External_Name => Ghost_Link_Prefix & "spark_Rcon",
+     Global        => null,
+     Always_Terminates;
+   --  The ghost shim AES_KeyExpansion.Rcon, by its link name.
+   --  @param I The index, 1 .. 10.
+   --  @param Output The result, written through Cryptol's output pointer.
+
+   procedure Rcon (I : Byte; Output : out AESWord)
+   with
+     Export,
+     Convention    => C,
+     External_Name => "spark_Rcon";
+   --  Cryptol's foreign spark_Rcon :
+   --  [8] -> AESWord.
+   --  Calls Ghost_Rcon.
+   --  @param I The index, 1 .. 10.
+   --  @param Output The result, written through Cryptol's output pointer.
+
    procedure Ghost_KeyExpansion
      (K : C_Size; Key : All_Key_Words; Output : in out All_Round_Keys)
    with
