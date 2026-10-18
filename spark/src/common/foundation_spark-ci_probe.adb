@@ -16,10 +16,4 @@ is
       return R;
    end Count_Up;
 
-   function Check (X : Integer) return Integer is
-   begin
-      pragma Assert (X > 0);
-      return X;
-   end Check;
-
 end Foundation_Spark.CI_Probe;
