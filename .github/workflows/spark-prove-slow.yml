@@ -1,0 +1,80 @@
+name: SPARK prove slow units
+
+# On-demand proof of the slow units (spark/README.md "Slow proofs"). The
+# default gate (spark-ci.yml's prove job, through check-proof.sh) skips the
+# units listed in spark/scripts/proof-slow.txt and fails when one's recorded
+# proof is stale. This workflow proves them, through
+# spark/scripts/prove-slow.sh at their committed levels, and prints the
+# manifest entries a successful proof would write.
+#
+# It cannot push: commit the printed entries (or run prove-slow.sh locally and
+# commit what it writes). The entry records this run's commit, so the
+# entries are only worth committing when that commit is the branch's head
+# (or differs from it only in proof-slow.txt).
+#
+# Cold: it neither restores nor saves the proof cache. main's cache holds no
+# slow unit's proofs, and only main's own runs save one.
+on:
+  workflow_dispatch:
+    inputs:
+      units:
+        description: Files under spark/ to prove, space-separated (default every listed unit).
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  prove-slow:
+    name: Prove slow units (SPARK, linux arm64)
+    runs-on: ubuntu-24.04-arm
+    # The slowest unit so far, SBox_Entries, took 1h40m cold in CI.
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Alire and gnatprove
+        uses: ./.github/actions/setup-alire-spark
+        with:
+          gnatprove: 'true'
+
+      - name: Build
+        working-directory: spark
+        run: alr -n build
+
+      # The same wall-clock allowance as the default gate's (spark-prove.yml).
+      - name: Prove slow units
+        working-directory: spark
+        env:
+          FOUNDATION_SPARK_PROOF_ALLOWANCE: ci
+          UNITS: ${{ inputs.units }}
+        run: |
+          start="$(date +%s)"
+          status=0
+          # shellcheck disable=SC2086  # UNITS is word-split on purpose
+          scripts/prove-slow.sh --print $UNITS | tee prove-slow-entries.txt || status=$?
+          secs=$(( $(date +%s) - start ))
+          {
+            echo "### Slow proofs at \`${GITHUB_SHA::7}\`: exit $status after ${secs}s"
+            echo
+            echo "The entries to commit in \`spark/scripts/proof-slow.txt\`:"
+            echo
+            echo '```'
+            sed -n '/^unit /,$p' prove-slow-entries.txt | grep -E '^(unit |  )' || echo "(none: no unit proved)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload gnatprove output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spark-prove-slow
+          path: |
+            spark/prove-slow-entries.txt
+            spark/obj/prove-slow-*.log
+            spark/obj/*/gnatprove/gnatprove.out
+            spark/obj/*/gnatprove/*.spark
+          if-no-files-found: ignore

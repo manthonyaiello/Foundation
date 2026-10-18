@@ -15,7 +15,10 @@ name: SPARK CI
 # prove  The proof gate, through the reusable spark-prove.yml: every unit at
 #        its committed level, nothing unproved outside the (empty)
 #        spark/scripts/proof-xfail.txt, no warning. Warm from the proof cache;
-#        PRs restore it and never save it, and only main saves.
+#        PRs restore it and never save it, and only main saves. The slow units
+#        of spark/scripts/proof-slow.txt are skipped, and their recorded
+#        proofs checked current (spark-prove-slow.yml proves them on demand).
+#        Bounded at 30 minutes.
 # ffi    The FFI check (#4): spark/scripts/check-ffi.sh builds the crate as a
 #        shared library with ghost code enabled and runs every property in
 #        spark/cryptol/properties.txt against the NSA Cryptol.
@@ -64,6 +67,11 @@ jobs:
       - name: Check trust surface
         run: spark/scripts/check-trust-surface.sh
 
+      # The slow-proof manifest's detector and the proof gate's exemption for
+      # listed units (and only them), on a scratch copy, with no prover.
+      - name: Test the slow-proof gate
+        run: spark/scripts/test-slow-proofs.sh
+
   docs:
     name: GNATdoc (gate)
     needs: trust
@@ -110,6 +118,7 @@ jobs:
     with:
       restore: true
       save: ${{ github.ref == 'refs/heads/main' }}
+      timeout: 30
 
   ffi:
     name: FFI (Cryptol, linux x86_64)

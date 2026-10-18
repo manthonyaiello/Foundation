@@ -24,7 +24,19 @@
 #     unit's files, or a tracked unit had no entity analyzed at all. A
 #     library-level generic instance without pragma SPARK_Mode (On) is skipped
 #     whole, with no SPARK_Mode text for the trust gate to find, and gnatprove
-#     still reports success (#5).
+#     still reports success (#5);
+#   * a slow unit's recorded proof is stale, or the slow-proof manifest
+#     disagrees with the tree (below).
+#
+# Slow units (README "Slow proofs"). A unit listed in scripts/proof-slow.txt
+# is proved on demand by scripts/prove-slow.sh, not here. This gate proves
+# every other tracked file (prove.sh -u each), prints each skipped unit with
+# the commit its proof was recorded at, and exempts ONLY the listed units from
+# the "tracked unit absent" and "entity skipped" rules above. It fails when a
+# listed unit's inputs no longer match its recorded fingerprint, naming the
+# inputs that changed (scripts/slow_proofs.py check), and when the manifest
+# lists a unit that does not exist, or a unit marked slow is not listed.
+# With no unit listed, the run is the whole crate, as before.
 #
 # Usage:
 #   scripts/check-proof.sh          # prove, then gate (exit 1 on regression)
@@ -39,6 +51,9 @@
 #                    --level or --timeout in it: CI's wall-clock allowance is
 #                    FOUNDATION_SPARK_PROOF_ALLOWANCE=ci, which the GPR turns
 #                    into a per-level floor (README "Levels").
+#   CHECK_PROOF_OUT  for scripts/test-slow-proofs.sh only: gate this
+#                    gnatprove.out instead of running gnatprove, and skip the
+#                    fingerprint check (which that test exercises directly).
 #
 set -euo pipefail
 
@@ -57,26 +72,71 @@ esac
 RUNLOG="$(mktemp "${TMPDIR:-/tmp}/gnatprove-run.XXXXXX")"
 trap 'rm -f "$RUNLOG"' EXIT
 
-# prove.sh clears it too, but only once its own checks pass: a refused run
-# must not leave the last run's summary for this gate to read.
-find obj -path '*/gnatprove/gnatprove.out' -delete 2>/dev/null || true
+# --- slow units: skipped here, their fingerprints checked ---------------------
 
-# The run itself is scripts/prove.sh's: the same command line as a local run,
-# its -j from PROVE_JOBS, GNATPROVE_EXTRA checked there (no --level or
-# --timeout may override a committed level), and its freshness guard (no
-# gnatprove.out or .spark of an earlier run survives into this one; exit 3 if
-# this run did not write them).
-set +e
-PROVE_LOG="$RUNLOG" scripts/prove.sh -- --warnings=error
-GP_STATUS=$?
-set -e
+# The listed units (base names). A malformed manifest fails here, before
+# anything is proved.
+SLOW_UNITS="$(python3 scripts/slow_proofs.py units)" || {
+  echo "!! scripts/proof-slow.txt could not be read" >&2; exit 1; }
 
-if [ "$GP_STATUS" -eq 3 ]; then
-  echo "!! PROOF OUTPUT STALE -- prove.sh found gnatprove's output missing or older than the run" >&2
-  exit 1
+# Each skipped unit is printed with its recorded commit. Exit 1 means a listed
+# unit's inputs changed since its proof (the message names them); the proof
+# still runs, so its result is reported too, and the gate fails at the end.
+# Exit 2 means the manifest and the tree disagree, and fails at once.
+SLOW_STALE=0
+if [ -z "${CHECK_PROOF_OUT:-}" ]; then
+  set +e
+  python3 scripts/slow_proofs.py check
+  SLOW_STATUS=$?
+  set -e
+  case "$SLOW_STATUS" in
+    0) ;;
+    1) SLOW_STALE=1 ;;
+    *) exit 1 ;;
+  esac
 fi
 
-OUT="$(find obj -path '*/gnatprove/gnatprove.out' 2>/dev/null | head -n 1)"
+is_slow() {
+  [ -n "$SLOW_UNITS" ] && printf '%s\n' "$SLOW_UNITS" | grep -qxF "$1"
+}
+
+# Every tracked file but the slow units', for prove.sh -u. Empty when no unit
+# is listed: then the run is the whole crate, exactly as before.
+UNIT_ARGS=()
+if [ -n "$SLOW_UNITS" ]; then
+  while IFS= read -r src; do
+    [ -z "$src" ] && continue
+    u="$(basename "$src")"; u="${u%.*}"
+    is_slow "$u" || UNIT_ARGS+=(-u "$src")
+  done <<< "$(git ls-files -- src | grep -E '^src/.+\.(ads|adb)$' || true)"
+fi
+
+if [ -n "${CHECK_PROOF_OUT:-}" ]; then
+  OUT="$CHECK_PROOF_OUT"
+  GP_STATUS=0
+  : > "$RUNLOG"
+else
+  # prove.sh clears it too, but only once its own checks pass: a refused run
+  # must not leave the last run's summary for this gate to read.
+  find obj -path '*/gnatprove/gnatprove.out' -delete 2>/dev/null || true
+
+  # The run itself is scripts/prove.sh's: the same command line as a local
+  # run, its -j from PROVE_JOBS, GNATPROVE_EXTRA checked there (no --level or
+  # --timeout may override a committed level), and its freshness guard (no
+  # gnatprove.out or .spark of an earlier run survives into this one, for
+  # every unit in scope; exit 3 if this run did not write them).
+  set +e
+  PROVE_LOG="$RUNLOG" scripts/prove.sh "${UNIT_ARGS[@]+"${UNIT_ARGS[@]}"}" -- --warnings=error
+  GP_STATUS=$?
+  set -e
+
+  if [ "$GP_STATUS" -eq 3 ]; then
+    echo "!! PROOF OUTPUT STALE -- prove.sh found gnatprove's output missing or older than the run" >&2
+    exit 1
+  fi
+
+  OUT="$(find obj -path '*/gnatprove/gnatprove.out' 2>/dev/null | head -n 1)"
+fi
 [ -n "$OUT" ] && [ -f "$OUT" ] || { echo "!! gnatprove wrote no gnatprove.out (exit $GP_STATUS)" >&2; exit 2; }
 
 # --- what was proved ----------------------------------------------------------
@@ -126,6 +186,9 @@ while IFS= read -r src; do
   [ -z "$src" ] && continue
   unit="$(basename "$src")"
   unit="${unit%.*}"
+  # A listed slow unit is proved on demand, not by this run: exempt, and
+  # only it.
+  is_slow "$unit" && continue
   if ! grep -qE "^in unit ${unit}," "$OUT"; then
     MISSING="${MISSING}${src} (unit ${unit})"$'\n'
   fi
@@ -148,8 +211,12 @@ fi
 # says "Success". A skipped entity is allowed only in a unit whose files have
 # a spark-mode-off entry in trust-surface.txt (an FFI shim's body, say). A
 # tracked unit with no entity analyzed fails regardless.
+#
+# A listed slow unit is not in TRACKED_UNITS here: this run does not prove it,
+# so neither rule applies to it (prove-slow.sh checks its own run).
 TRACKED_UNITS="$(git ls-files -- src | grep -E '^src/.+\.(ads|adb)$' \
-  | sed -E 's#^.*/##; s/\.(ads|adb)$//' | sort -u || true)"
+  | sed -E 's#^.*/##; s/\.(ads|adb)$//' | sort -u \
+  | { if [ -n "$SLOW_UNITS" ]; then grep -vxF "$SLOW_UNITS"; else cat; fi; } || true)"
 OFF_UNITS="$(
   { grep -vE '^[[:space:]]*#|^[[:space:]]*$' scripts/trust-surface.txt 2>/dev/null || true; } \
   | awk -F'|' '{ k = $1; gsub(/[ \t]/, "", k); p = $2; gsub(/[ \t]/, "", p)
@@ -283,11 +350,27 @@ fi
 echo ""
 echo "$ANALYZED"
 echo "$TOTAL_ROW"
+
+# --- gate: no slow unit's recorded proof is stale -------------------------------
+
+if [ "$SLOW_STALE" -ne 0 ]; then
+  echo "" >&2
+  echo "!! SLOW PROOF STALE -- the rest of the crate proved, but a slow unit's inputs" >&2
+  echo "   changed since its recorded proof (named above). Run scripts/prove-slow.sh" >&2
+  echo "   and commit the scripts/proof-slow.txt entry it writes." >&2
+  summary "slow unit stale (see the log)"
+  exit 1
+fi
+
+SLOW_NOTE=""
+if [ -n "$SLOW_UNITS" ]; then
+  SLOW_NOTE=" Slow units skipped (proved on demand, fingerprints current): $(printf '%s\n' "$SLOW_UNITS" | wc -l | tr -d ' ')."
+fi
 if [ "$allowed_n" -eq 0 ]; then
-  echo ">> PROOF OK -- no unproved checks."
-  summary "OK, no unproved checks"
+  echo ">> PROOF OK -- no unproved checks.${SLOW_NOTE}"
+  summary "OK, no unproved checks.${SLOW_NOTE}"
 else
-  echo ">> PROOF OK -- ${allowed_n} unproved check(s), all allowed by $XFAIL."
-  summary "OK, ${allowed_n} allowed by proof-xfail.txt"
+  echo ">> PROOF OK -- ${allowed_n} unproved check(s), all allowed by $XFAIL.${SLOW_NOTE}"
+  summary "OK, ${allowed_n} allowed by proof-xfail.txt.${SLOW_NOTE}"
 fi
 exit 0
