@@ -175,37 +175,47 @@ is
    -- Inv_Mix_Column --
    --------------------
 
-   function Inv_Mix_Column (S : AESWord) return AESWord is
-      X2 : constant AESWord :=
-        [X_Times (S (0)), X_Times (S (1)), X_Times (S (2)), X_Times (S (3))];
-      X4 : constant AESWord :=
-        [X_Times (X2 (0)), X_Times (X2 (1)), X_Times (X2 (2)),
-         X_Times (X2 (3))];
-      X8 : constant AESWord :=
-        [X_Times (X4 (0)), X_Times (X4 (1)), X_Times (X4 (2)),
-         X_Times (X4 (3))];
-      M9  : constant AESWord := Xor_Word (X8, S);
-      M11 : constant AESWord := Xor_Word (Xor_Word (X8, X2), S);
-      M13 : constant AESWord := Xor_Word (Xor_Word (X8, X4), S);
-      M14 : constant AESWord := Xor_Word (Xor_Word (X8, X4), X2);
+   function Inv_Mix_Byte (A, B, C, D : Byte) return Byte
+   with
+     Post => Inv_Mix_Byte'Result
+             = (Spec.GF28.Dot (16#0e#, A) xor Spec.GF28.Dot (16#0b#, B)
+                xor Spec.GF28.Dot (16#0d#, C) xor Spec.GF28.Dot (16#09#, D));
+   --  One byte of InvMixColumnsStep: 0x0e • A ^ 0x0b • B ^ 0x0d • C ^
+   --  0x09 • D, with X_Times alone. Inv_Mix_Column calls it once per row,
+   --  rotating the column, so that each proof has four products in it.
+   --  @param A The byte multiplied by 0x0e.
+   --  @param B The byte multiplied by 0x0b.
+   --  @param C The byte multiplied by 0x0d.
+   --  @param D The byte multiplied by 0x09.
+   --  @return The mixed byte.
+
+   function Inv_Mix_Byte (A, B, C, D : Byte) return Byte is
+      A2 : constant Byte := X_Times (A);
+      A4 : constant Byte := X_Times (A2);
+      B2 : constant Byte := X_Times (B);
+      B4 : constant Byte := X_Times (B2);
+      C2 : constant Byte := X_Times (C);
+      C4 : constant Byte := X_Times (C2);
+      D2 : constant Byte := X_Times (D);
+      D4 : constant Byte := X_Times (D2);
    begin
-      for I in AESWord_Index loop
-         Lemmas.Lemma_Dot (16#09#, S (I));
-         Lemmas.Lemma_Dot (16#0b#, S (I));
-         Lemmas.Lemma_Dot (16#0d#, S (I));
-         Lemmas.Lemma_Dot (16#0e#, S (I));
-         pragma Loop_Invariant
-           (for all J in 0 .. I =>
-              Spec.GF28.Dot (16#09#, S (J)) = M9 (J)
-              and then Spec.GF28.Dot (16#0b#, S (J)) = M11 (J)
-              and then Spec.GF28.Dot (16#0d#, S (J)) = M13 (J)
-              and then Spec.GF28.Dot (16#0e#, S (J)) = M14 (J));
-      end loop;
+      Lemmas.Lemma_Dot (16#0e#, A);
+      Lemmas.Lemma_Dot (16#0b#, B);
+      Lemmas.Lemma_Dot (16#0d#, C);
+      Lemmas.Lemma_Dot (16#09#, D);
+      return (X_Times (A4) xor A4 xor A2)
+             xor (X_Times (B4) xor B2 xor B)
+             xor (X_Times (C4) xor C4 xor C)
+             xor (X_Times (D4) xor D);
+   end Inv_Mix_Byte;
+
+   function Inv_Mix_Column (S : AESWord) return AESWord is
+   begin
       return
-        [M14 (0) xor M11 (1) xor M13 (2) xor M9 (3),
-         M9 (0) xor M14 (1) xor M11 (2) xor M13 (3),
-         M13 (0) xor M9 (1) xor M14 (2) xor M11 (3),
-         M11 (0) xor M13 (1) xor M9 (2) xor M14 (3)];
+        [Inv_Mix_Byte (S (0), S (1), S (2), S (3)),
+         Inv_Mix_Byte (S (1), S (2), S (3), S (0)),
+         Inv_Mix_Byte (S (2), S (3), S (0), S (1)),
+         Inv_Mix_Byte (S (3), S (0), S (1), S (2))];
    end Inv_Mix_Column;
 
    -----------------
@@ -217,11 +227,17 @@ is
       Mixed : constant Columns :=
         [Mix_Column (Cols (0)), Mix_Column (Cols (1)),
          Mix_Column (Cols (2)), Mix_Column (Cols (3))];
+      Expected : constant Columns :=
+        [for J in AESWord_Index =>
+           Spec.Cipher.MixColumnsStep (Split (State) (J))]
+      with Ghost;
    begin
       pragma Assert
         (for all J in AESWord_Index =>
            Mixed (J) = Spec.Cipher.MixColumnsStep (Split (State) (J)));
+      pragma Assert (Mixed = Expected);
       State := Join (Mixed);
+      pragma Assert (State = Join (Expected));
    end Mix_Columns;
 
    ---------------------
@@ -233,11 +249,17 @@ is
       Mixed : constant Columns :=
         [Inv_Mix_Column (Cols (0)), Inv_Mix_Column (Cols (1)),
          Inv_Mix_Column (Cols (2)), Inv_Mix_Column (Cols (3))];
+      Expected : constant Columns :=
+        [for J in AESWord_Index =>
+           Spec.Cipher.InvMixColumnsStep (Split (State) (J))]
+      with Ghost;
    begin
       pragma Assert
         (for all J in AESWord_Index =>
            Mixed (J) = Spec.Cipher.InvMixColumnsStep (Split (State) (J)));
+      pragma Assert (Mixed = Expected);
       State := Join (Mixed);
+      pragma Assert (State = Join (Expected));
    end Inv_Mix_Columns;
 
    -------------------
