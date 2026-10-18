@@ -5,7 +5,7 @@
 --  arguments, so they are this generic's formals, in the same order; the
 --  per-call sizes `k` (the key's length), `n` (the text's) and `λ` (the
 --  output's) stay per call. SHA256 instantiates it as packaging/Hash.cry's
---  `HMAC` (Hash.cry:79) does, with every hash the one SHA-256 `hash`.
+--  `HMAC` (Hash.cry:71) does, with every hash the one SHA-256 `hash`.
 --
 --  Cryptol gives `Hk`, `Hn` and `HL` the input types `[k * 8]`,
 --  `[B * 8 + n]` and `[(B + L) * 8]`, and leaves it to the caller to have

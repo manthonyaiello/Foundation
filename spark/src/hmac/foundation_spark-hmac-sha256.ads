@@ -11,7 +11,7 @@ package Foundation_Spark.HMAC.SHA256 is new Foundation_Spark.HMAC.Main
    Hn         => Foundation_Spark.SHA2.SHA256.Hash,
    HL         => Foundation_Spark.SHA2.SHA256.Hash);
 --  HMAC-SHA-256 [FIPS-PUB-198-1, FIPS-PUB-180-4 Section 6.2]: Main
---  instantiated as packaging/Hash.cry's `HMAC` (Hash.cry:79) instantiates
+--  instantiated as packaging/Hash.cry's `HMAC` (Hash.cry:71) instantiates
 --  algorithms/HMAC/Main.cry's for algorithms/SHA2/SHA256.cry: B =
 --  BlockSize / 8 = 64, L = DigestSize / 8 = 32, and Hk, Hn and HL all the
 --  SHA-256 `hash` (Main.cry:55 of algorithms/SHA2), whose message bound
