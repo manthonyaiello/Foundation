@@ -9,7 +9,6 @@ is
    function Count_Up (N : Natural) return Natural is
       R : Natural := 0;
    begin
-      pragma Assume (N < 1_000);
       for I in 1 .. N loop
          R := R + 1;
          pragma Loop_Invariant (R = I);

@@ -16,4 +16,6 @@ is
    --  @param N How far to count.
    --  @return N.
 
+   function Undocumented (X : Integer) return Integer is (X);
+
 end Foundation_Spark.CI_Probe;
