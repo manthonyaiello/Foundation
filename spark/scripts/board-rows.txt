@@ -74,18 +74,34 @@ AES::Main::Decrypt            | Foundation_Spark.AES.Spec.Main.Decrypt          
 
 # SHA-2 (#14): Functions.cry and Main.cry's step, through the SHA-256
 # instance of the generic Main (Ch and Maj are its instance of Logical).
-SHA2::Functions::Ch           | Foundation_Spark.SHA2.SHA256.Logical.Ch             | -
-SHA2::Functions::Maj          | Foundation_Spark.SHA2.SHA256.Logical.Maj            | -
-SHA2::Functions::SIGMA_256_0  | Foundation_Spark.SHA2.Functions.SIGMA_256_0         | -
-SHA2::Functions::SIGMA_256_1  | Foundation_Spark.SHA2.Functions.SIGMA_256_1         | -
-SHA2::Functions::sigma_256_0  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0   | -
-SHA2::Functions::sigma_256_1  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1   | -
+#
+# The Functions rows' impl entity is the spec entity itself. Functions.cry's
+# Ch, Maj, SIGMA_256_0/1 and sigma_256_0/1 are functions on [32], which the
+# spec layer states on Unsigned_32 with no change of representation, so the
+# spec functions are not ghost: they are executable, and they are what
+# SHA256_Stream.Compress calls at run time for every round and schedule
+# word. There is no other implementation of them to prove equal, and a
+# wrapper that only called them would add a name, not a proof.
+SHA2::Functions::Ch           | Foundation_Spark.SHA2.SHA256.Logical.Ch             | Foundation_Spark.SHA2.SHA256.Logical.Ch
+SHA2::Functions::Maj          | Foundation_Spark.SHA2.SHA256.Logical.Maj            | Foundation_Spark.SHA2.SHA256.Logical.Maj
+SHA2::Functions::SIGMA_256_0  | Foundation_Spark.SHA2.Functions.SIGMA_256_0         | Foundation_Spark.SHA2.Functions.SIGMA_256_0
+SHA2::Functions::SIGMA_256_1  | Foundation_Spark.SHA2.Functions.SIGMA_256_1         | Foundation_Spark.SHA2.Functions.SIGMA_256_1
+SHA2::Functions::sigma_256_0  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0   | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0
+SHA2::Functions::sigma_256_1  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1   | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1
 SHA2::Main::step (SHA-256)    | Foundation_Spark.SHA2.SHA256.Step                   | Foundation_Spark.SHA2.SHA256_Stream.Compress
 
 # SHA-2 (#15): Preprocessing.cry's pad and parse (stated in the generic Main,
 # whose formals fix w) and Main.cry's hash, through the SHA-256 instance.
+#
+# parse's impl is SHA256_Stream.Load_Block, which parses one block of bytes
+# into words: its postcondition is the spec's Parse of the 64 bytes' bits at
+# N = 1 (SHA256_Blocks.Lemma_Block_Parse). The streaming hash parses each
+# block with it as it reaches it. pad has no executable counterpart of its
+# own: the stream never builds the padded message, and SHA256_Stream.Final
+# writes only its last one or two blocks (Tail_Pad), whose correctness is
+# part of Lemma_Final and so of Hash's proof.
 SHA2::Preprocessing::pad (SHA-256)   | Foundation_Spark.SHA2.SHA256.Pad     | -
-SHA2::Preprocessing::parse (SHA-256) | Foundation_Spark.SHA2.SHA256.Parse   | -
+SHA2::Preprocessing::parse (SHA-256) | Foundation_Spark.SHA2.SHA256.Parse   | Foundation_Spark.SHA2.SHA256_Stream.Load_Block
 SHA2::Main::hash (SHA-256)    | Foundation_Spark.SHA2.SHA256.Hash                   | Foundation_Spark.SHA2.SHA256_Stream.Hash
 
 # SHA-2 (#16): the byte-level refinement of hash at SHA-256. Hash_Bytes is not
