@@ -18,28 +18,34 @@
 #     to be listed and justified;
 #   * a tracked unit under src/ is missing from gnatprove's report. A run that
 #     proved nothing looks like a run that passed, so the gate checks that
-#     every unit it expected was analyzed.
+#     every unit it expected was analyzed;
+#   * a tracked unit has an entity gnatprove skipped ("skipped; SPARK_Mode =>
+#     Off"), unless trust-surface.txt lists a spark-mode-off site in that
+#     unit's files, or a tracked unit had no entity analyzed at all. A
+#     library-level generic instance without pragma SPARK_Mode (On) is skipped
+#     whole, with no SPARK_Mode text for the trust gate to find, and gnatprove
+#     still reports success (#5).
 #
 # Usage:
 #   scripts/check-proof.sh          # prove, then gate (exit 1 on regression)
 #   scripts/check-proof.sh --list   # prove, then list the unproved checks
 #
 # Env:
-#   ALR              the alr binary (default: alr)
-#   GNATPROVE_EXTRA  extra flags appended to the gnatprove call, word-split.
-#                    Empty by default, so a local run is exactly the committed
-#                    level. CI passes its wall-clock allowance (--timeout) and
-#                    its cache (--memcached-server=file:...) here; see
-#                    .github/workflows/spark-prove.yml.
+#   ALR, PROVE_JOBS, GNATPROVE_EXTRA
+#                    passed to scripts/prove.sh, which runs gnatprove (see
+#                    there). GNATPROVE_EXTRA is empty by default, so a local
+#                    run is exactly the committed level; CI passes its cache
+#                    (--memcached-server=file:...) there. prove.sh refuses a
+#                    --level or --timeout in it: CI's wall-clock allowance is
+#                    FOUNDATION_SPARK_PROOF_ALLOWANCE=ci, which the GPR turns
+#                    into a per-level floor (README "Levels").
 #
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-ALR="${ALR:-alr}"
 XFAIL="scripts/proof-xfail.txt"
-EXTRA="${GNATPROVE_EXTRA:-}"
 
 LIST=0
 case "${1:-}" in
@@ -48,18 +54,27 @@ case "${1:-}" in
   *) echo "!! unknown argument: $1" >&2; exit 2 ;;
 esac
 
-# A stale summary from an earlier run must not be read as this run's.
-find obj -path '*/gnatprove/gnatprove.out' -delete 2>/dev/null || true
-
 RUNLOG="$(mktemp "${TMPDIR:-/tmp}/gnatprove-run.XXXXXX")"
 trap 'rm -f "$RUNLOG"' EXIT
 
-echo ">> $ALR -n exec -- gnatprove -P foundation_spark.gpr -j0 --warnings=error $EXTRA"
+# prove.sh clears it too, but only once its own checks pass: a refused run
+# must not leave the last run's summary for this gate to read.
+find obj -path '*/gnatprove/gnatprove.out' -delete 2>/dev/null || true
+
+# The run itself is scripts/prove.sh's: the same command line as a local run,
+# its -j from PROVE_JOBS, GNATPROVE_EXTRA checked there (no --level or
+# --timeout may override a committed level), and its freshness guard (no
+# gnatprove.out or .spark of an earlier run survives into this one; exit 3 if
+# this run did not write them).
 set +e
-# shellcheck disable=SC2086  # EXTRA is word-split on purpose
-"$ALR" -n exec -- gnatprove -P foundation_spark.gpr -j0 --warnings=error $EXTRA 2>&1 | tee "$RUNLOG"
-GP_STATUS=${PIPESTATUS[0]}
+PROVE_LOG="$RUNLOG" scripts/prove.sh -- --warnings=error
+GP_STATUS=$?
 set -e
+
+if [ "$GP_STATUS" -eq 3 ]; then
+  echo "!! PROOF OUTPUT STALE -- prove.sh found gnatprove's output missing or older than the run" >&2
+  exit 1
+fi
 
 OUT="$(find obj -path '*/gnatprove/gnatprove.out' 2>/dev/null | head -n 1)"
 [ -n "$OUT" ] && [ -f "$OUT" ] || { echo "!! gnatprove wrote no gnatprove.out (exit $GP_STATUS)" >&2; exit 2; }
@@ -121,6 +136,53 @@ if [ -n "$MISSING" ]; then
   echo "!! PROOF INCOMPLETE -- tracked units absent from $OUT:" >&2
   printf '%s' "$MISSING" | sed 's/^/     /' >&2
   summary "units not analyzed" "$MISSING"
+  exit 1
+fi
+
+# --- gate: no entity of a tracked unit was skipped ------------------------------
+
+# A unit can appear in the report and still have nothing proved: gnatprove
+# prints "in unit U, 0 subprograms and packages out of 9 analyzed" and lists
+# each entity as "skipped; SPARK_Mode => Off". That is how a library-level
+# generic instance without pragma SPARK_Mode (On) looks, and the run still
+# says "Success". A skipped entity is allowed only in a unit whose files have
+# a spark-mode-off entry in trust-surface.txt (an FFI shim's body, say). A
+# tracked unit with no entity analyzed fails regardless.
+TRACKED_UNITS="$(git ls-files -- src | grep -E '^src/.+\.(ads|adb)$' \
+  | sed -E 's#^.*/##; s/\.(ads|adb)$//' | sort -u || true)"
+OFF_UNITS="$(
+  { grep -vE '^[[:space:]]*#|^[[:space:]]*$' scripts/trust-surface.txt 2>/dev/null || true; } \
+  | awk -F'|' '{ k = $1; gsub(/[ \t]/, "", k); p = $2; gsub(/[ \t]/, "", p)
+                 if (k == "spark-mode-off") { sub(/^.*\//, "", p); sub(/\.ad[sb]$/, "", p); print p } }' \
+  | sort -u
+)"
+SKIPPED="$(
+  awk -v tracked="$TRACKED_UNITS" -v off="$OFF_UNITS" '
+    BEGIN { n = split(tracked, t, "\n"); for (i = 1; i <= n; i++) T[t[i]] = 1
+            n = split(off, o, "\n");     for (i = 1; i <= n; i++) O[o[i]] = 1 }
+    /^in unit / {
+      unit = $3; sub(/,$/, "", unit)
+      # "0 out of 0" is a generic unit: it is analyzed through its instances.
+      if ((unit in T) && match($0, /, [0-9]+ subprograms and packages out of [0-9]+/)) {
+        counts = substr($0, RSTART + 2, RLENGTH - 2)
+        split(counts, c, " ")
+        if (c[1] + 0 == 0 && c[7] + 0 > 0) print unit ": no entity analyzed"
+      }
+      next
+    }
+    /^  [^ ]/ && / skipped/ && (unit in T) && !(unit in O) {
+      s = $0; sub(/^  /, "", s); print unit ": " s
+    }' "$OUT"
+)"
+
+if [ -n "$SKIPPED" ]; then
+  echo "" >&2
+  echo "!! PROOF INCOMPLETE -- entities of tracked units that gnatprove did not analyze:" >&2
+  printf '%s\n' "$SKIPPED" | sed 's/^/     /' >&2
+  echo "" >&2
+  echo "   A generic instance needs its own pragma SPARK_Mode (On). A deliberate" >&2
+  echo "   SPARK_Mode => Off is a hole: list it in scripts/trust-surface.txt." >&2
+  summary "entities skipped" "$SKIPPED"
   exit 1
 fi
 

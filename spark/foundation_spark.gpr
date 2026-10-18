@@ -28,8 +28,45 @@ project Foundation_Spark is
       for Artifacts (".") use ("share");
    end Install;
 
+   --  Which wall-clock allowance the proof levels get: "none" (the default,
+   --  for local runs) or "ci" (set by .github/workflows/spark-prove.yml for
+   --  its slower runner). See package Prove, and README "Levels".
+   type Proof_Allowance_Type is ("none", "ci");
+   Proof_Allowance : Proof_Allowance_Type :=
+     external ("FOUNDATION_SPARK_PROOF_ALLOWANCE", "none");
+
    package Prove is
-      for Proof_Switches ("Ada") use ("--level=2", "--counterexamples=on");
+
+      --  The proof levels. Every Proof_Switches below uses one of these
+      --  lists, never a literal --level or --timeout: scripts/prove.sh
+      --  refuses one.
+      --
+      --  Why. An explicit --timeout overrides the timeout that --level
+      --  implies, wherever it comes from (command line, the "Ada" default,
+      --  or a per-file entry; measured with gnatprove 16.1.0, README
+      --  "Levels"), and the "Ada" default's switches also apply to every
+      --  file with an entry of its own. So CI cannot add one --timeout for
+      --  everyone without cutting a raised unit's 20 s (level 3) or 60 s
+      --  (level 4) down to it. Instead, under "ci" each level carries an
+      --  explicit timeout of max (its own, 10 s): 10, 20 and 60 s. Under
+      --  "none" a level is just the level (5, 20 and 60 s).
+      Level_2 := ("--level=2");
+      Level_3 := ("--level=3");
+      Level_4 := ("--level=4");
+      case Proof_Allowance is
+         when "none" =>
+            null;
+         when "ci" =>
+            Level_2 := ("--level=2", "--timeout=10");
+            Level_3 := ("--level=3", "--timeout=20");
+            Level_4 := ("--level=4", "--timeout=60");
+      end case;
+
+      --  The crate's default level. A unit raised above it gets its own
+      --  entry, with the reason in the commit that raises it:
+      --     for Proof_Switches ("<file>") use Level_3;
+      for Proof_Switches ("Ada") use Level_2 & ("--counterexamples=on");
+
    end Prove;
 
 end Foundation_Spark;
