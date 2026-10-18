@@ -1,6 +1,7 @@
 --  The exports Cryptol calls for AES.Impl: each calls the executable AES
 --  on the caller's prefix of its buffers.
 
+with Interfaces;
 with Foundation_Spark.AES.Impl;
 with Foundation_Spark.AES.Impl.Main;
 
@@ -46,6 +47,7 @@ is
           (Key_Size (K),
            AES.Impl.Main.Key_Bytes (Key (0 .. Key_Size (K) / 8 - 1)),
            Input);
+      Output (15) := Interfaces."xor" (Output (15), 1);  --  DEMO: broken
    end Encrypt;
 
    procedure Decrypt
