@@ -140,3 +140,4 @@ is
    --  @return affine b.
 
 end Foundation_Spark.AES.Spec.SBox;
+
