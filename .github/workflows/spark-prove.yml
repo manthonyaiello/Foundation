@@ -95,21 +95,26 @@ jobs:
           restore-keys: |
             ${{ steps.fp.outputs.prefix }}
 
-      # GNATPROVE_EXTRA is appended to the gnatprove call by check-proof.sh.
+      # check-proof.sh runs gnatprove through scripts/prove.sh, which appends
+      # GNATPROVE_EXTRA to the call.
       #
-      # --timeout=10 is a wall-clock allowance, not a level change: --level's
-      # timeouts are wall-clock, and this 4-vCPU runner is slower than the
-      # campaign's machine, so a check that proves there can time out here.
-      # memcp's prove.yml does the same. The committed levels stay in
-      # foundation_spark.gpr, and local runs use them with no allowance.
+      # FOUNDATION_SPARK_PROOF_ALLOWANCE=ci is the wall-clock allowance for
+      # this 4-vCPU runner, slower than the campaign's machine: the GPR gives
+      # each level an explicit timeout of max (its own, 10 s), that is 10 s at
+      # level 2, 20 s at level 3 and 60 s at level 4. It is not a command-line
+      # --timeout, because that overrides every unit's level timeout, so it
+      # would cut a unit raised to level 3 or 4 down to 10 s (measured; see
+      # spark/README.md "Levels"). prove.sh refuses a --timeout here. The
+      # committed levels stay in foundation_spark.gpr, and local runs use them
+      # with no allowance.
       #
       # --memcached-server=file: points gnatprove at the cache directory. It
       # must exist; on a cold run it is empty, which is what makes the daily
       # refresh a full reprove.
       - name: Prove
         env:
+          FOUNDATION_SPARK_PROOF_ALLOWANCE: ci
           GNATPROVE_EXTRA: >-
-            --timeout=10
             --memcached-server=file:${{ env.CACHE_DIR }}
         run: |
           mkdir -p "$CACHE_DIR"
@@ -128,6 +133,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           echo "proof cache: $before entries before, $after after; ${secs}s"
           exit "$status"
+
+      # The board (spark/scripts/board.py), counted from this run's .spark
+      # files, in the job summary. It reports and does not gate.
+      - name: Board
+        if: always()
+        run: python3 spark/scripts/board.py >> "$GITHUB_STEP_SUMMARY"
 
       # Only where writing is safe: pushes to main, and the cold refresh.
       - name: Save proof cache

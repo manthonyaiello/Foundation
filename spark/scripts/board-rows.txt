@@ -1,0 +1,26 @@
+# board-rows.txt -- the rows of the campaign's board, read by scripts/board.py.
+#
+# One line per function the campaign promises, which makes this file the
+# board's denominator:
+#
+#     function | spec entity | impl entity
+#
+# function     The Cryptol declaration, qualified by its module as the .cry
+#              file names it (AES::GF28::xTimes, SHA2::Main::step). The FFI
+#              log (README "The board") names its properties' functions the
+#              same way, which is how a row finds its FFI results.
+# spec entity  The spec-layer Ada entity that mirrors it, fully qualified, as
+#              gnatprove names it in its .spark files
+#              (Foundation_Spark.AES.Spec.GF28.xTimes). For a generic, name the
+#              entity of the instance that is proved
+#              (Foundation_Spark.SHA2.SHA256.Step), not the generic's.
+# impl entity  The implementation entity proved equal to the spec, likewise;
+#              `-` until it exists.
+#
+# The spec and the implementation of one function live in different units, so
+# a row names both. A tick that adds a spec-layer function adds its row here in
+# the same PR; the tick that adds the implementation fills in the third field.
+# A name that matches no .spark entity shows as "no" on the board (not built
+# yet, or misspelled: the board says which entity it looked for).
+#
+# Empty: the scaffold has no spec-layer function yet.

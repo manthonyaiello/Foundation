@@ -18,6 +18,9 @@
 
 /spark/scripts/proof-xfail.txt              @manthonyaiello
 /spark/scripts/check-proof.sh               @manthonyaiello
+/spark/scripts/prove.sh                     @manthonyaiello
+/spark/scripts/board.py                     @manthonyaiello
+/spark/scripts/board-rows.txt               @manthonyaiello
 
 /spark/scripts/check-docs.sh                @manthonyaiello
 /spark/scripts/check-doc-placement.sh       @manthonyaiello
