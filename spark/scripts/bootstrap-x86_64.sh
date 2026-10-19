@@ -27,9 +27,12 @@
 #   cryptol    Cryptol's release build with solvers, sha256 checked.
 #   saw        SAW's release build with solvers, sha256 checked (and its .sig,
 #              when SAW_SIGNING_KEY_FILE names the signing key).
-#   gnat-llvm  no download: checks GNAT Pro's LLVM back end when GNAT_LLVM_DIR
-#              names it (and writes it to env.sh, for scripts/check-saw.sh);
-#              skipped, with a note, when GNAT_LLVM_DIR is unset.
+#   gnat-llvm  checks GNAT Pro's LLVM back end when GNAT_LLVM_DIR names it
+#              (nothing of it is downloaded), and installs llvm-link from
+#              LLVM's own release of the same version (sha256 checked; only
+#              bin/llvm-link extracted); writes GNAT_LLVM_DIR and
+#              LLVM_LINK_DIR to env.sh, for scripts/check-saw.sh. Skipped,
+#              with a note, when GNAT_LLVM_DIR is unset.
 #   build      `alr -n build` in spark/.
 #   proof      scripts/check-proof.sh (the slow units of proof-slow.txt are
 #              skipped, and their recorded proofs checked current, as in CI),
@@ -62,7 +65,9 @@
 #                      an armored public key; when set, SAW's .sig is verified
 #                      with it (and the key must be SAW_SIGNING_KEY's).
 #   GNAT_LLVM_DIR      a GNAT Pro LLVM install (holding bin/llvm-gcc), for
-#                      the gnat-llvm phase; optional.
+#                      the gnat-llvm phase; optional. When set, the phase
+#                      also downloads LLVM's release tarball (2 GB) for
+#                      llvm-link.
 #
 # Exit status: 0 when every phase passed; 1 when one failed (the proof and FFI
 # phases both run even if the other fails, so one run reports both); 2 on a
@@ -264,6 +269,10 @@ for c in curl:curl git:git python3:python3 tar:tar gzip:gzip sha256sum:coreutils
          od:coreutils ldd:libc-bin; do
   command -v "${c%%:*}" >/dev/null 2>&1 || need+=("${c#*:}")
 done
+# The gnat-llvm phase unpacks LLVM's .tar.xz, only when GNAT_LLVM_DIR is set.
+if [ -n "${GNAT_LLVM_DIR:-}" ]; then
+  command -v xz >/dev/null 2>&1 || need+=(xz-utils)
+fi
 # curl over https needs the CA bundle; GNAT links against the C library's
 # start files and libc.so, which come with libc6-dev.
 [ -f /etc/ssl/certs/ca-certificates.crt ] || need+=(ca-certificates)
@@ -389,18 +398,52 @@ end
 # --- gnat-llvm ------------------------------------------------------------------------
 
 begin gnat-llvm
-# Nothing is downloaded: the GNAT-LLVM that E4's SAW checks use is GNAT Pro's
-# (M4.1, #22), which is not public. When GNAT_LLVM_DIR names its install,
-# check it and record it in env.sh for scripts/check-saw.sh; when it is
-# unset, skip: everything but check-saw.sh works without it. It is not put
+# The GNAT-LLVM that E4's SAW checks use is GNAT Pro's (M4.1, #22), which is
+# not public: nothing of it is downloaded. When GNAT_LLVM_DIR names its
+# install, check it and record it in env.sh for scripts/check-saw.sh; when it
+# is unset, skip: everything but check-saw.sh works without it. It is not put
 # on PATH: the crate's toolchain stays FSF GNAT (README "SAW").
+#
+# check-saw.sh also needs llvm-link (M4.2, #23), which GNAT Pro does not
+# ship: it comes from LLVM's own release of the same LLVM version, pinned in
+# toolchain-pins.env. The tarball is 2 GB; only bin/llvm-link (statically
+# linked) is extracted, to $TOOLS/llvm-<version>, written to env.sh as
+# LLVM_LINK_DIR. Only when GNAT_LLVM_DIR is set: nothing else uses it.
 GNAT_LLVM_ENV=""
+LLVM_LINK_DIR="$TOOLS/llvm-$LLVM_LINK_VERSION"
 if [ -n "${GNAT_LLVM_DIR:-}" ]; then
   [ -x "$GNAT_LLVM_DIR/bin/llvm-gcc" ] || die "GNAT_LLVM_DIR=$GNAT_LLVM_DIR has no bin/llvm-gcc"
+  [ -x "$GNAT_LLVM_DIR/bin/llvm-nm" ] || die "GNAT_LLVM_DIR=$GNAT_LLVM_DIR has no bin/llvm-nm"
   # Captured, not piped into head: SIGPIPE under pipefail.
   llvm_gcc_version="$("$GNAT_LLVM_DIR/bin/llvm-gcc" --version)"
   echo ">> GNAT_LLVM_DIR=$GNAT_LLVM_DIR: ${llvm_gcc_version%%$'\n'*}"
-  GNAT_LLVM_ENV="export GNAT_LLVM_DIR=\"$GNAT_LLVM_DIR\""
+  gnat_llvm_version="$("$GNAT_LLVM_DIR/bin/llvm-nm" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
+  [ "$gnat_llvm_version" = "$LLVM_LINK_VERSION" ] \
+    || die "GNAT_LLVM_DIR's LLVM is ${gnat_llvm_version:-?}, but toolchain-pins.env pins llvm-link $LLVM_LINK_VERSION: they must match"
+
+  if [ -x "$LLVM_LINK_DIR/bin/llvm-link" ] && [ -f "$LLVM_LINK_DIR/.bootstrap-sha256" ] \
+     && [ "$(cat "$LLVM_LINK_DIR/.bootstrap-sha256")" = "$LLVM_LINK_SHA256" ]; then
+    echo ">> $LLVM_LINK_DIR: already installed"
+  else
+    fetch "https://github.com/llvm/llvm-project/releases/download/$LLVM_LINK_TAG/$LLVM_LINK_TARBALL" \
+          "$TOOLS/downloads/$LLVM_LINK_TARBALL" "$LLVM_LINK_SHA256"
+    rm -rf "$LLVM_LINK_DIR.new"
+    mkdir -p "$LLVM_LINK_DIR.new"
+    echo ">> extracting bin/llvm-link from $LLVM_LINK_TARBALL"
+    tar -xJf "$TOOLS/downloads/$LLVM_LINK_TARBALL" -C "$LLVM_LINK_DIR.new" --strip-components=1 \
+        "${LLVM_LINK_TARBALL%.tar.xz}/bin/llvm-link"
+    echo "$LLVM_LINK_SHA256" > "$LLVM_LINK_DIR.new/.bootstrap-sha256"
+    rm -rf "$LLVM_LINK_DIR"
+    mv "$LLVM_LINK_DIR.new" "$LLVM_LINK_DIR"
+  fi
+  ensure_libs "$LLVM_LINK_DIR"
+  llvm_link_version="$("$LLVM_LINK_DIR/bin/llvm-link" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
+  [ "$llvm_link_version" = "$LLVM_LINK_VERSION" ] \
+    || die "$LLVM_LINK_DIR/bin/llvm-link is LLVM ${llvm_link_version:-?}, not $LLVM_LINK_VERSION"
+  echo ">> LLVM_LINK_DIR=$LLVM_LINK_DIR: llvm-link $llvm_link_version"
+
+  GNAT_LLVM_ENV="export GNAT_LLVM_DIR=\"$GNAT_LLVM_DIR\"
+export LLVM_LINK_DIR=\"$LLVM_LINK_DIR\""
   end
 else
   echo ">> skipped: GNAT_LLVM_DIR is unset. Only scripts/check-saw.sh (local, E4) needs it:"
