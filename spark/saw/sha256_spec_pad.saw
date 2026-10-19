@@ -1,0 +1,141 @@
+/*
+ * The SHA-256 spec layer's padding, SHA2.SHA256.Pad (Main's Pad, mirroring
+ * algorithms/SHA2/Preprocessing.cry's pad, which has no executable
+ * counterpart: the implementation's Final writes only the last one or two
+ * padded blocks), with what it calls: Small_K, Zero and the SHA2 root's
+ * To_Bits. Included by sha256_spec.saw after the module's load with lax
+ * arithmetic (below), whose verify_spec it uses.
+ *
+ * At the message lengths of M4.3's Hash proofs (README "SAW"): 0, 1, 55,
+ * 56, 63, 64, 65, 100, 119, 120, 128 and 200 bytes, l = 8 times that in
+ * bits.
+ *
+ * Bits (SHA2.Bits, index Bit_Index, 0 .. 2 ** 126) is a ghost Boolean
+ * array: one byte per bit, 0 or 1 (an Ada Boolean's validity is the
+ * precondition), as a fat pointer whose bounds record is two i128,
+ * {First, Last} (README "The bitcode ABI"). Each of Pad, Zero and To_Bits
+ * returns its Bits on the secondary stack (secondary_stack.saw): the
+ * contracts state where, and the stack's state after the call.
+ *
+ * Lax arithmetic. To_Bits (V, 1) concatenates To_Bits (V / 2, 0), the
+ * null range {0, -1}, and GNAT-LLVM computes a range's length as
+ * select (Lo > Hi, 0, (Hi - Lo) +nuw 1): the add wraps to a poison value
+ * that the select discards, which crucible refuses at its creation (the
+ * case M4.3 met in Final; README "The bitcode ABI"). Pad on an empty
+ * message does the same. So To_Bits' lemmas, which rest on the one at
+ * width 1, and Pad's, which rest on them, are proved in a load of the
+ * module with lax arithmetic, under which overflow is not an obligation:
+ * absence of overflow in these functions is gnatprove's (it proves it).
+ */
+
+let bits_bounds_t = llvm_alias "foundation_spark__sha2__bits_BOUNDS";
+
+/* Bytes, each 0 or 1, as Cryptol bits, and bits as such bytes. */
+let bits_of = {{ \bs -> [ b == (1 : [8]) | b <- bs ] }};
+let bytes_of = {{ \x -> [ if b then (1 : [8]) else 0 | b <- x ] }};
+
+/*
+ * The message lengths, in bits, grouped by their k = Small_K (l) (447,
+ * 439, 7, 511, 455, 159, 383): Zero's lemma and To_Bits' chain (below)
+ * depend on k alone, and are proved once per group.
+ */
+let pad_length_groups = [[0, 512, 1024], [8, 520], [440, 952], [448, 960], [504], [800], [1600]];
+
+/*
+ * Small_K (L) = hash's type k = (l + 1 + 2 * w) %^ m (Main.cry:58) at
+ * w = 32, m = 512: a value at each length (both sides are constants).
+ */
+let small_k (l : Int) = eval_int {{ `((l + 65) %^ 512) : [64] }};
+let verify_small_k (l : Int) =
+  verify_spec "sha256__small_k" []
+    (do {
+       llvm_execute_func [llvm_term {{ `l : [128] }}];
+       llvm_return (llvm_term {{ `((l + 65) %^ 512) : [128] }});
+     }) z3 "z3" (str_concat (str_concat "L = " (show l)) ": `((L + 1 + 2 * 32) %^ 512) (Main.cry's hash's k)");
+
+/*
+ * Zero (Count) = Cryptol's zero : [k], at k = Small_K (l) for each
+ * length: Count bytes of 0 with bounds {0, Count - 1}, on an empty
+ * secondary stack.
+ */
+let verify_zero (k : Int) =
+  verify_spec "sha256__zero" []
+    (do {
+       stack <- secondary_stack;
+       llvm_execute_func [llvm_term {{ `k : [128] }}];
+       ss_post stack (ss_size 32 k);
+       llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `k - 1 : [128] }}]);
+       llvm_points_to_untyped (ss_at stack 32) (llvm_term {{ bytes_of (zero : [k]) }});
+       llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+     }) z3 "z3" (str_concat (str_concat "zero : [" (show k)) "] (Preprocessing.cry's pad's zero)");
+
+/*
+ * To_Bits (V, W): the W-bit big-endian representation of V, Cryptol's
+ * (`l : [2 * w]) in pad at W = 64: drop`{128 - W} (v : [128]). One lemma
+ * per width W in 0 .. 64, each with the lemma at W - 1 as the override for
+ * its recursive call, all with the secondary stack at `used` bytes when
+ * the chain starts (Pad calls To_Bits after Zero), of which the first
+ * `keep` (Zero's result) are left as found: To_Bits (V, W) calls
+ * To_Bits (V / 2, W - 1) first, which leaves its own result and every
+ * shorter one on the stack (to_bits_used), and then allocates its
+ * result.
+ */
+let to_bits_used (w : Int) = eval_int {{ sum [ ((32 + j + 15) / 16) * 16 | j <- [0 .. w] ] : [64] }};
+let to_bits_contract (used : Int) (keep : Int) (w : Int) = do {
+  let is0 = eval_bool {{ `w == (0 : Integer) }};
+  let before = if is0 then 0 else to_bits_used (eval_int {{ `w - 1 : [64] }});
+  let at = eval_int {{ `used + `before : [64] }};
+  let data = eval_int {{ `at + 32 : [64] }};
+  let tw = to_bits_used w;
+  let after = eval_int {{ `used + `tw : [64] }};
+  stack <- secondary_stack_used used;
+  kept <- keep_pre stack keep;
+  v <- llvm_fresh_var "v" (llvm_int 128);
+  llvm_precond {{ v <= 2 ^^ 126 }};
+  llvm_execute_func [llvm_term v, llvm_term {{ `w : [128] }}];
+  ss_post stack after;
+  keep_post stack keep kept;
+  llvm_points_to_untyped (ss_at stack at) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `w - 1 : [128] }}]);
+  if is0 then return ()
+  else llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (drop`{128 - w} v) }});
+  llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
+};
+rec to_bits_lemmas (used : Int) (keep : Int) (w : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- verify_spec "to_bits" prev (to_bits_contract used keep w) z3 "z3"
+             (str_concat (str_concat (str_concat (str_concat "W = " (show w)) ", the secondary stack at ") (show used))
+                " bytes: drop`{128 - W} (v : [128]) ((`l : [2 * w]) in Preprocessing.cry's pad)");
+  if eval_bool {{ `w == (64 : Integer) }} then return lemma
+  else to_bits_lemmas used keep (eval_int {{ `w + 1 : [32] }}) [lemma];
+};
+
+/*
+ * Pad (M) = Preprocessing.cry's pad`{m = 512, w = 32, l, k} M
+ * [FIPS-PUB-180-4 Section 5.1.1]: pad M = M # 0b1 # zero # (`l : [64]),
+ * at each length l, with k = Small_K (l). M is a fat pointer to l bits
+ * with bounds {0, l - 1}. Pad calls Small_K, then Zero (on the empty
+ * stack), then To_Bits (l, 64) (the stack at Zero's result), and then
+ * allocates its result: their lemmas are the overrides, To_Bits' chain
+ * proved for this stack.
+ */
+let pad_contract (l : Int) = do {
+  let k = small_k l;
+  let len = eval_int {{ `l + 1 + `k + 64 : [64] }};
+  let uz = ss_size 32 k;
+  let t64 = to_bits_used 64;
+  let at = eval_int {{ `uz + `t64 : [64] }};
+  let data = eval_int {{ `at + 32 : [64] }};
+  let sz = ss_size 32 len;
+  let after = eval_int {{ `at + `sz : [64] }};
+  stack <- secondary_stack;
+  msg <- llvm_fresh_var "msg" (llvm_array l (llvm_int 8));
+  llvm_precond {{ all (\b -> b <= 1) msg }};
+  mp <- llvm_alloc_readonly (llvm_array l (llvm_int 8));
+  llvm_points_to mp (llvm_term msg);
+  mb <- llvm_alloc_readonly bits_bounds_t;
+  llvm_points_to mb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `l - 1 : [128] }}]);
+  llvm_execute_func [llvm_struct_value [mp, mb]];
+  ss_post stack after;
+  llvm_points_to_untyped (ss_at stack at) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `len - 1 : [128] }}]);
+  llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (pad`{512, 32, l, k} (bits_of msg)) }});
+  llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
+};

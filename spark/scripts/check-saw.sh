@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
 # check-saw.sh -- SAW's llvm_verify of the SPARK AES, SHA-256 and
-# HMAC-SHA-256 implementations, and of the AES spec layer, against NSA's
-# Cryptol, on GNAT-LLVM bitcode of the crate's own sources (E4, #21; M4.1
-# #22, M4.2 #23, M4.3 #24, M4.4 #59). README "SAW".
+# HMAC-SHA-256 implementations, and of the AES and SHA-256 spec layers,
+# against NSA's Cryptol, on GNAT-LLVM bitcode of the crate's own sources
+# (E4, #21; M4.1 #22, M4.2 #23, M4.3 #24, M4.4 #59). README "SAW".
 #
 # LOCAL ONLY: never wired into a CI workflow. It needs GNAT Pro's LLVM back
 # end (llvm-gcc), which CI does not have and which nobody without GNAT Pro
@@ -26,7 +26,8 @@
 #   3. refuses any llvm_unsafe_assume_spec in saw/ (every override must be
 #      a proof), then runs saw/<module>_impl.saw, every llvm_verify of
 #      which must succeed;
-# then, for each module of SPEC_MODULES (aes_spec), the spec layer (M4.4):
+# then, for each module of SPEC_MODULES (aes_spec, sha256_spec), the spec
+# layer (M4.4):
 #   1. compiles its units the same way plus -fno-inline and the
 #      configuration pragmas of saw/spec.adc (ghost code on, every other
 #      assertion kind off) to saw/obj/spec/<unit>.bc, and links them into
@@ -171,7 +172,7 @@ SWITCHES=(-c -gnat2022 -gnatp -gnatVn -O0 -emit-llvm)
 # The spec layer's modules (M4.4, #59), each the units listed linked into
 # saw/obj/spec/<module>.bc, and the script of proofs run on it,
 # saw/<module>.saw.
-SPEC_MODULES=(aes_spec)
+SPEC_MODULES=(aes_spec sha256_spec)
 
 # aes_spec: the AES spec layer's units whose functions the script proves
 # (all ghost but AES.Spec.Types).
@@ -183,6 +184,17 @@ UNITS_aes_spec=(
   aes/foundation_spark-aes-spec-cipher.ads
   aes/foundation_spark-aes-spec-keyexpansion.ads
   aes/foundation_spark-aes-spec-main.ads
+)
+
+# sha256_spec: the SHA-256 instance of the generic SHA2.Main (its ghost
+# functions are the spec layer), with the SHA2 root (To_Bits, Ceil_Div,
+# Ceil_Mod), SHA2.Functions and SHA2.Preprocessing (H0_256), which it
+# calls or reads.
+UNITS_sha256_spec=(
+  sha2/foundation_spark-sha2.ads
+  sha2/foundation_spark-sha2-functions.ads
+  sha2/foundation_spark-sha2-preprocessing.ads
+  sha2/foundation_spark-sha2-sha256.ads
 )
 
 # The spec layer's switches: the implementation's, plus
@@ -242,8 +254,9 @@ CRYPTOL_FILES=(
   algorithms/SHA2/Preprocessing.cry
   algorithms/HMAC/Main.cry
 )
-# Our own Cryptol in saw/: instantiations of NSA's, recorded by sha256.
-OUR_CRYPTOL=(spark/saw/SHA256Main.cry)
+# Our own Cryptol in saw/, recorded by sha256: an instantiation of NSA's,
+# and a copy of the local definitions of its step (sha256_spec.saw).
+OUR_CRYPTOL=(spark/saw/SHA256Main.cry spark/saw/SHA256Step.cry)
 
 T0="$(date +%s)"
 COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
@@ -451,10 +464,10 @@ record() {
   echo "# saw/results.txt -- written by scripts/check-saw.sh; do not edit."
   echo "#"
   echo "# SAW llvm_verify of the SPARK AES, SHA-256 and HMAC-SHA-256"
-  echo "# implementations' bitcode, and of the AES spec layer's (lines"
-  echo "# \"proved spec layer: ...\"), against NSA's Cryptol. Local only (GNAT"
-  echo "# Pro LLVM), never run by CI: this record is the provenance of the"
-  echo "# result. README \"SAW\"."
+  echo "# implementations' bitcode, and of the AES and SHA-256 spec layers'"
+  echo "# (lines \"proved spec layer: ...\"), against NSA's Cryptol. Local only"
+  echo "# (GNAT Pro LLVM), never run by CI: this record is the provenance of"
+  echo "# the result. README \"SAW\"."
   echo
   echo "commit      $COMMIT$DIRTY"
   echo "date        $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -493,7 +506,7 @@ record() {
     echo "cryptol     $(sha "$ROOT_DIR/$f") $f"
   done
   for f in "${OUR_CRYPTOL[@]}"; do
-    echo "cryptol     $(sha "$ROOT_DIR/$f") $f (ours: an instantiation)"
+    echo "cryptol     $(sha "$ROOT_DIR/$f") $f (ours)"
   done
   for p in "${PROVED[@]}"; do
     echo "proved      $p"

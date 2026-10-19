@@ -1,0 +1,92 @@
+/*
+ * llvm_verify of the SPARK SHA-256 spec layer (the ghost functions of
+ * Foundation_Spark.SHA2.SHA256, the SHA-256 instance of the generic
+ * spark/src/sha2/foundation_spark-sha2-main.ads) against NSA's Cryptol:
+ * M4.4 (#59): the compression function, the padding at the twelve message
+ * lengths of M4.3's Hash proofs, and the hash at nine of them.
+ * sha256_spec_common.saw has the shared parts; the lemmas are in
+ * sha256_spec_step.saw (the compression function), sha256_spec_pad.saw
+ * (Pad and what it calls) and sha256_spec_hash.saw (Hash and the
+ * recursions it calls).
+ *
+ * Main.cry's `step` (Main.cry:67) holds the message schedule W, the round
+ * step3 and its T1 and T2 as local definitions, which cannot be named
+ * from outside it. The spec's W, T1, T2, Step3 and Foldl_Step3 are proved
+ * against saw/SHA256Step.cry, our copy of those locals at SHA-256, lifted
+ * out of `step`; the spec's Step is proved against NSA's `step` itself
+ * (saw/SHA256Main.cry, as sha256_impl.saw uses it), with Foldl_Step3's
+ * lemma and "+"'s as the overrides: that proof is what ties the copies to
+ * Main.cry.
+ *
+ * The recursions are never unfolded: W (Main.cry: W@t = sigma_1 (W@(t-2))
+ * + W@(t-7) + sigma_0 (W@(t-15)) + W@(t-16)) one index t at a time, 64
+ * lemmas, each with the lemmas below it as the overrides for its four
+ * recursive calls; Foldl_Step3 (foldl step3 H [0 ..< N]) one N at a
+ * time, 65 lemmas. T1 and Step3 take the round t and are proved at each,
+ * 64 lemmas apiece. To_Bits, Word_Of and Foldl_Step likewise, one width,
+ * count or block count at a time.
+ */
+
+include "sha256_spec_common.saw";
+
+/* --- the compression function -------------------------------------------- */
+
+include "sha256_spec_step.saw";
+
+/* --- Pad and Hash, in a load with lax arithmetic --------------------------- */
+
+/*
+ * In the module's load with lax arithmetic (sha256_spec_common.saw):
+ * Pad's lemmas, and Hash's, which rest on them, with the compression
+ * function's lemmas proved again in it for Hash's overrides; their
+ * RESULT lines say "(lax arithmetic module)".
+ */
+let verify_spec = verify_spec_lax;
+include "sha256_spec_step.saw";
+include "sha256_spec_pad.saw";
+include "sha256_spec_hash.saw";
+
+/*
+ * Word_Of's and Foldl_Step's lemmas for padded messages of 1 and 2
+ * blocks. Hash is proved at the lengths that pad to 1 or 2 blocks (0, 1,
+ * 55, 56, 63, 64, 65, 100 and 119 bytes), not at 120, 128 and 200 bytes
+ * (3 and 4 blocks): each Word_Of lemma, First symbolic, takes about 5 s
+ * per 512 bits of padded message (yices; z3 takes half again as long),
+ * so their 33 lemmas would add about 30 minutes for 1536 and 2048 bits.
+ * Pad is proved at all twelve lengths.
+ */
+i_word_of_1 <- word_of_lemmas 512 0 [];
+i_word_of_2 <- word_of_lemmas 1024 0 [];
+i_foldl_step_1 <- foldl_step_lemmas 1 0 [];
+i_foldl_step_2 <- foldl_step_lemmas 2 0 [];
+
+/*
+ * Pad, and Hash where the padded message has 1 or 2 blocks, at each
+ * length, by groups of the same k (Zero's lemma and To_Bits' chain are
+ * proved once per group). Hash at 0 bytes has no symbolic input: the
+ * overrides' step is evaluated on constants, so the Cryptol's must be too,
+ * and nothing is left uninterpreted (as sha256_impl.saw's Hash at 0).
+ */
+let verify_pad_hash_group (ls : [Int]) = do {
+  let k = small_k (head ls);
+  z <- verify_zero k;
+  tb <- to_bits_lemmas (ss_size 32 k) (eval_int {{ 32 + `k : [64] }}) 0 [];
+  for ls (\l -> do {
+    sk <- verify_small_k l;
+    pad_l <- verify_spec "sha256__pad" [sk, z, tb] (pad_contract l) z3 "z3"
+               (str_concat (str_concat "l = " (show l)) ": Preprocessing::pad`{512, 32, l, (l + 65) %^ 512}");
+    let nb = eval_int {{ (`l + 65 + 511) / 512 : [64] }};
+    if eval_bool {{ `nb > (2 : Integer) }} then return ()
+    else do {
+      let one = eval_bool {{ `nb == (1 : Integer) }};
+      verify_spec "sha256__hash"
+        [pad_l, if one then i_word_of_1 else i_word_of_2, if one then i_foldl_step_1 else i_foldl_step_2]
+        (hash_contract l)
+        (if eval_bool {{ `l == (0 : Integer) }} then z3 else w4_unint_z3 ["step"])
+        (if eval_bool {{ `l == (0 : Integer) }} then "z3, nothing uninterpreted (no symbolic input)" else "w4_unint_z3 step")
+        (str_concat (str_concat "l = " (show l)) ": SHA256Main::hash`{l} (Main.cry's hash at SHA-256)");
+      return ();
+    };
+  });
+};
+for pad_length_groups verify_pad_hash_group;

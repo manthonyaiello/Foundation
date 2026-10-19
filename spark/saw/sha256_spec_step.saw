@@ -1,0 +1,158 @@
+/*
+ * The SHA-256 spec layer's compression function: the leaves (Functions'
+ * SIGMA and sigma, the instance's Ch and Maj), W, T1, T2, Step3,
+ * Foldl_Step3, "+" and Step (sha256_spec.saw says against what, and how).
+ * Included by sha256_spec.saw twice: once for the module as loaded, and
+ * once for its load with lax arithmetic, whose Hash proofs take these
+ * lemmas as overrides (SAW takes an override only from the module it
+ * verifies). verify_spec is the one in scope at each include.
+ */
+
+/* --- the leaves: Functions' SIGMA and sigma, the instance's Ch and Maj ---- */
+
+let word_contract (f : Term) = do {
+  x <- llvm_fresh_var "x" word_t;
+  llvm_execute_func [llvm_term x];
+  llvm_return (llvm_term {{ f x }});
+};
+let tuple_contract (f : Term) = do {
+  x <- llvm_fresh_var "x" word_t;
+  y <- llvm_fresh_var "y" word_t;
+  z <- llvm_fresh_var "z" word_t;
+  llvm_execute_func [llvm_term x, llvm_term y, llvm_term z];
+  llvm_return (llvm_term {{ f (x, y, z) }});
+};
+f_SIGMA_0 <- verify_spec "functions__sigma_256_0" [] (word_contract {{ SIGMA_256_0 }}) rme "rme" "Functions::SIGMA_256_0";
+f_SIGMA_1 <- verify_spec "functions__sigma_256_1" [] (word_contract {{ SIGMA_256_1 }}) rme "rme" "Functions::SIGMA_256_1";
+f_sigma_0 <- verify_spec "functions__small_sigma_256_0" [] (word_contract {{ sigma_256_0 }}) rme "rme" "Functions::sigma_256_0";
+f_sigma_1 <- verify_spec "functions__small_sigma_256_1" [] (word_contract {{ sigma_256_1 }}) rme "rme" "Functions::sigma_256_1";
+i_ch <- verify_spec "sha256__logical__ch" [] (tuple_contract {{ Ch }}) rme "rme" "Functions::Ch at [32]";
+i_maj <- verify_spec "sha256__logical__maj" [] (tuple_contract {{ Maj }}) rme "rme" "Functions::Maj at [32]";
+
+/* --- W, one index at a time ------------------------------------------------ */
+
+/*
+ * W (M, T) = Ws m @ t, `step`'s W@t, for each T in 0 .. 63. M is a
+ * pointer to the block; W's recursive calls pass it on.
+ */
+let w_contract (t : Int) = do {
+  m <- llvm_fresh_var "m" block_t;
+  mp <- llvm_alloc block_t;
+  llvm_points_to mp (llvm_term m);
+  llvm_execute_func [mp, llvm_term {{ `t : [32] }}];
+  llvm_points_to mp (llvm_term m);
+  llvm_return (llvm_term {{ Ws m @ (`t : [32]) }});
+};
+rec w_lemmas (t : Int) (window : [LLVMSpec]) (all : [LLVMSpec]) : TopLevel [LLVMSpec] = do {
+  lemma <- verify_spec "sha256__w" (concat window [f_sigma_0, f_sigma_1]) (w_contract t)
+             unint_sigmas unint_sigmas_name
+             (str_concat (str_concat "T = " (show t)) ": Ws m @ T (Main.cry's step's W@t)");
+  let len = length window;
+  let next = if eval_bool {{ (`len : Integer) == 16 }} then concat (tail window) [lemma]
+             else concat window [lemma];
+  if eval_bool {{ `t == (63 : Integer) }} then return (concat all [lemma])
+  else w_lemmas (eval_int {{ `t + 1 : [32] }}) next (concat all [lemma]);
+};
+i_w <- w_lemmas 0 [] [];
+
+/* --- T1, T2, Step3, at each round ----------------------------------------- */
+
+/*
+ * T1 (M, Vars, T), T2 (Vars) and Step3 (M, Vars, T) at round t: Vars is a
+ * pointer to the working variables [a, b, c, d, e, f, g, h].
+ */
+let vars_contract (with_m : Bool) (t : Int) (f : Term) = do {
+  m <- llvm_fresh_var "m" block_t;
+  mp <- llvm_alloc block_t;
+  llvm_points_to mp (llvm_term m);
+  vars <- llvm_fresh_var "vars" hash_value_t;
+  vp <- llvm_alloc hash_value_t;
+  llvm_points_to vp (llvm_term vars);
+  if with_m then llvm_execute_func [mp, vp, llvm_term {{ `t : [32] }}]
+  else llvm_execute_func [vp];
+  llvm_points_to mp (llvm_term m);
+  llvm_points_to vp (llvm_term vars);
+  llvm_return (llvm_term {{ f m vars (`t : Integer) }});
+};
+i_t2 <- verify_spec "sha256__t2" [f_SIGMA_0, i_maj]
+          (do {
+             vars <- llvm_fresh_var "vars" hash_value_t;
+             vp <- llvm_alloc hash_value_t;
+             llvm_points_to vp (llvm_term vars);
+             llvm_execute_func [vp];
+             llvm_points_to vp (llvm_term vars);
+             llvm_return (llvm_term {{ T2 vars }});
+           }) unint_sigmas unint_sigmas_name "T2 (Main.cry's step3's T2)";
+rec round_lemmas (t : Int) (t1s : [LLVMSpec]) (step3s : [LLVMSpec]) : TopLevel [LLVMSpec] = do {
+  t1 <- verify_spec "sha256__t1" (concat i_w [f_SIGMA_1, i_ch]) (vars_contract true t {{ T1 }})
+          unint_sigmas unint_sigmas_name
+          (str_concat (str_concat "T = " (show t)) ": T1 m vars T (Main.cry's step3's T1)");
+  s3 <- verify_spec "sha256__step3" [t1, i_t2] (vars_contract true t {{ step3 }})
+          unint_sigmas unint_sigmas_name
+          (str_concat (str_concat "T = " (show t)) ": step3 m vars T (Main.cry's step's step3)");
+  if eval_bool {{ `t == (63 : Integer) }} then return (concat step3s [s3])
+  else round_lemmas (eval_int {{ `t + 1 : [32] }}) (concat t1s [t1]) (concat step3s [s3]);
+};
+i_step3 <- round_lemmas 0 [] [];
+
+/* --- Foldl_Step3, one N at a time ------------------------------------------ */
+
+/*
+ * Foldl_Step3 (M, H, N) = foldl (step3 m) h [0 ..< N], for each N in
+ * 0 .. 64, with the lemma at N - 1 and Step3's (SAW applies the one at
+ * round N - 1) as the overrides.
+ */
+let foldl_step3_contract (n : Int) = do {
+  m <- llvm_fresh_var "m" block_t;
+  mp <- llvm_alloc block_t;
+  llvm_points_to mp (llvm_term m);
+  h <- llvm_fresh_var "h" hash_value_t;
+  hp <- llvm_alloc hash_value_t;
+  llvm_points_to hp (llvm_term h);
+  llvm_execute_func [mp, hp, llvm_term {{ `n : [32] }}];
+  llvm_points_to mp (llvm_term m);
+  llvm_points_to hp (llvm_term h);
+  llvm_return (llvm_term {{ foldl (step3 m) h [0 ..< n] }});
+};
+rec foldl_lemmas (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- verify_spec "sha256__foldl_step3" (concat prev i_step3) (foldl_step3_contract n)
+             unint_sigmas unint_sigmas_name
+             (str_concat (str_concat "N = " (show n)) ": foldl (step3 m) h [0 ..< N]");
+  if eval_bool {{ `n == (64 : Integer) }} then return lemma
+  else foldl_lemmas (eval_int {{ `n + 1 : [32] }}) [lemma];
+};
+i_foldl_step3_64 <- foldl_lemmas 0 [];
+
+/* --- "+" and Step -------------------------------------------------------- */
+
+/*
+ * "+" = Cryptol's + on [8][32]; Step = Main.cry's step at SHA-256
+ * [FIPS-PUB-180-4 Section 6.2.2]: step H M = H + foldl step3 H [0 ..< 64].
+ * Step passes H and the fold's result (a temporary) to "+".
+ */
+i_add <- verify_spec "sha256__Oadd" []
+           (do {
+              l <- llvm_fresh_var "l" hash_value_t;
+              lp <- llvm_alloc hash_value_t;
+              llvm_points_to lp (llvm_term l);
+              r <- llvm_fresh_var "r" hash_value_t;
+              rp <- llvm_alloc hash_value_t;
+              llvm_points_to rp (llvm_term r);
+              llvm_execute_func [lp, rp];
+              llvm_points_to lp (llvm_term l);
+              llvm_points_to rp (llvm_term r);
+              llvm_return (llvm_term {{ l + r }});
+            }) z3 "z3" "\\l r -> l + r : [8][32]";
+i_step <- verify_spec "sha256__step" [i_foldl_step3_64, i_add]
+            (do {
+               h <- llvm_fresh_var "h" hash_value_t;
+               hp <- llvm_alloc hash_value_t;
+               llvm_points_to hp (llvm_term h);
+               m <- llvm_fresh_var "m" block_t;
+               mp <- llvm_alloc block_t;
+               llvm_points_to mp (llvm_term m);
+               llvm_execute_func [hp, mp];
+               llvm_points_to hp (llvm_term h);
+               llvm_points_to mp (llvm_term m);
+               llvm_return (llvm_term {{ step h m }});
+             }) unint_sigmas unint_sigmas_name "SHA256Main::step (Main.cry's step at SHA-256)";

@@ -1,0 +1,26 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * One of sha256_spec.saw's per-index lemmas of the message schedule W
+ * with the wrong Cryptol: W at T = 16 against Ws (reverse m) @ 16, with
+ * the overrides of the lemma at T = 16 (the W lemmas, of which SAW
+ * applies those at 0, 1 and 9, and the sigmas') and its tactic (z3 with
+ * the SIGMA and sigma functions uninterpreted). It runs
+ * sha256_spec_step.saw first, for the lemmas. The proof must fail with a
+ * counterexample block, which shows that the overrides of W's recursive
+ * calls and the uninterpreted sigmas do not make the per-index lemmas
+ * vacuous: which words of the block the recursion reads is checked.
+ */
+
+include "../sha256_spec_common.saw";
+include "../sha256_spec_step.saw";
+
+verify_spec "sha256__w" (concat i_w [f_sigma_0, f_sigma_1])
+  (do {
+     m <- llvm_fresh_var "m" block_t;
+     mp <- llvm_alloc block_t;
+     llvm_points_to mp (llvm_term m);
+     llvm_execute_func [mp, llvm_term {{ 16 : [32] }}];
+     llvm_points_to mp (llvm_term m);
+     llvm_return (llvm_term {{ Ws (reverse m) @ (16 : [32]) }});
+   }) unint_sigmas unint_sigmas_name "T = 16: Ws (reverse m) @ 16";

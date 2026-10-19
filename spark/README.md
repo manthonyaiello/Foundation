@@ -778,7 +778,10 @@ key schedule and both ciphers at each key size, against
 `algorithms/AES/KeyExpansion.cry` and `Cipher.cry`; M4.3 (#24) proves
 SHA-256's compression function for all inputs, and the one-shot SHA-256
 and HMAC-SHA-256 at fixed lengths, against `algorithms/SHA2/Main.cry` and
-`algorithms/HMAC/Main.cry`. The NSA Cryptol is imported unmodified.
+`algorithms/HMAC/Main.cry`. M4.4 (#59) proves the **spec layer** equal to
+the same Cryptol, so that spec = Cryptol, which the FFI check tests, is
+also a proof at these sizes (below, "The spec layer"). The NSA Cryptol is
+imported unmodified.
 
 **SAW proves each size separately; gnatprove covers every size.**
 `Compress` is proved for every hash value and block, but `Hash` and
@@ -896,6 +899,180 @@ executed within `Hash`'s proofs: they take arrays and offsets that differ
 from call to call, so one contract would not serve as their override), `Init`, `Update` and `Final` on their own (likewise, through
 `Hash`), `Hash_Chunked`, and the incremental HMAC interface.
 
+### The spec layer
+
+M4.4 (#59) proves the ghost spec layer equal to the NSA Cryptol, with
+`llvm_verify` as above, on bitcode built apart from the implementation's:
+
+- **The build** (`saw/obj/spec/`, one module per algorithm,
+  `aes_spec.bc` and `sha256_spec.bc`): the implementation's switches, plus
+  `-gnatec=saw/spec.adc`, whose `pragma Assertion_Policy (Ignore)` then
+  `pragma Assertion_Policy (Ghost => Check)` compile the ghost code and no
+  contract or assertion (GNAT rejects the one-pragma form `(Ghost =>
+  Check, others => Ignore)`: `others` is not an assertion kind), and
+  **`-fno-inline`**: GNAT-LLVM marks every expression function
+  `alwaysinline`, and the spec layer is expression functions, so without
+  it a fold's call to its round function, or `W`'s to `SubWord`, is
+  inlined and no lemma can be its override. `-fno-inline` makes each a
+  call (`noinline`) and changes nothing else. The implementation's builds
+  keep the check that no ghost symbol appears; the spec modules must
+  define them instead.
+- **Recursions are never unfolded.** A recursive ghost function whose
+  variant is a size is proved one index at a time, each lemma with the
+  lemmas at the smaller indices it calls as overrides: the GF(2^8) and
+  GF(2) folds per bit count, the cipher folds per number of round keys,
+  `KeyExpansion`'s `W` per index (44, 52 and 60 lemmas at k = 128, 192,
+  256), SHA-2's `W` per index (64) and `Foldl_Step3` per round count (65),
+  `To_Bits` per width, `Word_Of` per bit count, `Foldl_Step` per block
+  count. GF2's `Inner` (pgcd's `inner`) recurses on a value, the degree of
+  `r'`, not on a size, and with a symbolic byte SAW's evaluation of the
+  Cryptol's `inner` does not terminate: `Pgcd`, `Inverse` and `Affine` are
+  proved on each of the 256 bytes, one `llvm_verify` per byte, which
+  together are the proof for every byte.
+- **SHA-2's `step` locals.** Main.cry's `W`, `step3`, `T1` and `T2` are
+  local to `step` and cannot be named. `saw/SHA256Step.cry` (ours) copies
+  them, at SHA-256, out of `step`, text for text with the block as an
+  explicit argument; the spec's `W`, `T1`, `T2`, `Step3` and `Foldl_Step3`
+  are proved against the copy, and the spec's `Step` against NSA's `step`
+  itself (through `saw/SHA256Main.cry`), with `Foldl_Step3`'s lemma as the
+  override: that proof ties the copy to Main.cry.
+
+AES (`aes_spec.saw`, with `aes_spec_gf.saw`, `aes_spec_cipher.saw`,
+`aes_spec_keyexpansion.saw`, `aes_spec_main.saw`; contracts in
+`aes_spec_common.saw`):
+
+| Ada (`AES.Spec.`) | Cryptol | sizes, lemmas | overrides | tactic |
+|---|---|---|---|---|
+| `GF28.xTimes`, `.Head`, `.Bit`, `.Product_Bit` | `GF28.cry`: `xTimes`; `head`, `@` | | | rme, z3 |
+| `GF28.Pmult_Fold` | `zext (pmult b (take`{N} c))` | N = 0 .. 8 | N - 1 | rme |
+| `GF28.Pmult`, `.Reduce`, `.Pmod` | `pmult`, `pmod` at GF28.cry's types | | the folds at 8, 15 | rme |
+| `GF28.Pmod_Fold` | `pmod (take`{N} x) y` | N = 0 .. 15 | N - 1, `Reduce`, `Product_Bit` | rme |
+| `GF28.Dot` | `GF28.cry`: `(•)` | | `Pmult`, `Pmod` | rme |
+| `GF2.Pmult`, `.Pdeg`, `.Pdiv` | `GF2.cry`: `(^*)`, `pdeg`, `(^/)` at `[9]` | | `Pdiv_Fold` at 9 | rme, z3 |
+| `GF2.Pmod_Fold`, `.Pdiv_Fold` | `pmod`, `pdiv` of `take`{N} x` | N = 0 .. 9 | N - 1 | rme |
+| `GF2.Pgcd`, `.Inverse` | `GF2.cry`: `pgcd`{7, 8} a SBoxPolynomial`, `inverse a SBoxPolynomial` | each of the 256 bytes | `Pdiv`; `Pgcd` at that byte | rme |
+| `SBox.Affine` | `SBox.cry`: `affine` | each of the 256 bytes | `Inverse` at that byte | rme |
+| `Types.Nk`, `.Nr`, `.Split`, `.Join` | as for the implementation | | | z3, rme |
+| `Cipher.SubBytes` to `.InvMixColumns`, `.AddRoundKey` | `Cipher.cry`, each | | `Dot`; the column step, `Split`, `Join` | rme |
+| `Cipher.Round`, `.InvRound`, `.InvRound_Prime` | `Round`, `InvRound`, `InvRound'` | | their four steps | rme; z3 for `InvRound'` |
+| `Cipher.Foldl_Round`, `.Foldl_InvRound`, `.Foldl_InvRound_Prime` | `foldl Round z xs` and the others | M = 0 .. 13 round keys | M - 1, the round | z3, the round uninterpreted |
+| `Cipher.Cipher` | ``Cipher`{k}`` | 128, 192, 256 | `Nr`, the fold, `SubBytes`, `ShiftRows`, `AddRoundKey` | z3, the four uninterpreted |
+| `Cipher.Reverse_Keys` | `reverse` | 9, 11, 13 round keys | | z3 |
+| `Cipher.InvCipher`, `.InvCipher_Prime` | ``InvCipher`{k}``, ``InvCipher'`{k}`` | 128, 192, 256 | `Nr`, the fold, the steps (`Reverse_Keys` executed) | z3, the round and steps uninterpreted |
+| `KeyExpansion.RotWord`, `.SubWord`, `"xor"` | `RotWord`, `SubWord`, `^` | | | rme |
+| `KeyExpansion.W` | `w @ i` = `(groupBy`{4} (join (KeyExpansion`{k} key))) @ i` | each I at each k: 44, 52, 60 | the lemmas below I (SAW applies those at I - 1 and I - Nk), the leaves | z3, `SubWord` uninterpreted |
+| `KeyExpansion.KeyExpansion` | ``KeyExpansion`{k}`` | 128, 192, 256 | the W lemmas, `Nr`, `Join` | z3, `SubWord` uninterpreted |
+| `Main.Bit_Of`, `.Byte_At`, `.Split_Block`, `.Split_Key` | `Main.cry`'s `split`s: `b @ j`, ``take`{8} (bs << from)``, `split in`, `split (split key)` | `Byte_At` at 128, 192, 256 bits; `Split_Key` at each k | `Byte_At` | z3 |
+
+`Rcon` is read by the W lemmas, and the `SBox` and `InvSBox` tables by
+`SubBytes` and `InvSubBytes` (every entry, for a symbolic block).
+
+SHA-256 (`sha256_spec.saw`, with `sha256_spec_step.saw`,
+`sha256_spec_pad.saw`, `sha256_spec_hash.saw`; shared parts in
+`sha256_spec_common.saw`). Message lengths are M4.3's: 0, 1, 55, 56, 63,
+64, 65, 100, 119, 120, 128 and 200 bytes.
+
+| Ada (`SHA2.SHA256.` unless named) | Cryptol | sizes, lemmas | overrides | tactic |
+|---|---|---|---|---|
+| `SHA2.Functions.SIGMA_256_0/1`, `Small_Sigma_256_0/1`; `Logical.Ch`, `.Maj` | `Functions.cry` | | | rme |
+| `W` | `Ws m @ t` (`SHA256Step.cry`: `step`'s `W@t`) | T = 0 .. 63 | the lemmas below T (SAW applies those at T - 2, T - 7, T - 15, T - 16), the sigmas | z3, the four sigmas uninterpreted |
+| `T1`, `T2`, `Step3` | `SHA256Step.cry`: `step3`'s `T1`, `T2`, and `step3` | each T: 64, 1, 64 | `W` at T, the sigmas, `Ch`, `Maj`; `T1` at T, `T2` | z3, sigmas uninterpreted |
+| `Foldl_Step3` | `foldl (step3 m) h [0 ..< N]` | N = 0 .. 64 | N - 1, `Step3` at N - 1 | z3, sigmas uninterpreted |
+| `"+"`, `Step` | `+` on `[8][32]`; **`Main.cry`: `step`** | | `Foldl_Step3` at 64, `"+"` | z3, sigmas uninterpreted |
+| `Small_K` | `hash`'s `type k = (l + 1 + 2 * w) %^ m` | each length | | z3 |
+| `Zero` | `zero : [k]` | each k (7 values) | | z3 |
+| `SHA2.To_Bits` | ``drop`{128 - W} v``, `pad`'s ``(`l : [64])`` | W = 0 .. 64, for each k | W - 1 | z3 |
+| **`Pad`** | `Preprocessing.cry`: ``pad`{512, 32, l, k}`` | all twelve lengths | `Small_K`, `Zero`, `To_Bits` at 64 | z3 |
+| `Word_Of` | ``zext (take`{Count} (p << first))`` (a word of `parse`) | Count = 0 .. 32, P of 512 and 1024 bits | Count - 1 | yices |
+| `Foldl_Step` | ``foldl step h (take`{N} ms)`` | N = 0 .. 1 of 1 block, 0 .. 2 of 2 | N - 1, `Step` | z3, `step` uninterpreted |
+| **`Hash`** | `Main.cry`: ``hash`{l}`` | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes | `Pad`, `Word_Of` at 32, `Foldl_Step` (`Parse`, `Parse_Block`, `Join`, `Bit` executed) | z3, `step` uninterpreted |
+
+`Pad` (`pad` has no executable counterpart: `Final` writes only the last
+blocks) and `Hash` are proved in a load of the module with lax arithmetic
+(see "The bitcode ABI": `To_Bits (V, 1)` concatenates the null range
+`To_Bits (V / 2, 0)`, and `Pad` on an empty message makes one), with
+`Small_K`, `Zero`, `To_Bits`, `Word_Of`, `Foldl_Step` and the compression
+function's lemmas proved again in that load; `results.txt` marks each of
+those results "lax arithmetic module".
+
+**Not proved by SAW**, and why:
+
+- `AES.Spec.Main.Join_Block`, and so `Encrypt`, `Decrypt` and the
+  `AES128`, `AES192` and `AES256` packages' functions, which call it:
+  `Join_Block`'s aggregate indexes its `Block_Bits` result, a constrained
+  array, by the 128-bit `Bit_Index` directly (`getelementptr [128 x i8],
+  ptr, i64 0, i128 %n`), and SAW 1.6's simulator rejects a getelementptr
+  index wider than 64 bits ("Invalid index value in GEP") when it
+  translates the function. This is SAW's limit, not the crate's, and needs
+  no change to the SPARK.
+- `SHA2.SHA256.Hash` at 120, 128 and 200 bytes (3 and 4 padded blocks):
+  each `Word_Of` lemma, `First` symbolic, takes about 5 s per 512 bits of
+  padded message (yices; z3 half again as long), so the 33 lemmas for
+  1536 and 2048 bits would add about 30 minutes to every run. `Pad` is
+  proved at those lengths.
+- `SHA2.SHA256_Bytes`' and HMAC's spec layer (`HMAC.Main`, `HMAC.SHA256`:
+  `HMAC`, `HMAC_init`): not attempted in M4.4.
+- On their own: `Parse`, `Parse_Block`, `Join` and `Bit` (executed within
+  `Hash`), `Ceil_Div` and `Ceil_Mod` (within `Small_K`), GF2's `Inner`,
+  `Inner_Step`, `Inner_Next`, `Sub_Mult`, `Term`, `Lead`, `Reduce` and
+  `Bit` (within `Pgcd` and the folds; `Inner` and the rest are pgcd's
+  locals, with no Cryptol name), `SBox.Reversed_Bit` and `Affine_Bit`,
+  `KeyExpansion.Words`, and the `Is_*` predicates (contract helpers).
+- `Pgcd` and `Inverse` are proved at the modulus `SBoxPolynomial` only,
+  the one `SBox.cry` and the spec's `Affine` pass.
+
+#### The secondary stack
+
+A spec function that returns an unconstrained array (`KeyExpansion`,
+`Reverse_Keys`, `Split_Key`, `Pad`, `Zero`, `To_Bits`, `Parse`, `Join`,
+`Hash`) allocates its result on the secondary stack, with
+`System.Secondary_Stack.SS_Allocate`. That is executed, not assumed:
+`check-saw.sh` compiles GNAT Pro's own `s-secsta.adb` and `s-soflin.adb`
+from the runtime's sources (`-gnatg -gnatp -O0`, their sha256 in
+`results.txt`) and links them into each spec module. A contract of such a
+function starts from the state the runtime's `SS_Init` leaves the
+environment task's stack in (`saw/secondary_stack.saw`): one static chunk
+of 64 KiB, `Top` at its first byte (or after the bytes a caller has
+already allocated), and `NT_TSD.Sec_Stack_Ptr` pointing to it; and it
+states where the result is on the stack, and the stack's `Top` after the
+call. Two things stand between SAW and the runtime as it is:
+
+- GNAT calls a soft link with a static-chain ("nest") argument that the
+  default target, `Get_Sec_Stack_NT`, does not take; native code ignores
+  it, but SAW refuses a call whose arguments do not match the callee's
+  ("Failed to load function handle"). The contracts set the soft link to
+  `saw/saw_soft_links.ads`'s `Get_Sec_Stack`, harness code that takes the
+  argument and returns `Get_Sec_Stack_NT`'s result. This adapter is the
+  one piece of the spec proofs that is not the crate's or the runtime's
+  own code.
+- When SAW applies an override, it invalidates every writable allocation
+  and global of its precondition that its postcondition does not describe.
+  So a lemma used as an override (`Zero`, `To_Bits`, `Pad`) restates the
+  soft link, `NT_TSD`'s pointer and the stack's headers, and what its
+  caller allocated before the call (`keep`), and every array a spec
+  contract takes by reference is writable and stated unchanged (a
+  read-only allocation in an override does not match a writable one, and
+  the callers pass temporaries and arrays on the secondary stack).
+
+#### The FFI properties now backed by a proof
+
+The FFI check stays: it is the reproducible one. These spec-layer
+properties, tested with `:check` (random inputs), are now also SAW-proved
+at the spec layer, for every input at the sizes stated: `prop_SubBytes`,
+`prop_InvSubBytes`, `prop_ShiftRows`, `prop_InvShiftRows`,
+`prop_MixColumnsStep`, `prop_MixColumns`, `prop_InvMixColumnsStep`,
+`prop_InvMixColumns`, `prop_AddRoundKey`, `prop_Round`, `prop_InvRound`,
+`prop_InvRound'`, `prop_RotWord`, `prop_SubWord`, `prop_Ch`, `prop_Maj`,
+`prop_SIGMA_256_0`, `prop_SIGMA_256_1`, `prop_sigma_256_0`,
+`prop_sigma_256_1`, `prop_step` (every input); `prop_Cipher*`,
+`prop_InvCipher*`, `prop_InvCipher'*` and `prop_KeyExpansion*` (every key
+and block, at the property's key size); `prop_pad` (at the twelve
+lengths) and `prop_hash`, `prop_hash_bits` (at nine). `SBox.affine` and
+`GF2::inverse`, which have no FFI property and no executable counterpart,
+are proved for every byte. Not backed: `prop_parse` (executed within
+`Hash` only), `Main`'s `prop_Encrypt*`/`prop_Decrypt*`, `prop_Hash_Bytes`
+and the HMAC properties.
+
 ### Running it
 
 There is **no `llvm_unsafe_assume_spec`**: every override is a proof in
@@ -977,10 +1154,21 @@ do not read `saw/`: the trust and docs gates scan `src/`, and the bitcode
    functions, `HMAC.SHA256_Impl`'s); and every `Lemma_`. The check is not
    vacuous: with `-gnata` it lists over a hundred such symbols in the
    SHA-256 and HMAC units.
-3. `saw aes_impl.saw` and `saw sha256_impl.saw` (from `saw/`, with
-   `CRYPTOLPATH` the repository's root), each capped: every proof must
-   pass.
-4. `saw negative/*.saw`, each capped: each negative control must **fail**
+3. The spec layer (M4.4): for each spec module, `aes_spec` and
+   `sha256_spec`, the same `llvm-gcc` with `-fno-inline` and
+   `-gnatec=saw/spec.adc` on its units into `saw/obj/spec/`: for
+   `aes_spec`, `src/aes/foundation_spark-aes-spec-{types,gf28,gf2,sbox,
+   cipher,keyexpansion,main}.ads`; for `sha256_spec`,
+   `src/sha2/foundation_spark-sha2.ads`, `-sha2-functions.ads`,
+   `-sha2-preprocessing.ads` and `-sha2-sha256.ads`. The runtime's
+   `s-secsta.adb` and `s-soflin.adb` (`-gnatg -gnatp -O0 -emit-llvm`) and
+   `saw/saw_soft_links.ads` are compiled once and linked into each.
+   `llvm-nm` checks that each spec module defines ghost symbols.
+4. `saw aes_impl.saw`, `saw sha256_impl.saw`, `saw aes_spec.saw` and
+   `saw sha256_spec.saw` (from `saw/`, with `CRYPTOLPATH` the repository's
+   root), each capped: every proof must pass. A `RESULTS <n> proved` line
+   (the exhaustive `Pgcd`, `Inverse` and `Affine`) counts n proofs.
+5. `saw negative/*.saw`, each capped: each negative control must **fail**
    with a counterexample:
    - `X_Times` against the shift without the reduction: `b = 128`;
    - `Sub_Bytes` against `InvSubBytes`;
@@ -992,12 +1180,31 @@ do not read `saw/`: the trust and docs gates scan `src/`, and the bitcode
      reversed (`step h m - h + reverse h`);
    - `Hash` at 56 bytes against `hash` of the message's bytes reversed;
    - `HMAC_SHA256` at a 100-byte key and a 3-byte text against `HMAC` of
-     the key reversed.
+     the key reversed;
+   - and of the spec layer, one per kind of proof, each with the
+     overrides and tactic of the proof it mirrors:
+     `spec_xtimes_without_reduction` (a leaf, rme: `b = 128`);
+     `spec_dot_wrong_modulus` (`Dot` on the fold lemmas, against `pmod`
+     by `x^^8 + x^^4 + x^^3 + x^^2 + 1`); `spec_affine_wrong_byte` (an
+     exhaustive proof: `Affine` at `0x53` against `affine 0x52`, a goal
+     with no variable, so its counterexample is empty);
+     `spec_w_reversed_key` (`KeyExpansion.W` at k = 128, I = 4, on the
+     lemmas at 0 .. 3, against the key words reversed);
+     `spec_foldl_round_reversed` (`Foldl_Round` at 9 round keys against
+     `foldl Round z (reverse xs)`); `spec_cipher_reversed_round_keys`
+     (`Cipher` at 256); `spec_sha256_w_reversed_block` (SHA-2's `W` at 16
+     against the block reversed); `spec_sha256_step_reversed_feed_forward`
+     (`Step`, as the `Compress` control); `spec_sha256_pad_complemented`
+     (`Pad` at 1 byte, in the lax load, against `pad` of the message
+     complemented). (The leaf control was first `ShiftRows` against
+     `InvShiftRows`: rme's normal form of that false 128-bit equality took
+     the 10 GB cap.)
 
-   All but the first two run their module's script first and use its
-   overrides and tactics, in the same uninterpreted vocabulary, so they
-   show that neither the overrides nor the uninterpreted functions make
-   the top-level proofs vacuous. (`Encrypt_Block` against
+   The implementation's controls but the first two run their module's
+   script first, and the spec layer's the lemma files they need, and use
+   their overrides and tactics, in the same uninterpreted vocabulary, so
+   they show that neither the overrides nor the uninterpreted functions
+   make the proofs vacuous. (`Encrypt_Block` against
    ``InvCipher`{128}`` fails too, but z3 took 245 s to find the
    counterexample, with `Round` uninterpreted on one side and `InvRound`
    interpreted on the other; it is not among the controls. Nor are three
@@ -1149,3 +1356,50 @@ What `llvm-gcc -O0` makes of the SHA-256 and HMAC units (M4.3, #24):
   proofs that reach one load the module a second time with SAW's
   `enable_lax_arithmetic` (above), under which overflow is not an
   obligation; absence of overflow is gnatprove's to prove, and it does.
+
+What the spec layer's build (`-fno-inline`, ghost code on, M4.4, #59)
+adds:
+
+- **Ghost symbols are GNAT's external names, unchanged.** GNAT-LLVM 27
+  links ghost entities under their plain names:
+  `Foundation_Spark.AES.Spec.GF28.Dot` is
+  `foundation_spark__aes__spec__gf28__dot`, and even a ghost `Export` with
+  `External_Name => "spark_xTimes"` is `spark_xTimes` (checked with
+  `llvm-nm` on the FFI shim `Foundation_Spark.FFI.AES_GF28`). FSF GNAT
+  16.1, which builds the FFI library, links them under `___ghost_`
+  followed by the name ("The FFI harness"); the SAW scripts name the
+  plain symbols. A generic instance's functions take the instance's name:
+  `foundation_spark__sha2__sha256__w`, `..._sha256__logical__ch`; `"+"` is
+  `..._Oadd`, `"xor"` `..._Oxor`.
+- **Every subprogram is a call.** GNAT-LLVM marks expression functions
+  `alwaysinline` (the attribute set `alwaysinline memory(read)`), and LLVM
+  inlines those even at `-O0`; with `-fno-inline` they are `noinline`.
+- **`Boolean` is `i8`**, 0 or 1, as an argument, a result and an array
+  element.
+- **Bit sequences** (`AES.Spec.Main.Bits`, `SHA2.Bits`, index a 128-bit
+  integer type) are arrays of `i8`, one per bit, 0 or 1, the Cryptol's
+  first bit first. Unconstrained, they are fat pointers `{ ptr, ptr }`
+  whose bounds record is `{ i128, i128 }` (`..._bits_BOUNDS`): `Byte_At
+  (Bs, From)` is `i8 ({ ptr, ptr } %bs, i128 %from)`. The contracts take
+  n bytes under the precondition that each is 0 or 1 (an Ada Boolean's
+  validity) and read them as Cryptol bits (`[ b == 1 | b <- bs ]`).
+  `Block_Bits` (`Bits (0 .. 127)`, constrained) is passed by reference and
+  returned through a hidden first pointer. **SAW 1.6 cannot translate a
+  `getelementptr` with an `i128` index**, which GNAT-LLVM emits where a
+  constrained array of a 128-bit index type is indexed directly
+  (`Join_Block`'s aggregate over `Block_Bits'Range`); indexing through a
+  fat pointer goes through an `i64` offset and is fine.
+- **Unconstrained results** are on the secondary stack: `SS_Allocate`'s
+  block holds the bounds record, then the data (`KeyExpansion`'s
+  `Round_Keys`: `{ i32, i32 }` at 0, the blocks at 8; a `Bits`:
+  `{ i128, i128 }` at 0, the bits at 32), and the function returns the fat
+  pointer `{ data, bounds }`. Sizes are rounded up to 16 bytes. An empty
+  `Bits` aggregate (`To_Bits (V, 0)`) is the bounds `{0, -1}` alone. A
+  function that calls others which allocate (`InvCipher`, `Main`'s) marks
+  the stack and releases it on exit, through a finalizer called on every
+  path (and an `invoke` of each call, which SAW translates).
+- **Slices' bounds** (`W (1 .. Nr (K) - 1)`, and each fold's rest) are
+  built in a stack temporary of the caller, writable and 1-byte aligned
+  (`alloca ..., align 1`): the fold lemmas' bounds are allocated so, and a
+  slice's data pointer points into its array (an interior pointer, which
+  an override's allocation matches).
