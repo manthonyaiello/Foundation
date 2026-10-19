@@ -995,6 +995,16 @@ blocks) and `Hash` are proved in a load of the module with lax arithmetic
 function's lemmas proved again in that load; `results.txt` marks each of
 those results "lax arithmetic module".
 
+**Measured** (`results.txt`, the run at `2ae2b2a` on the x86_64 IOD):
+2162 proofs of the spec layer, 1064 of AES (768 of them the exhaustive
+`Pgcd`, `Inverse` and `Affine`, recorded as three `RESULTS 256` lines) and
+1098 of SHA-256 (266 in the module as loaded, 832 in its lax-arithmetic
+load: the compression function again, 7 `To_Bits` chains, 12 `Pad`, 66
+`Word_Of`, 5 `Foldl_Step`, 9 `Hash`, and their leaves), with 9 negative
+controls of the spec layer failing as they must. `aes_spec.saw` takes
+522 s, `sha256_spec.saw` 1363 s (most of it `Word_Of`), the whole
+`check-saw.sh` 2732 s; peak memory 2.5 GB.
+
 **Not proved by SAW**, and why:
 
 - `AES.Spec.Main.Join_Block`, and so `Encrypt`, `Decrypt` and the
