@@ -21,7 +21,9 @@
 #      AES.Impl calls AES.Spec.Types;
 #   2. checks the bitcode, each unit's and the linked module: no symbol of a
 #      ghost unit (the spec layer and the lemmas) is defined or referenced;
-#   3. runs saw/aes_impl.saw, every llvm_verify of which must succeed;
+#   3. refuses any llvm_unsafe_assume_spec in saw/ (every override must be
+#      a proof), then runs saw/aes_impl.saw, every llvm_verify of which
+#      must succeed;
 #   4. runs each saw/negative/*.saw, every one of which must FAIL with a
 #      counterexample (the negative controls);
 #   5. writes saw/results.txt (unless --print).
@@ -190,6 +192,11 @@ no_ghost "$OBJ_DIR/$LINKED"
 BITCODE+=("$OBJ_DIR/$LINKED")
 
 # --- 3. the proofs ---------------------------------------------------------------------
+
+# No assumption: every override must be a proof (README "SAW").
+assumed="$(grep -rn --include='*.saw' -E 'llvm_unsafe_assume_spec|_unsafe_assume' "$SAW_DIR" || true)"
+[ -z "$assumed" ] || die "an assumed spec in saw/: every override must be proved:
+$assumed"
 
 export CRYPTOLPATH="$ROOT_DIR"
 LOG_DIR="$OBJ_DIR/logs"

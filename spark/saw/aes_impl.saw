@@ -12,7 +12,8 @@
  * SMT solver with the overridden compositions left uninterpreted for the
  * ciphers. Every proof is of the linked module obj/aes.bc (AES.Impl and
  * AES.Spec.Types), so the overrides of Spec.Types' Nk, Nr, Split and Join
- * are proofs, not assumptions: there is no llvm_unsafe_assume_spec here.
+ * are proofs, not assumptions (check-saw.sh refuses any assumed spec in
+ * saw/).
  */
 
 include "aes_impl_common.saw";
