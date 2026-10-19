@@ -1,0 +1,254 @@
+/*
+ * llvm_verify of Foundation_Spark.SHA2.SHA256_Stream (spark/src/sha2/
+ * foundation_spark-sha2-sha256_stream.ad[sb]) and Foundation_Spark.HMAC.
+ * SHA256_Impl (spark/src/hmac/foundation_spark-hmac-sha256_impl.ad[sb])
+ * against NSA's Cryptol, directly: the SPARK spec layer plays no part.
+ * M4.3 (#24) proves Compress = Main.cry's `step` at SHA-256 for all
+ * inputs, the one-shot Hash = Main.cry's `hash` at SHA-256 at fixed
+ * message lengths, and HMAC_SHA256 = HMAC/Main.cry's `HMAC` at SHA-256
+ * (packaging/Hash.cry's HMAC) at fixed key and text lengths.
+ *
+ * SAW proves each length separately; gnatprove (E2, E3) proves the same
+ * subprograms for every length, against the SPARK spec layer.
+ *
+ * Shaped as aes_impl.saw: leaves first, each verified leaf passed as an
+ * override to the subprograms that call it, rme for the leaves that are
+ * bitwise, z3 with the overridden Cryptol functions uninterpreted above
+ * them. Every proof is of the linked module obj/sha256.bc, so every
+ * override is a proof (check-saw.sh refuses any assumed spec in saw/).
+ */
+
+include "sha256_impl_common.saw";
+
+/*
+ * The leaves and Compress, proved in module m (sha256_impl, or
+ * sha256_impl_lax for the proofs that need lax arithmetic: see "Null
+ * slices" below); tag marks the results of the lax module. Returns the
+ * proofs that Compress's callers and the negative controls use as
+ * overrides: (SIGMA_256_0, SIGMA_256_1, sigma_256_0, sigma_256_1, Ch,
+ * Maj, "+", Compress).
+ */
+let prove_compress m (tag : String) = do {
+  let verify name = verify_symbol_in m name;
+  let named (s : String) = str_concat s tag;
+
+  /* --- Functions: Notation's SHR and ROTR, in each instance -------------- */
+
+  /*
+   * Functions' By_<n> instances of the generic Notation: ROTR`{n} and
+   * SHR`{n} at w = 32 (Notation.cry:60 and :67, [FIPS-PUB-180-4 Section
+   * 3.2]). The Ada ROTR is FIPS's (x >> n) || (x << (w - n)), the Cryptol
+   * x >>> n; rme decides them equal.
+   */
+  let verify_rotr (n : String) (f : Term) =
+    verify (functions_symbol (str_concat (str_concat "by_" n) "__rotr"))
+      (named (str_concat (str_concat "functions.by_" n) ".rotr")) []
+      (word_to_word_contract f) rme "rme"
+      (str_concat (str_concat "Notation::ROTR`{" n) ", 32}");
+  let verify_shr (n : String) (f : Term) =
+    verify (functions_symbol (str_concat (str_concat "by_" n) "__shr"))
+      (named (str_concat (str_concat "functions.by_" n) ".shr")) []
+      (word_to_word_contract f) rme "rme"
+      (str_concat (str_concat "Notation::SHR`{" n) ", 32}");
+
+  rotr_2  <- verify_rotr "2"  {{ ROTR`{2, 32} }};
+  rotr_13 <- verify_rotr "13" {{ ROTR`{13, 32} }};
+  rotr_22 <- verify_rotr "22" {{ ROTR`{22, 32} }};
+  rotr_6  <- verify_rotr "6"  {{ ROTR`{6, 32} }};
+  rotr_11 <- verify_rotr "11" {{ ROTR`{11, 32} }};
+  rotr_25 <- verify_rotr "25" {{ ROTR`{25, 32} }};
+  rotr_7  <- verify_rotr "7"  {{ ROTR`{7, 32} }};
+  rotr_18 <- verify_rotr "18" {{ ROTR`{18, 32} }};
+  rotr_17 <- verify_rotr "17" {{ ROTR`{17, 32} }};
+  rotr_19 <- verify_rotr "19" {{ ROTR`{19, 32} }};
+  shr_3   <- verify_shr "3"   {{ SHR`{3, 32} }};
+  shr_10  <- verify_shr "10"  {{ SHR`{10, 32} }};
+
+  /* --- Functions: the SIGMA and sigma functions -------------------------- */
+
+  /*
+   * SIGMA_256_0/1 and Small_Sigma_256_0/1 = Functions.cry's SIGMA_256_0/1
+   * and sigma_256_0/1 (Functions.cry:26-29, [FIPS-PUB-180-4 Section
+   * 4.1.2]), with their three ROTR/SHR proofs as overrides.
+   */
+  sigma_0 <- verify (functions_symbol "sigma_256_0") (named "functions.sigma_256_0")
+    [rotr_2, rotr_13, rotr_22] (word_to_word_contract {{ SIGMA_256_0 }}) rme "rme"
+    "Functions::SIGMA_256_0";
+  sigma_1 <- verify (functions_symbol "sigma_256_1") (named "functions.sigma_256_1")
+    [rotr_6, rotr_11, rotr_25] (word_to_word_contract {{ SIGMA_256_1 }}) rme "rme"
+    "Functions::SIGMA_256_1";
+  small_sigma_0 <- verify (functions_symbol "small_sigma_256_0") (named "functions.small_sigma_256_0")
+    [rotr_7, rotr_18, shr_3] (word_to_word_contract {{ sigma_256_0 }}) rme "rme"
+    "Functions::sigma_256_0";
+  small_sigma_1 <- verify (functions_symbol "small_sigma_256_1") (named "functions.small_sigma_256_1")
+    [rotr_17, rotr_19, shr_10] (word_to_word_contract {{ sigma_256_1 }}) rme "rme"
+    "Functions::sigma_256_1";
+
+  /* --- The SHA-256 instance of Main: Ch, Maj and "+" --------------------- */
+
+  /*
+   * Ch and Maj (the instance's Logical, of Functions.Logical) =
+   * Functions.cry's Ch and Maj (Functions.cry:13 and :23, [FIPS-PUB-180-4
+   * Section 4.1]) at [32].
+   */
+  ch <- verify (instance_symbol "logical__ch") (named "sha256.logical.ch") []
+    (three_words_contract {{ \(x : [32], y, z) -> Ch (x, y, z) }}) rme "rme"
+    "Functions::Ch at [32]";
+  maj <- verify (instance_symbol "logical__maj") (named "sha256.logical.maj") []
+    (three_words_contract {{ \(x : [32], y, z) -> Maj (x, y, z) }}) rme "rme"
+    "Functions::Maj at [32]";
+
+  /*
+   * "+" on Hash_Value = Cryptol's + on [8][32], as `step` uses it
+   * (Main.cry:67). z3, not rme: rme's algebraic normal form of eight
+   * 32-bit additions reached a 4 GB memory cap in under 7 s (measured
+   * once; uncapped, it took the machine's 15.7 GB).
+   */
+  hash_value_add <- verify (instance_symbol "Oadd") (named "sha256.\"+\"") []
+    hash_value_add_contract z3 "z3" "\\a b -> a + b : [8][32]";
+
+  /* --- SHA256_Stream.Compress, for all hash values and blocks ------------ */
+
+  /*
+   * Compress = Main.cry's `step` at SHA-256 (Main.cry:67, [FIPS-PUB-180-4
+   * Section 6.2.2]), SHA256Main::step, for every H and M:
+   *   step H M = H + foldl step3 H [0 ..< 64]
+   * with the message schedule W and the 64 rounds of step3.
+   *
+   * At -O0, Compress is one function: its schedule loop and its round
+   * loop are inline, and there is no round or schedule subprogram to
+   * verify on its own (the spec layer's W, T1, T2 and Step3 are ghost and
+   * not in the bitcode). What it calls is overridden: the four SIGMA and
+   * sigma functions, Ch, Maj and "+", by their proofs above. SAW executes
+   * the 64 rounds with those calls as overrides, and z3 has the SIGMA and
+   * sigma functions uninterpreted on both sides: about 3 s and 0.2 GB.
+   */
+  compress <- verify (stream_symbol "compress") (named "sha256_stream.compress")
+    [sigma_0, sigma_1, small_sigma_0, small_sigma_1, ch, maj, hash_value_add]
+    (compress_contract {{ step }})
+    (w4_unint_z3 compress_unint) "w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1"
+    "SHA256Main::step (Main.cry step at SHA-256)";
+
+  return (sigma_0, sigma_1, small_sigma_0, small_sigma_1, ch, maj, hash_value_add, compress);
+};
+
+(sigma_0, sigma_1, small_sigma_0, small_sigma_1, ch, maj, hash_value_add, compress) <-
+  prove_compress sha256_impl "";
+
+/* --- Null slices: lax arithmetic where GNAT-LLVM makes a discarded poison - */
+
+/*
+ * GNAT-LLVM computes the length of a range Lo .. Hi as
+ *   select (Lo > Hi, 0, (Hi - Lo) +nuw 1)
+ * For a null range with Hi = Lo - 1 the `add nuw` wraps, which makes a
+ * poison value in the arm the select discards. In LLVM's semantics that
+ * is not undefined behaviour (a select's result is poison only if the
+ * chosen operand is), but SAW 1.6 (crucible) fails the proof where the
+ * poison is created: "Poison value created: Unsigned addition caused
+ * wrapping even though the `nuw` flag was set". The crate makes such a
+ * range when an argument is empty (Data or Key with no bytes) and when
+ * Final copies the 0 buffered bytes of a message whose length is a
+ * multiple of 64 (`Last (0 .. R - 1) := C.Buf (0 .. R - 1)`, R = 0).
+ *
+ * Those proofs, and only those, are of sha256_impl_lax, the module loaded
+ * with SAW's lax arithmetic (sha256_impl_common.saw), under which an
+ * overflowing nuw/nsw operation yields its wrapped value instead of a
+ * failed obligation. The functional result is still proved equal to the
+ * Cryptol; the absence of overflow is gnatprove's (AoRTE, E2 and E3), not
+ * SAW's. Their overrides are re-proved in that module (an override must
+ * come from the module verified), and every result of it is marked "lax
+ * arithmetic module".
+ */
+(_, _, _, _, _, _, _, compress_lax) <- prove_compress sha256_impl_lax " (lax arithmetic module)";
+
+/* --- SHA256_Stream.Hash, at fixed message lengths ------------------------ */
+
+/*
+ * Hash = Main.cry's `hash` at SHA-256 (Main.cry:55, [FIPS-PUB-180-4
+ * Sections 5 and 6.2]) on the message's bits, SHA256Main::hash (join
+ * msg), its digest split into bytes, at n bytes:
+ *   hash M = take (join (foldl step H0 (parse (pad M))))
+ * Hash is Init, one Update and Final; with n fixed, their loops and
+ * branches are concrete. Compress's proof is the override for each block
+ * compressed, and z3 has `step` and the SIGMA and sigma functions
+ * uninterpreted. The lengths reach each case of the padding: 0 (one
+ * block of padding alone), 1, 55 (the longest message whose padding fits
+ * one block), 56 (the shortest that needs two), 63, 64 (one whole block,
+ * then one of padding), 65 and 100 (the key lengths of the long-key HMAC
+ * proofs below, which use these as overrides), 119 and 120 (the same
+ * boundary in the second block), 128, and 200 (four blocks).
+ *
+ * 0, 64 and 128 are of the lax module (null slices, above). At 0 bytes
+ * nothing is symbolic: SAW evaluates the override's `step` on constants,
+ * so the implementation's side is the digest itself, and the Cryptol side
+ * must be evaluated too: z3 with nothing uninterpreted (with `step` or the
+ * SIGMA functions uninterpreted, the goal is an uninterpreted term equal
+ * to a constant, which is not valid, and z3 ran 10 minutes on it before
+ * it was stopped).
+ */
+let verify_hash_in m (comp : LLVMSpec) (n : Int) (size : String) (tag : String) (unint : [String]) (unint_name : String) =
+  verify_symbol_in m (stream_symbol "hash")
+    (str_concat (str_concat (str_concat "sha256_stream.hash at " size) " bytes") tag)
+    [comp]
+    (hash_contract n {{ \(msg : [n][8]) -> split (hash (join msg)) : [32][8] }})
+    (w4_unint_z3 unint) unint_name
+    (str_concat (str_concat "\\msg -> split (SHA256Main::hash`{8 * " size) "} (join msg))");
+let hash_unint_name = "w4_unint_z3 step SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1";
+let verify_hash (n : Int) (size : String) =
+  verify_hash_in sha256_impl compress n size "" hash_unint hash_unint_name;
+let verify_hash_lax (n : Int) (size : String) =
+  verify_hash_in sha256_impl_lax compress_lax n size " (lax arithmetic module)" hash_unint hash_unint_name;
+
+hash_0   <- verify_hash_in sha256_impl_lax compress_lax 0 "0" " (lax arithmetic module)"
+              [] "z3, nothing uninterpreted (no symbolic input)";
+hash_1   <- verify_hash     1   "1";
+hash_55  <- verify_hash     55  "55";
+hash_56  <- verify_hash     56  "56";
+hash_63  <- verify_hash     63  "63";
+hash_64  <- verify_hash_lax 64  "64";
+hash_65  <- verify_hash     65  "65";
+hash_100 <- verify_hash     100 "100";
+hash_119 <- verify_hash     119 "119";
+hash_120 <- verify_hash     120 "120";
+hash_128 <- verify_hash_lax 128 "128";
+hash_200 <- verify_hash     200 "200";
+
+/* --- HMAC.SHA256_Impl.HMAC_SHA256, at fixed key and text lengths --------- */
+
+/*
+ * HMAC_SHA256 = packaging/Hash.cry's HMAC at SHA-256 (Hash.cry:71), that
+ * is HMAC/Main.cry's HMAC (Main.cry:40, [FIPS-PUB-198-1 Section 4]) with
+ * λ = 256, B = 64, L = 32 and Hk = Hn = HL = SHA256Main::hash, on the
+ * key's bytes and the text's bits, the MAC split into bytes:
+ *   HMAC Hk Hn HL K text =
+ *     take (HL ((K0 ^ opad) # (Hn ((K0 ^ ipad) # text))))
+ * with K0 = HMAC_init Hk K. The key lengths cover HMAC_init's three
+ * cases: 0 and 32 (shorter than the block: padded with zeros), 64 (the
+ * block: as it is), 65 and 100 (longer: hashed first, with Hash's proof
+ * at that length as the override for Init_Key's call). The texts are
+ * short: 0, 3 and 32 bytes. Compress's proof is the override for every
+ * block compressed, and z3 has `step` and the SIGMA and sigma functions
+ * uninterpreted; `hash` is not, since the inner and outer hashes are
+ * computed by Update and Final, block by block, not by a call to Hash.
+ * The empty key and text are of the lax module (null slices, above), and
+ * with nothing symbolic nothing is uninterpreted, as for Hash at 0 bytes.
+ */
+let verify_hmac_in m (overrides : [LLVMSpec]) (k : Int) (n : Int) (ksize : String) (nsize : String) (tag : String) (unint : [String]) (unint_name : String) =
+  verify_symbol_in m (hmac_symbol "hmac_sha256")
+    (str_concat (str_concat (str_concat (str_concat (str_concat "hmac.sha256_impl.hmac_sha256 at key " ksize) " bytes, text ") nsize) " bytes") tag)
+    overrides
+    (hmac_contract k n {{ \(key : [k][8]) (text : [n][8]) ->
+                            split (HMAC`{256, 64, k, 8 * n, 32} hash hash hash key (join text)) : [32][8] }})
+    (w4_unint_z3 unint) unint_name
+    (str_concat (str_concat (str_concat (str_concat "\\key text -> split (HMAC::HMAC`{256, 64, " ksize) ", 8 * ") nsize) ", 32} SHA256Main::hash (x3) key (join text))");
+let verify_hmac (k : Int) (n : Int) (ksize : String) (nsize : String) (overrides : [LLVMSpec]) =
+  verify_hmac_in sha256_impl (concat [compress] overrides) k n ksize nsize "" hash_unint hash_unint_name;
+
+hmac_0_0    <- verify_hmac_in sha256_impl_lax [compress_lax] 0 0 "0" "0" " (lax arithmetic module)"
+                 [] "z3, nothing uninterpreted (no symbolic input)";
+hmac_32_3   <- verify_hmac 32  3  "32"  "3"  [];
+hmac_32_32  <- verify_hmac 32  32 "32"  "32" [];
+hmac_64_3   <- verify_hmac 64  3  "64"  "3"  [];
+hmac_64_32  <- verify_hmac 64  32 "64"  "32" [];
+hmac_65_3   <- verify_hmac 65  3  "65"  "3"  [hash_65];
+hmac_100_32 <- verify_hmac 100 32 "100" "32" [hash_100];

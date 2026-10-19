@@ -14,8 +14,8 @@ Foundation algorithms, proved against the Cryptol specifications in
 - `cryptol/` – our Cryptol: the modules that call the SPARK exports by
   `foreign` and state the properties, and `properties.txt`
 - `saw/` – SAW scripts proving the implementation's bitcode against the
-  Cryptol directly (E4), and `results.txt`, their record; local only, see
-  "SAW"
+  Cryptol directly (E4), `SHA256Main.cry` (SHA-2's `Main` at SHA-256, for
+  them), and `results.txt`, their record; local only, see "SAW"
 
 ## Toolchain
 
@@ -775,7 +775,19 @@ directly, with SAW's `llvm_verify` on LLVM bitcode of the crate's own
 sources, independently of the SPARK spec layer and of gnatprove. M4.1 (#22)
 proved three leaves of `Foundation_Spark.AES.Impl`; M4.2 (#23) proves the
 key schedule and both ciphers at each key size, against
-`algorithms/AES/KeyExpansion.cry` and `Cipher.cry`, imported unmodified:
+`algorithms/AES/KeyExpansion.cry` and `Cipher.cry`; M4.3 (#24) proves
+SHA-256's compression function for all inputs, and the one-shot SHA-256
+and HMAC-SHA-256 at fixed lengths, against `algorithms/SHA2/Main.cry` and
+`algorithms/HMAC/Main.cry`. The NSA Cryptol is imported unmodified.
+
+**SAW proves each size separately; gnatprove covers every size.**
+`Compress` is proved for every hash value and block, but `Hash` and
+`HMAC_SHA256` take arrays, and SAW executes them at one length at a time:
+each row below is one length. gnatprove (E2, E3) proves the same
+subprograms for every length below 2 ** 61 bytes, against the SPARK spec
+layer, which the FFI check tests against the same Cryptol.
+
+### AES
 
 | Ada (`AES.Impl`) | Cryptol | k | overrides | tactic |
 |---|---|---|---|---|
@@ -802,13 +814,93 @@ proved first and then passed as an override to its callers:
 | `Round` | `Cipher.cry`: `Round` | `Sub_Bytes`, `Shift_Rows`, `Mix_Columns`, `Add_Round_Key` | rme |
 | `Inv_Round` | `Cipher.cry`: `InvRound` | `Inv_Shift_Rows`, `Inv_Sub_Bytes`, `Add_Round_Key`, `Inv_Mix_Columns` | rme |
 
+Not proved by SAW: `Dot` (no cipher calls it), and `Decrypt_Block_Prime`
+with `Inv_Round_Prime` (``InvCipher'``, which the issue does not ask for).
+`Sub_Word`, `Rot_Word`, `Xor_Word` and `Rcon` are expression functions
+that llvm-gcc inlines into `Expand_Key` even at `-O0`, so they are proved
+as part of it.
+
+### SHA-256 and HMAC-SHA-256
+
+The Cryptol: `step` and `hash` of `algorithms/SHA2/Main.cry` at SHA-256's
+parameters, and `HMAC` of `algorithms/HMAC/Main.cry`. Two things stand
+between the scripts and `SHA256.cry` itself, so `saw/SHA256Main.cry`
+instantiates `Main` with **SHA256.cry's own parameters, copied** (as
+`cryptol/SPARK/SHA2/SHA256.cry`'s `Main256` does for the FFI check):
+
+- `SHA256.cry` instantiates `Main` privately (`import algorithms::SHA2::Main
+  as SHA256 where ...`), so its `step` cannot be named from outside;
+- **SAW 1.6 cannot load `SHA256.cry`** at all, by `import` or by
+  `cryptol_load`: it is `packaging::Hash` instantiated, `Hash.cry` imports
+  `algorithms/PBKDF/Main.cry`, and SAW's translation of that module to
+  SAWCore fails ("Argument type not subtype of expected type", at a
+  `parmap` over `kLen /^ hLen` blocks).
+
+For the same reason `Hash.cry`'s `HMAC` (Hash.cry:71) is stated as
+`Hash.cry` states it: ``HMAC`{λ = 256, B = 64, k, n, L = 32} hash hash
+hash`` of `HMAC/Main.cry`, with `SHA256Main`'s `hash` as `Hk`, `Hn` and
+`HL`.
+
+| Ada | Cryptol | sizes (bytes) | overrides | tactic |
+|---|---|---|---|---|
+| `SHA2.SHA256_Stream.Compress` | `Main.cry`: `step` | all `H`, `M` | `SIGMA_256_0/1`, `Small_Sigma_256_0/1`, `Ch`, `Maj`, `"+"` | z3, `SIGMA_256_0/1`, `sigma_256_0/1` uninterpreted |
+| `SHA2.SHA256_Stream.Hash` | `\msg -> split (hash (join msg))` | 0, 1, 55, 56, 63, 64, 65, 100, 119, 120, 128, 200 | `Compress` | z3, `step` and the four sigmas uninterpreted (at 0: none, below) |
+| `HMAC.SHA256_Impl.HMAC_SHA256` | `\key text -> split (HMAC`{256, 64, k, 8 * n, 32} hash hash hash key (join text))` | (key, text): (0, 0), (32, 3), (32, 32), (64, 3), (64, 32), (65, 3), (100, 32) | `Compress`; at keys 65 and 100, `Hash` at that length | z3, `step` and the four sigmas uninterpreted (at (0, 0): none) |
+
+The lengths reach each case of the padding (55, the longest message whose
+padding fits one block; 56, the shortest that needs two; 64 and 128, whole
+blocks; 119 and 120, the boundary in the second block; 200, four blocks)
+and each case of `HMAC_init` (a key shorter than the block, the block, and
+longer: hashed first). `Compress` takes about 3 s; `Hash` 0.2 to
+1.2 s, and `HMAC_SHA256` 0.6 to 1.6 s, except at 0 bytes (2.6 s) and at
+(0, 0) (10 s), where the whole digest is evaluated on constants;
+`results.txt` has each one's time. Their
+leaves:
+
+| Ada | Cryptol | overrides | tactic |
+|---|---|---|---|
+| `SHA2.Functions.By_<n>.ROTR`, `.SHR` (12 instances of `Notation`) | `Notation.cry`: ``ROTR`{n, 32}``, ``SHR`{n, 32}`` | | rme |
+| `SHA2.Functions.SIGMA_256_0/1`, `Small_Sigma_256_0/1` | `Functions.cry`: `SIGMA_256_0/1`, `sigma_256_0/1` | their three `ROTR`/`SHR` | rme |
+| `SHA2.SHA256.Ch`, `.Maj` (the instance's `Logical`) | `Functions.cry`: `Ch`, `Maj` at `[32]` | | rme |
+| `SHA2.SHA256."+"` | `+` on `[8][32]` | | z3 |
+
+- **`Compress` is one function at `-O0`.** Its message-schedule loop and
+  its 64-round loop are inline; there is no round or schedule subprogram
+  in the bitcode (the spec layer's `W`, `T1`, `T2` and `Step3`, which
+  would be, are ghost). So the 64 rounds are executed symbolically in one
+  proof, with every call they make overridden and the sigmas
+  uninterpreted: about 3 s and 0.2 GB of memory.
+- **`"+"` by z3, not rme**: rme's normal form of eight 32-bit additions
+  reached a 4 GB cap in under 7 s; uncapped, it took the IOD's 15.7 GB
+  and was killed by the kernel (#24). Hence the memory cap below.
+- **`Ch` and `Maj` stay interpreted** at the top: `Functions.cry`'s take a
+  tuple, and SAW 1.6's what4 back end cannot make an uninterpreted
+  function of one ("Cannot create uninterpreted higher-order function").
+  They are three bitwise operations.
+- **With no symbolic input** (`Hash` at 0 bytes, `HMAC_SHA256` at (0, 0))
+  SAW evaluates the overrides' `step` on constants, so the
+  implementation's side is the digest itself; the Cryptol side must then
+  be evaluated too, so nothing is uninterpreted there. (With `step`
+  uninterpreted the goal is "uninterpreted term = constant", not valid; z3
+  ran 10 minutes on it before it was stopped.)
+- **Lax arithmetic for null slices.** The proofs where the code makes a
+  null range (an empty `Data` or `Key`, and `Final`'s copy of 0 buffered
+  bytes when the length is a multiple of 64: `Hash` at 0, 64 and 128,
+  `HMAC_SHA256` at (0, 0)) are of a second load of the module with SAW's
+  lax arithmetic; see "The bitcode ABI". Their overrides (the leaves and
+  `Compress`) are re-proved in that module, and their results are marked
+  "lax arithmetic module" in `results.txt`.
+
+Not proved by SAW: `Load_Block` and `To_Digest` on their own (they are
+executed within `Hash`'s proofs: they take arrays and offsets that differ
+from call to call, so one contract would not serve as their override), `Init`, `Update` and `Final` on their own (likewise, through
+`Hash`), `Hash_Chunked`, and the incremental HMAC interface.
+
+### Running it
+
 There is **no `llvm_unsafe_assume_spec`**: every override is a proof in
 the same module, and `check-saw.sh` refuses to run if a script under
-`saw/` contains one. Not proved by SAW: `Dot` (no cipher calls it), and
-`Decrypt_Block_Prime` with `Inv_Round_Prime` (``InvCipher'``, which the
-issue does not ask for). `Sub_Word`, `Rot_Word`, `Xor_Word` and `Rcon` are
-expression functions that llvm-gcc inlines into `Expand_Key` even at
-`-O0`, so they are proved as part of it.
+`saw/` contains one.
 
 ```console
 $ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install LLVM_LINK_DIR=.../llvm-21.1.8 scripts/check-saw.sh
@@ -824,77 +916,112 @@ the x86_64 instance the bootstrap's `gnat-llvm` phase checks
 `GNAT_LLVM_DIR` and writes it to `env.sh` when it is set; nothing of GNAT
 Pro is downloaded.
 
+**A memory cap on every `saw` run.** Each runs in its own systemd scope,
+`systemd-run --user --scope -p MemoryMax=10G -p MemorySwapMax=0`
+(`SAW_MEMORY_MAX` overrides the 10G), so that a proof whose terms blow up
+is killed alone, not the machine and everything on it. A run killed by
+the cap is reported as a failure ("KILLED by the memory cap"), never as a
+hang or a pass, and a negative control killed by it does not count as
+failing. Where `systemd-run --user` does not work, the runs are uncapped
+and the script says so; the record names the cap it ran under.
+
 **`llvm-link`, pinned.** SAW verifies one LLVM module at a time and takes
-an override only from that module, and `AES.Impl` calls `AES.Spec.Types`
-(see "The bitcode ABI"). GNAT Pro ships no `llvm-link`, so `check-saw.sh`
-links the two units' bitcode with **LLVM's own 21.1.8 release**, the LLVM
-of GNAT Pro 27's llvm-gcc: `LLVM_LINK_VERSION`, `_TAG`, `_TARBALL` and
-`_SHA256` in `scripts/toolchain-pins.env` (the sha256 is the digest
-GitHub lists for `LLVM-21.1.8-Linux-X64.tar.xz`). `LLVM_LINK_DIR` must
-name a directory with that `bin/llvm-link`; the script fails, saying
-which, when it is unset, missing, of another version, or when GNAT-LLVM's
-LLVM (`llvm-nm --version`) is not the same version. The bootstrap's
-`gnat-llvm` phase installs it when `GNAT_LLVM_DIR` is set: it fetches
-the 2 GB tarball, checks its sha256, extracts `bin/llvm-link` alone (it
-is statically linked against LLVM) to `~/foundation-tools/llvm-21.1.8`,
-and writes `LLVM_LINK_DIR` to `env.sh`.
+an override only from that module, and `AES.Impl` calls `AES.Spec.Types`,
+`SHA256_Stream` the SHA-256 instance and `Functions`, `HMAC.SHA256_Impl`
+`SHA256_Stream` (see "The bitcode ABI"). GNAT Pro ships no `llvm-link`, so
+`check-saw.sh` links each module's units' bitcode with **LLVM's own 21.1.8
+release**, the LLVM of GNAT Pro 27's llvm-gcc: `LLVM_LINK_VERSION`,
+`_TAG`, `_TARBALL` and `_SHA256` in `scripts/toolchain-pins.env` (the
+sha256 is the digest GitHub lists for `LLVM-21.1.8-Linux-X64.tar.xz`).
+`LLVM_LINK_DIR` must name a directory with that `bin/llvm-link`; the
+script fails, saying which, when it is unset, missing, of another
+version, or when GNAT-LLVM's LLVM (`llvm-nm --version`) is not the same
+version. The bootstrap's `gnat-llvm` phase installs it when
+`GNAT_LLVM_DIR` is set: it fetches the 2 GB tarball, checks its sha256,
+extracts `bin/llvm-link` alone (it is statically linked against LLVM) to
+`~/foundation-tools/llvm-21.1.8`, and writes `LLVM_LINK_DIR` to `env.sh`.
 
 **The record.** Since no one else can rerun it, every run that passes
 writes `saw/results.txt`: the commit (the tree must be clean), the date,
 the host, the versions of llvm-gcc, LLVM, llvm-link (with the tarball's
-sha256), SAW, Cryptol and z3, the compiler switches, the sha256 of each
-unit's bitcode and of the linked module, of every crate source the
-compiler read for them (the ALIs' dependencies) and of every NSA Cryptol
-file imported, each result with its tactic and SAW's time for it, each
-negative control's counterexample, and the wall-clock. Commit it with the
-change it checks. CI's gates do not read `saw/`: the trust and docs gates
-scan `src/`, and the bitcode (`saw/obj/`) is not tracked.
+sha256), SAW, Cryptol and z3, the memory cap, the compiler switches, the
+sha256 of each unit's bitcode and of each linked module, of every crate
+source the compiler read for them (the ALIs' dependencies), of every NSA
+Cryptol file imported and of `saw/SHA256Main.cry`, each result with its
+tactic and SAW's time for it, each negative control's counterexample and
+time, and the wall-clock. Commit it with the change it checks. CI's gates
+do not read `saw/`: the trust and docs gates scan `src/`, and the bitcode
+(`saw/obj/`) is not tracked.
 
 **What it runs.**
 
-1. `llvm-gcc -c -gnat2022 -gnatp -gnatVn -O0 -emit-llvm` on
+1. For each module, `aes` and `sha256`, `llvm-gcc -c -gnat2022 -gnatp
+   -gnatVn -O0 -emit-llvm` on its units, every directory of `src/` on the
+   search path, into `saw/obj/`: for `aes`,
    `src/aes/foundation_spark-aes-impl.adb` and
-   `src/aes/foundation_spark-aes-spec-types.ads`, every directory of
-   `src/` on the search path, into `saw/obj/`. No run-time or validity
-   checks (gnatprove proves them absent). No `-gnata`, so contracts,
-   assertions and ghost code are ignored and none reaches the bitcode.
-   The units need no SPARKlib.
-2. `llvm-link` of the two into `saw/obj/aes.bc`, the one module the
-   scripts load. `llvm-nm` checks each unit's bitcode and the linked
-   module: no symbol of a ghost unit (`AES.Spec.Cipher`, `GF28`, `SBox`,
-   `KeyExpansion`, `Lemmas`, ...) is defined or referenced.
-3. `saw aes_impl.saw` (from `saw/`, with `CRYPTOLPATH` the repository's
-   root): every proof must pass.
-4. `saw negative/*.saw`: each negative control must **fail** with a
-   counterexample:
+   `src/aes/foundation_spark-aes-spec-types.ads`; for `sha256`,
+   `src/sha2/foundation_spark-sha2-sha256_stream.adb`,
+   `src/sha2/foundation_spark-sha2-sha256.ads` (the SHA-256 instance of
+   the generic `Main`), `src/sha2/foundation_spark-sha2-functions.ads` and
+   `src/hmac/foundation_spark-hmac-sha256_impl.adb`. No run-time or
+   validity checks (gnatprove proves them absent). No `-gnata`, so
+   contracts, assertions and ghost code are ignored and none reaches the
+   bitcode. The units need no SPARKlib.
+2. `llvm-link` of each module's units into `saw/obj/aes.bc` and
+   `saw/obj/sha256.bc`. `llvm-nm` checks each unit's bitcode and each
+   linked module: no symbol of a ghost entity is defined or referenced —
+   the AES spec units and lemmas; `SHA2.SHA256_Blocks`, `HMAC.Main` and
+   `HMAC.SHA256`; the ghost functions of the units that also hold
+   executable code (the spec layer's `W`, `Step`, `Hash` and the rest of
+   the SHA-256 instance, `SHA256_Bytes`' and `SHA256_Stream`'s ghost
+   functions, `HMAC.SHA256_Impl`'s); and every `Lemma_`. The check is not
+   vacuous: with `-gnata` it lists over a hundred such symbols in the
+   SHA-256 and HMAC units.
+3. `saw aes_impl.saw` and `saw sha256_impl.saw` (from `saw/`, with
+   `CRYPTOLPATH` the repository's root), each capped: every proof must
+   pass.
+4. `saw negative/*.saw`, each capped: each negative control must **fail**
+   with a counterexample:
    - `X_Times` against the shift without the reduction: `b = 128`;
    - `Sub_Bytes` against `InvSubBytes`;
    - `Expand_Key` at 128 against `KeyExpansion` of the key words reversed;
    - `Encrypt_Block` at 256 against `Cipher` of the round keys reversed;
    - `Decrypt_Block` at 128 against `InvCipher` of the round keys
-     reversed.
+     reversed;
+   - `Compress` against `step` with the feed-forward adding `H`'s words
+     reversed (`step h m - h + reverse h`);
+   - `Hash` at 56 bytes against `hash` of the message's bytes reversed;
+   - `HMAC_SHA256` at a 100-byte key and a 3-byte text against `HMAC` of
+     the key reversed.
 
-   The last three run `aes_impl.saw` first and use its overrides and
-   tactics, so they show that neither the overrides nor the uninterpreted
-   functions make the top-level proofs vacuous. (`Encrypt_Block` against
+   All but the first two run their module's script first and use its
+   overrides and tactics, in the same uninterpreted vocabulary, so they
+   show that neither the overrides nor the uninterpreted functions make
+   the top-level proofs vacuous. (`Encrypt_Block` against
    ``InvCipher`{128}`` fails too, but z3 took 245 s to find the
    counterexample, with `Round` uninterpreted on one side and `InvRound`
-   interpreted on the other; it is not among the controls.)
+   interpreted on the other; it is not among the controls. Nor are three
+   stronger controls of `Compress` that no solver refuted in time: `step`
+   of the block reversed (z3 stopped after 11 min at 2.8 GB; yices and
+   bitwuzla, 400 s), of the block with word 15 flipped (z3, 400 s), and
+   with its result words rotated (z3, 150 s). Telling two different
+   64-round terms apart means bit-blasting both, with the uninterpreted
+   sigmas' applications Ackermannized; the correct spec is the same term
+   as the implementation's and is proved in 3 s.)
 
 The scripts follow `algorithms/AES/rust/Cipher/theorems/saw.py`: a
 contract per shape of subprogram, leaves first, each verified leaf passed
-as an override to its callers, `rme` for the leaves, and z3 with the
-overridden compositions uninterpreted for the ciphers (the template's
-`z3(["Round", "SubBytes", "ShiftRows"])`, plus `AddRoundKey`; the
-template uses ``InvCipher'`` and cvc5 for decryption, the crate's
+as an override to its callers, `rme` for the bitwise leaves, and z3 with
+the overridden compositions uninterpreted above them (for AES the
+template's `z3(["Round", "SubBytes", "ShiftRows"])`, plus `AddRoundKey`;
+the template uses ``InvCipher'`` and cvc5 for decryption, the crate's
 `Decrypt_Block` is ``InvCipher`` itself and z3 proves it). They are
-SAWScript,
-not the Python client: SAWScript runs with the `saw` of the release
-tarball alone, while the client needs `saw-remote-api` and an unpinned
-`saw-client` from PyPI; the NSA's own `algorithms/*/theorems/*.saw` are
-SAWScript too.
+SAWScript, not the Python client: SAWScript runs with the `saw` of the
+release tarball alone, while the client needs `saw-remote-api` and an
+unpinned `saw-client` from PyPI; the NSA's own
+`algorithms/*/theorems/*.saw` are SAWScript too.
 
-**Three constraints of SAW 1.6 on GNAT-LLVM 27 bitcode**, measured:
+**Constraints of SAW 1.6 on GNAT-LLVM 27 bitcode**, measured:
 
 - **No `-g`.** SAW rejects the debug metadata (`METADATA_BLOCK` "not yet
   implemented").
@@ -905,7 +1032,11 @@ SAWScript too.
 - **One module per proof.** An override must come from the module being
   verified (`llvm_verify` says "different LLVM module" otherwise), and the
   GNAT Pro install has no `llvm-link`: hence the pinned `llvm-link` above,
-  and one linked module.
+  and one linked module per algorithm.
+- **Lax arithmetic is fixed at load time.** `enable_lax_arithmetic`
+  changes nothing for a module already loaded: SAW applies it when it
+  translates the module, at `llvm_load_module`. Hence the second load of
+  `sha256.bc` for the proofs that need it.
 - And `llvm-gcc` refuses `-o x.bc` ("incorrect object file extension"): the
   bitcode takes the source's name.
 
@@ -970,3 +1101,51 @@ What `llvm-gcc -O0` makes of `AES.Impl`, which M4.2 (#23) builds on:
   `Xor_Word`, `Rcon`) are inlined into their callers by llvm-gcc even at
   `-O0` (the inlined blocks are named `..._xor_word.exit` and so on).
   `Expand_Key` calls none of them: it calls `Sub_Byte`, `Nk` and `Nr`.
+
+What `llvm-gcc -O0` makes of the SHA-256 and HMAC units (M4.3, #24):
+
+- **`Hash_Value` and `Block` are passed by reference**, unlike AES's
+  16-byte `Block`: `procedure Compress (H : in out Hash_Value; M : Block)`
+  is `void (ptr %h, ptr %m)`, `H` a writable pointer to `[8 x i32]`, `M` a
+  read-only pointer to `[16 x i32]`; the contract
+  (`compress_contract`) allocates both and states the result with
+  `llvm_points_to` on `H`. `"+" (Left, Right : Hash_Value)` takes two
+  read-only pointers and returns `[8 x i32]` by value. A function
+  returning a `Block` (`Load_Block`) takes a hidden first pointer to the
+  result (`ptr %_return`). The 32-byte `Digest` is returned by value,
+  `[32 x i8]`. `Unsigned_32` is `i32`; Ch and Maj take three `i32`.
+- **`Byte_Array`** (`SHA256_Bytes`, index `Byte_Index`, `0 .. 2 ** 62`) is
+  a fat pointer `{ ptr, ptr }`, its bounds record `{ i64, i64 }`
+  (`..._sha256_bytes__byte_array_BOUNDS`). `Hash (M)` is
+  `[32 x i8] ({ ptr, ptr } %m)`, `HMAC_SHA256 (Key, Text)` the same with
+  two. The contracts (`byte_array_arg`) allocate the `n` bytes read-only
+  with bounds `{0, n - 1}` (`{0, -1}` for `n = 0`, a null range). After
+  `llvm-link`, every `{ ptr, ptr }` fat-pointer type of the four units is
+  merged into one, named after the first the linker met
+  (`..._sha256_stream__chunk_ends_FP`): the name says nothing about the
+  array.
+- **Layout against the Cryptol.** Byte `I` of a `Byte_Array` is element
+  `i` of Cryptol's `[n][8]`, its most significant bit first, so the
+  message's bits are `join msg`, as `hash` and `HMAC` take them; the
+  `Digest`'s bytes are `split` of the `[256]`. Word `J` of a `Block` or a
+  `Hash_Value` is element `j` of `[16][32]` or `[8][32]`.
+- **Records** (`SHA256_Stream.Context`, packed `<{ [8 x i32], [64 x i8],
+  i64 }>`; `HMAC.SHA256_Impl.Context`) are passed by reference; the
+  one-shot `Hash` and `HMAC_SHA256` keep them on their own stack, so no
+  contract allocates one.
+- **Constant tables** (`K_256`, and the initial context with `H0_256`) are
+  private constant copies in `SHA256_Stream`'s bitcode
+  (`@foundation_spark-sha2-sha256_stream.for.ref`): `Compress` reads no
+  other unit's data.
+- **Ranges' lengths.** GNAT-LLVM computes the length of `Lo .. Hi` as
+  `select (Lo > Hi, 0, (Hi - Lo) +nuw 1)`. For a null range with
+  `Hi = Lo - 1`, the `add nuw` wraps and makes a poison value in the
+  operand the `select` discards. LLVM allows that (a `select` is poison
+  only if the operand it chooses is), but crucible fails the proof where
+  the poison is created ("Poison value created: Unsigned addition caused
+  wrapping even though the `nuw` flag was set"), with any bounds, `{0, -1}`
+  or `{1, 0}`. The crate makes such a range for an empty argument and in
+  `Final`'s `Last (0 .. R - 1) := C.Buf (0 .. R - 1)` when `R = 0`. The
+  proofs that reach one load the module a second time with SAW's
+  `enable_lax_arithmetic` (above), under which overflow is not an
+  obligation; absence of overflow is gnatprove's to prove, and it does.

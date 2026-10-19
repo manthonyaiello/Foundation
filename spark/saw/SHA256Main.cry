@@ -1,0 +1,31 @@
+/*
+ * algorithms::SHA2::Main at SHA-256's parameters, as a named module, for
+ * spark/saw/sha256_impl.saw: the parameters are copied from
+ * algorithms/SHA2/SHA256.cry (SHA256.cry:16-28), which instantiates Main
+ * the same way but privately (`import algorithms::SHA2::Main as SHA256
+ * where ...`), so that its `step` (Main.cry:67) cannot be named from
+ * outside. This module exports the instance's `step` and `hash`
+ * (Main.cry:55) as `step` and `hash`. NSA's Cryptol is not modified: this
+ * file only instantiates it, as spark/cryptol/SPARK/SHA2/SHA256.cry's
+ * Main256 does for the FFI check.
+ */
+module SHA256Main = algorithms::SHA2::Main where
+
+import algorithms::SHA2::Preprocessing (H0_256)
+import algorithms::SHA2::Functions ( SIGMA_256_0
+                                   , SIGMA_256_1
+                                   , sigma_256_0
+                                   , sigma_256_1
+                                   , K_256)
+
+type d = 256
+type w = 32
+type Klen = 64
+
+H0 = H0_256
+K = K_256
+
+SIGMA_0 = SIGMA_256_0
+SIGMA_1 = SIGMA_256_1
+sigma_0 = sigma_256_0
+sigma_1 = sigma_256_1

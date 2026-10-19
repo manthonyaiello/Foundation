@@ -1,0 +1,23 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * HMAC_SHA256 at a 100-byte key (hashed first) and a 3-byte text against
+ * HMAC/Main.cry's HMAC with the key reversed, with Compress's and Hash's
+ * (at 100 bytes) proofs as overrides and the tactic of sha256_impl.saw's
+ * HMAC proofs (z3 with `step` and the SIGMA and sigma functions
+ * uninterpreted). It runs sha256_impl.saw first, for the overrides. The
+ * proof must fail with a counterexample, which shows that the overrides
+ * (Hash's included, for the long key) and the uninterpreted `step` do not
+ * make the HMAC proofs vacuous: the key's bytes and their order are
+ * checked through HMAC_init's hash.
+ */
+
+include "../sha256_impl.saw";
+
+verify_symbol (hmac_symbol "hmac_sha256")
+  "hmac.sha256_impl.hmac_sha256 at key 100 bytes, text 3 bytes (against the reversed key)"
+  [compress, hash_100]
+  (hmac_contract 100 3 {{ \(key : [100][8]) (text : [3][8]) ->
+                            split (HMAC`{256, 64, 100, 24, 32} hash hash hash (reverse key) (join text)) : [32][8] }})
+  (w4_unint_z3 hash_unint) "w4_unint_z3 step SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1"
+  "\\key text -> split (HMAC::HMAC`{256, 64, 100, 24, 32} SHA256Main::hash (x3) (reverse key) (join text))";

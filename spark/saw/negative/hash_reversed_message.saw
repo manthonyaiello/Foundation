@@ -1,0 +1,19 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * Hash at 56 bytes (two blocks) against SHA256Main's hash of the message's
+ * bytes in reverse order, with Compress's proof as the override and the
+ * tactic of sha256_impl.saw's Hash proofs (z3 with `step` and the SIGMA
+ * and sigma functions uninterpreted). It runs sha256_impl.saw first, for
+ * the overrides. The proof must fail with a counterexample, which shows
+ * that the Compress override and the uninterpreted `step` do not make the
+ * Hash proofs vacuous: which bytes go into which block is checked.
+ */
+
+include "../sha256_impl.saw";
+
+verify_symbol (stream_symbol "hash") "sha256_stream.hash at 56 bytes (against the reversed message)"
+  [compress]
+  (hash_contract 56 {{ \(msg : [56][8]) -> split (hash (join (reverse msg))) : [32][8] }})
+  (w4_unint_z3 hash_unint) "w4_unint_z3 step SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1"
+  "\\msg -> split (SHA256Main::hash`{8 * 56} (join (reverse msg)))";
