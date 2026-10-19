@@ -3,8 +3,8 @@
 **Provenance.** Rewritten 2026-10-19. `main` is `ac09517` (the merge of PR
 #52). The board below was counted on it by `spark/scripts/board.py`, after a
 whole-crate `check-proof.sh` (through the scheduler, on `foundation`) and a
-full `check-ffi.sh`. Open: PR #46 (#6, the x86_64 bootstrap) and this plan's
-own PR. Everything else is merged.
+full `check-ffi.sh`. Open: PR #46 (#6, the x86_64 bootstrap), and the
+`x86-proof-margins` work it waits on. Everything else is merged.
 
 **A fresh session starts at "Next".**
 
@@ -68,16 +68,23 @@ The three incomplete rows, honestly so:
 
 ## Next
 
-1. **Merge PR #46 (#6)** once its bare-runner and container bootstrap jobs are
-   green; then this plan's PR.
+1. **Fix the x86_64 proof margins, then merge PR #46 (#6).** #46's bootstrap
+   jobs install everything (toolchain, Cryptol, SAW 1.6; a bare image needs
+   only `ca-certificates curl git libc6-dev python3`), pass FFI, prove the
+   repo's `GF28.saw`/`SBox.saw` with SAW, and match the slow unit's
+   fingerprint on x86_64. But three level-2 checks time out on the x86_64
+   runner under the 10 s CI allowance, though they prove on arm64 and with
+   60 s on x86_64: `AES.Spec.Properties.GF28MultiplicationCorrect`,
+   `HMAC.SHA256_Impl.Lemma_Hash_Ext`, `HMAC.SHA256_Impl.Lemma_HMAC`. The
+   `x86-proof-margins` tick restructures those proofs (or raises the two
+   files to `Level_3` if it must), re-runs the slow proof (properties.ads is
+   one of its inputs), and restacks #46 on top.
 2. **Run `spark-prove-slow.yml` once** on the final `main` (Tony's decision:
    only after everything is merged). It validates the on-demand workflow; it
    should reproduce sbox_entries' recorded fingerprint and 2482/2482.
 3. **Move to the x86_64 IOD** (Tony, 2026-10-19): run the bootstrap from
    `spark/README.md` ("Bootstrapping the x86_64 instance"), confirm the gates.
-   **Check whether the slow unit's fingerprint matches on x86_64** (prover
-   version strings may differ by architecture); if not, decide with Tony
-   (per-architecture entries, or strip the architecture from the strings).
+   The slow unit's fingerprint already matched on the x86_64 CI runner.
 4. **M4.1 (#22)** on the IOD: GNAT-LLVM + SAW 1.6, one AES leaf
    (`Sub_Bytes` or `X_Times`) proved by `llvm_verify` against the Cryptol.
    **Blocked on GNAT-LLVM** for x86_64 Linux: a GNAT Pro LLVM build, or a
@@ -223,6 +230,10 @@ Not yet, and not filed:
   use `[for N in Subtype'Range => …]`.
 * **The provers do not treat Ada array `=` as equality.** Extensionality and
   congruence lemmas (`*_Ext` in SHA-2, `*_Eq` in AES) are routinely needed.
+* **x86_64 provers are slower on some goals than arm64**: three checks that
+  prove in under 10 s on arm64 need up to 60 s on the x86_64 runner. A green
+  arm64 gate does not imply a green x86_64 gate; the bootstrap job runs the
+  x86_64 gate.
 * **Executing ghost recursions is exponential** (`KeyExpansion.W`, SHA-2's
   `W`): never put a large-N FFI property on a ghost spec export.
 * **Cryptol `[l /^ 8][8]`** does not determine `l`: pass `` `{l} ``.
