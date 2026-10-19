@@ -1,0 +1,102 @@
+name: SPARK coverage
+
+# GNATcoverage of the executable SPARK under the Cryptol-driven FFI
+# properties (issue #49): spark/scripts/check-coverage.sh instruments the FFI
+# library's coverage build, runs every property of
+# spark/cryptol/properties.txt against it through check-ffi.sh, and reports
+# statement, decision and MC/DC coverage of the units in
+# spark/coverage/units.txt. The report is uploaded as the artifact
+# spark-coverage; its per-unit table goes in the job summary.
+#
+# A workflow of its own, so it never lengthens spark-ci.yml's FFI gate: it
+# runs beside it, on a PR or a push to main that touches what the coverage
+# depends on, or by hand. It sets no coverage threshold. It fails when a
+# property fails, when a cryptol run writes no trace, or when an uncovered
+# statement, decision or condition is not explained in
+# spark/coverage/explained.txt (a gap is closed with a property instead).
+#
+# On ubuntu-24.04 (x86_64), as the FFI job: Cryptol has no arm64 Linux
+# release.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spark/src/**'
+      - 'spark/cryptol/**'
+      - 'spark/coverage/**'
+      - 'spark/foundation_spark_ffi.gpr'
+      - 'spark/scripts/check-coverage.sh'
+      - 'spark/scripts/check-ffi.sh'
+      - 'spark/scripts/coverage-summary.py'
+      - 'spark/scripts/toolchain-pins.env'
+      - '.github/workflows/spark-coverage.yml'
+      - '.github/actions/setup-alire-spark/**'
+  pull_request:
+    paths:
+      - 'spark/src/**'
+      - 'spark/cryptol/**'
+      - 'spark/coverage/**'
+      - 'spark/foundation_spark_ffi.gpr'
+      - 'spark/scripts/check-coverage.sh'
+      - 'spark/scripts/check-ffi.sh'
+      - 'spark/scripts/coverage-summary.py'
+      - 'spark/scripts/toolchain-pins.env'
+      - '.github/workflows/spark-coverage.yml'
+      - '.github/actions/setup-alire-spark/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Coverage (gnatcov, linux x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # gnatcov from the pins (GNATCOV_VERSION), and the pins in the job's
+      # environment for the Cryptol install below.
+      - name: Set up Alire and gnatcov
+        uses: ./.github/actions/setup-alire-spark
+        with:
+          gnatcov: 'true'
+
+      # As spark-ci.yml's ffi job.
+      - name: Install Cryptol
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/$CRYPTOL_TARBALL" \
+            "https://github.com/GaloisInc/cryptol/releases/download/$CRYPTOL_VERSION/$CRYPTOL_TARBALL"
+          echo "$CRYPTOL_SHA256  $RUNNER_TEMP/$CRYPTOL_TARBALL" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/cryptol"
+          tar -xzf "$RUNNER_TEMP/$CRYPTOL_TARBALL" -C "$RUNNER_TEMP/cryptol" --strip-components=1
+          echo "$RUNNER_TEMP/cryptol/bin" >> "$GITHUB_PATH"
+
+      - name: Tool versions
+        run: |
+          cryptol --version
+          gnatcov --version
+
+      - name: Build
+        working-directory: spark
+        run: alr -n build
+
+      - name: Coverage under the FFI properties
+        run: spark/scripts/check-coverage.sh
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spark-coverage
+          path: |
+            spark/obj/cov/report
+            spark/obj/cov/ffi/ffi-results.txt
+            spark/obj/cov/ffi/run
+          if-no-files-found: ignore

@@ -27,6 +27,7 @@ $ PROVE_JOBS=3 scripts/prove.sh                 # the whole crate
 $ PROVE_JOBS=3 scripts/prove.sh -u foundation_spark-aes-spec-gf28.ads
 $ scripts/board.py                               # the board, as markdown
 $ FFI_JOBS=3 scripts/check-ffi.sh                # every FFI property
+$ FFI_JOBS=3 scripts/check-coverage.sh           # gnatcov under the FFI properties
 ```
 
 ## Proving
@@ -414,6 +415,62 @@ All are compared with `algorithms::SHA2::SHA256::HMAC`, that is
 arm64 Linux release. It installs the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers`
 release, checked against its sha256 (the release without solvers does not
 start: Cryptol's type checker needs z3), and the same Alire toolchain.
+
+## Coverage
+
+`scripts/check-coverage.sh` (#49) measures how much of the executable code
+the FFI properties run: GNATcoverage's statement, decision and MC/DC
+obligations (`--level=stmt+mcdc`) of the units in `coverage/units.txt` (the
+executables `AES.Impl`, `AES.Impl.Main`, `SHA2.SHA256_Stream`,
+`HMAC.SHA256_Impl`, `SHA2.Functions`, and the non-ghost FFI export units),
+under every property of `cryptol/properties.txt`. The ghost spec is out of
+scope: it is not code that ships.
+
+```console
+$ FFI_JOBS=3 scripts/check-coverage.sh          # every property
+$ GNATCOV=/path/to/gnatcov scripts/check-coverage.sh prop_Impl_Dot
+```
+
+It needs gnatcov `GNATCOV_VERSION` (`scripts/toolchain-pins.env`; the
+Alire crate, `alr -n install gnatcov=26.2.1`, has aarch64 and x86_64 Linux
+builds) and what `check-ffi.sh` needs. It
+
+1. installs gnatcov's runtime in `obj/cov/rts` (`gnatcov setup`, once per
+   version);
+2. instruments and builds the coverage build of the FFI library:
+   `foundation_spark_ffi.gpr` with `FOUNDATION_SPARK_FFI_BUILD=coverage`,
+   which has its own object and library directories (`obj/cov/`) and one more
+   unit, `coverage/foundation_spark_coverage`. gnatprove never reads this
+   project, and the FFI check's build is untouched;
+3. runs `check-ffi.sh` against that library (`FFI_LIB`, `FFI_OUT`), which
+   judges every property as usual;
+4. consolidates the traces into `obj/cov/report/`: `summary.txt` (the
+   per-unit table and every violation with its explanation), `report.txt`
+   (gnatcov's report), `xcov/` (annotated sources) and `xml/`.
+
+**Dumping a trace from Cryptol's process.** gnatcov's `atexit` and
+`main-end` triggers are inserted into Ada mains, and Cryptol, which loads the
+library by `foreign`, has none. So the instrumentation uses
+`--dump-trigger=manual`: `Foundation_Spark_Coverage.Dump` holds
+`pragma Annotate (Xcov, Dump_Buffers)`, which gnatcov replaces with the dump,
+and the unit's elaboration registers `Dump` with the C library's `atexit`.
+The library elaborates itself when Cryptol loads it, so every `cryptol -b`
+(one per property) writes its own trace into `obj/cov/traces/` when it exits
+(`GNATCOV_TRACE_FILE`). The script fails unless there is one trace per run.
+
+**Explained, or closed.** Every violation must match an entry of
+`coverage/explained.txt` (the file, the trimmed text of the line, the
+reason), or the script fails. An entry is for code the properties cannot
+reach by construction, such as an expression function called only from
+contracts, which the FFI build does not execute. A gap in the targeted
+tests is closed with a property instead (`prop_Impl_Dot` closed
+`AES.Impl.Dot`, which the ciphers never call).
+
+**CI** runs it in `.github/workflows/spark-coverage.yml`, its own workflow,
+so it never lengthens the FFI gate: on `ubuntu-24.04` (x86_64), on a PR or a
+push to `main` that touches the sources, the properties or the coverage
+tooling, and by hand (`workflow_dispatch`). The report is the artifact
+`spark-coverage`, and the table goes in the job summary.
 
 ## Gates
 

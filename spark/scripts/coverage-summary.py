@@ -6,12 +6,22 @@ Reads the per-source XML that `gnatcov coverage --annotate=xml` writes (one
 for each unit of interest (spec and body together), the statement, decision
 and MC/DC obligations covered out of those relevant, then the totals.
 
-Usage: coverage-summary.py XML_DIR
+With --report and --explained, it then lists every violation of gnatcov's
+report (report.txt) with the entry of coverage/explained.txt that explains
+it, or as UNEXPLAINED, and exits 1 when one is unexplained. An entry is
+"file | line text | reason": it matches a violation in that file whose
+source line, trimmed, is that text.
+
+Usage: coverage-summary.py XML_DIR [--report REPORT --explained EXPLAINED]
 """
 
+import argparse
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
+
+VIOLATION = re.compile(r"^(\S+\.ad[sb]):(\d+):(\d+): (.*)$")
 
 KINDS = ("Stmt", "Decision", "MCDC")
 
@@ -39,14 +49,81 @@ def cell(covered, total):
     return "%d/%d (%d%%)" % (covered, total, 100 * covered // total)
 
 
+def source_paths(xml_dir):
+    """{basename: full path} of the sources the XML report covers."""
+    paths = {}
+    for name in os.listdir(xml_dir):
+        if name.endswith((".ads.xml", ".adb.xml")):
+            root = ET.parse(os.path.join(xml_dir, name)).getroot()
+            if root.tag == "source" and root.get("file"):
+                paths[os.path.basename(root.get("file"))] = root.get("file")
+    return paths
+
+
+def read_explained(path):
+    """{(file, line text): reason} from explained.txt."""
+    entries = {}
+    with open(path, encoding="utf-8") as f:
+        for n, line in enumerate(f, 1):
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            parts = [p.strip() for p in line.split(" | ")]
+            if len(parts) != 3 or not all(parts):
+                sys.exit("%s:%d: expected \"file | line text | reason\"" % (path, n))
+            entries[(parts[0], parts[1])] = parts[2]
+    return entries
+
+
+def violations(xml_dir, report, explained):
+    """Print each violation with its explanation; return the unexplained count."""
+    paths = source_paths(xml_dir)
+    entries = read_explained(explained)
+    lines_of = {}
+    found = []
+    with open(report, encoding="utf-8") as f:
+        for line in f:
+            m = VIOLATION.match(line.rstrip("\n"))
+            if m:
+                found.append(m.groups())
+    unexplained = 0
+    used = set()
+    print()
+    print("violations: %d" % len(found))
+    for base, ln, col, what in found:
+        if base not in lines_of:
+            with open(paths[base], encoding="utf-8") as f:
+                lines_of[base] = f.read().splitlines()
+        text = lines_of[base][int(ln) - 1].strip()
+        reason = entries.get((base, text))
+        if reason is None:
+            unexplained += 1
+            print("  UNEXPLAINED %s:%s:%s: %s" % (base, ln, col, what))
+            print("              %s" % text)
+        else:
+            used.add((base, text))
+            print("  explained   %s:%s:%s: %s" % (base, ln, col, what))
+            print("              %s" % reason)
+    for key in sorted(set(entries) - used):
+        print("  (stale entry, matched nothing: %s | %s)" % key)
+    print("unexplained: %d" % unexplained)
+    return unexplained
+
+
 def main(argv):
-    if len(argv) != 2 or not os.path.isdir(argv[1]):
-        sys.exit("usage: coverage-summary.py XML_DIR")
+    ap = argparse.ArgumentParser(description="The per-unit coverage table.")
+    ap.add_argument("xml_dir")
+    ap.add_argument("--report")
+    ap.add_argument("--explained")
+    args = ap.parse_args(argv[1:])
+    if not os.path.isdir(args.xml_dir):
+        sys.exit("coverage-summary.py: no directory %s" % args.xml_dir)
+    if bool(args.report) != bool(args.explained):
+        sys.exit("coverage-summary.py: --report and --explained go together")
     units = {}
-    for name in sorted(os.listdir(argv[1])):
+    for name in sorted(os.listdir(args.xml_dir)):
         if not name.endswith((".ads.xml", ".adb.xml")):
             continue
-        got = file_stats(os.path.join(argv[1], name))
+        got = file_stats(os.path.join(args.xml_dir, name))
         if got is None:
             continue
         unit, stats = got
@@ -56,7 +133,7 @@ def main(argv):
             acc[k][0] += c
             acc[k][1] += t
     if not units:
-        sys.exit("coverage-summary.py: no source XML in %s" % argv[1])
+        sys.exit("coverage-summary.py: no source XML in %s" % args.xml_dir)
     width = max(len(u) for u in units)
     head = "%-*s  %-16s  %-16s  %-16s" % (width, "unit", "statement", "decision", "MC/DC")
     print(head)
@@ -72,6 +149,8 @@ def main(argv):
     print("-" * len(head))
     print("%-*s  %-16s  %-16s  %-16s" % (
         width, "total", *(cell(*total[k]) for k in KINDS)))
+    if args.report and violations(args.xml_dir, args.report, args.explained):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

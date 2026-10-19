@@ -2,6 +2,7 @@
 #
 # check-coverage.sh -- GNATcoverage of the executable SPARK under the
 # Cryptol-driven FFI properties (issue #49): statement, decision and MC/DC
+# (gnatcov's stmt+mcdc, which includes decision)
 # coverage of the units in coverage/units.txt (the executable
 # implementations and the non-ghost FFI export units), from every property
 # of cryptol/properties.txt.
@@ -23,7 +24,8 @@
 #    report.txt (the violations, unit by unit), xcov/ (the annotated
 #    sources: one .xcov per source, each line marked + covered, - not,
 #    ! partly, . no code), xml/ (the same, for tools) and summary.txt (the
-#    per-unit table, from scripts/coverage-summary.py).
+#    per-unit table, and each violation with its explanation from
+#    coverage/explained.txt, from scripts/coverage-summary.py).
 #
 # Usage (from anywhere; needs the Alire workspace, i.e. `alr -n build` once):
 #   scripts/check-coverage.sh                 every property
@@ -34,9 +36,11 @@
 #               GNATCOV_VERSION of scripts/toolchain-pins.env.
 #   CRYPTOL, FFI_JOBS, ALR: as for check-ffi.sh.
 #
-# Exit status: 0 when every property passed and every run wrote a trace (the
-# coverage is reported, not gated), 1 when a property failed or a run wrote
-# no trace, 2 on a usage or setup error.
+# Exit status: 0 when every property passed, every run wrote a trace and
+# every violation (statement, decision or MC/DC obligation not covered) is
+# explained in coverage/explained.txt; 1 when one of those fails; 2 on a
+# usage or setup error. A partial run (PROPERTY ...) leaves violations that
+# the whole run would cover, so read its verdict accordingly.
 #
 set -euo pipefail
 
@@ -52,6 +56,7 @@ RTS="$COV/rts"
 TRACES="$COV/traces"
 REPORT="$COV/report"
 UNITS="coverage/units.txt"
+EXPLAINED="coverage/explained.txt"
 LEVEL="stmt+mcdc"
 X=(-XFOUNDATION_SPARK_FFI_BUILD=coverage -XGNATCOV_RTS_LIBRARY_TYPE=static-pic)
 
@@ -73,6 +78,7 @@ case "$want_version" in
   *) die "gnatcov is \"$have_version\", the pin is GNATCOV_VERSION=$want_version" ;;
 esac
 [ -f "$UNITS" ] || die "missing $UNITS"
+[ -f "$EXPLAINED" ] || die "missing $EXPLAINED"
 
 # The Alire environment (GPR_PROJECT_PATH for sparklib and the config GPR),
 # plus the gnatcov runtime's project.
@@ -136,7 +142,17 @@ for fmt in report xcov+ xml; do
     "${traces[@]}"
 done
 
-python3 "$ROOT/scripts/coverage-summary.py" "$REPORT/xml" | tee "$REPORT/summary.txt"
+explained=0
+python3 "$ROOT/scripts/coverage-summary.py" "$REPORT/xml" \
+  --report "$REPORT/report.txt" --explained "$EXPLAINED" \
+  > "$REPORT/summary.txt" || explained=$?
+cat "$REPORT/summary.txt"
+case "$explained" in
+  0) ;;
+  1) echo "!! a violation is not explained in spark/$EXPLAINED: close it with a property, or explain it" >&2
+     status=1 ;;
+  *) die "coverage-summary.py failed" ;;
+esac
 
 if [ -n "${GITHUB_STEP_SUMMARY-}" ]; then
   {
