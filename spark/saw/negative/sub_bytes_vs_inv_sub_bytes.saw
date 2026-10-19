@@ -1,0 +1,15 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * Sub_Bytes against Cipher.cry's InvSubBytes instead of SubBytes, with
+ * the same Sub_Byte override as aes_impl.saw. The proof must fail with a
+ * counterexample state, which shows the override does not make the
+ * Sub_Bytes proof vacuous.
+ */
+
+include "../aes_impl_common.saw";
+
+sub_byte <- verify_impl "sub_byte" [] (byte_to_byte_contract {{ \b -> SBox @ b }})
+                        "\\b -> SBox::SBox @ b";
+verify_impl "sub_bytes" [sub_byte] (block_in_out_contract {{ InvSubBytes }})
+            "Cipher::InvSubBytes";

@@ -1,0 +1,71 @@
+/*
+ * What the AES implementation's SAW scripts share: the bitcode, NSA's
+ * Cryptol, and the contracts, one per shape of Ada subprogram (as
+ * algorithms/AES/rust/Cipher/theorems/saw.py has one per shape of Rust
+ * function).
+ *
+ * Run from spark/saw/ by spark/scripts/check-saw.sh, which compiles
+ * obj/foundation_spark-aes-impl.bc from spark/src/aes/foundation_spark-
+ * aes-impl.adb with GNAT Pro's LLVM back end first. Not run by CI: see
+ * spark/README.md, "SAW".
+ */
+
+enable_experimental;
+
+/*
+ * NSA's Cryptol, imported unmodified. CRYPTOLPATH is the repository's
+ * root (check-saw.sh sets it), where the modules' own imports
+ * (algorithms::AES::Types, shared::algebra::Polynomial::GF2) resolve.
+ */
+import "../../algorithms/AES/GF28.cry";
+import "../../algorithms/AES/SBox.cry";
+import "../../algorithms/AES/Cipher.cry";
+
+/*
+ * Foundation_Spark.AES.Impl as bitcode, compiled with -O0 and without -g
+ * (spark/README.md, "SAW", says why both).
+ */
+aes_impl <- llvm_load_module "obj/foundation_spark-aes-impl.bc";
+
+/*
+ * The Ada names as LLVM symbols: GNAT's external names, the expanded name
+ * in lower case with "__" for each ".". No Export or Convention C is
+ * needed: the symbols are the crate's own, unchanged.
+ */
+let impl_symbol name = str_concat "foundation_spark__aes__impl__" name;
+
+/*
+ * function F (B : Byte) return Byte
+ *
+ * GNAT-LLVM passes and returns a Byte (Interfaces.Unsigned_8) as i8.
+ */
+let byte_to_byte_contract (f : Term) = do {
+  b <- llvm_fresh_var "b" (llvm_int 8);
+  llvm_execute_func [llvm_term b];
+  llvm_return (llvm_term {{ f b }});
+};
+
+/*
+ * procedure P (State : in out Block)
+ *
+ * Block is array (0 .. 15) of Byte, Cryptol's [16][8]. GNAT-LLVM does not
+ * pass this in out parameter by reference: the procedure takes the
+ * [16 x i8] by value and returns the updated [16 x i8], so the contract
+ * is that of a function Block -> Block, as Cipher.cry states SubBytes.
+ */
+let block_in_out_contract (f : Term) = do {
+  state <- llvm_fresh_var "state" (llvm_array 16 (llvm_int 8));
+  llvm_execute_func [llvm_term state];
+  llvm_return (llvm_term {{ f state }});
+};
+
+/*
+ * llvm_verify of one Impl subprogram against a Cryptol term, with the
+ * overrides given, by rme as the template's leaf lemmas are, and a line
+ * check-saw.sh records.
+ */
+let verify_impl name overrides contract cryptol = do {
+  result <- llvm_verify aes_impl (impl_symbol name) overrides false contract rme;
+  print (str_concat (str_concat (str_concat "RESULT proved " name) " = ") cryptol);
+  return result;
+};

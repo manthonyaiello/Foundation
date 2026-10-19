@@ -4,3 +4,4 @@
 /config/
 /docs/
 /.gnatprove-cache/
+/saw/obj/
