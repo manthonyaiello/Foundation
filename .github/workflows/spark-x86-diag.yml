@@ -1,0 +1,56 @@
+name: SPARK x86 proof-margin diagnostic (temporary)
+
+# TEMPORARY, removed before the PR is merged. Measures the three level-2
+# checks that run out of time on GitHub's x86_64 runner (PR #46): proves
+# their two units cold (-f), on x86_64 and on arm64, with per-check
+# statistics. Gates nothing.
+on:
+  push:
+    branches: [x86-proof-margins]
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    name: Diagnose (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-alire-spark
+        with:
+          gnatprove: 'true'
+      - name: Build
+        working-directory: spark
+        run: alr -n build
+      - name: Prove the two units, cold, with statistics
+        working-directory: spark
+        run: |
+          uname -m; nproc
+          for mode in "ci" "raw60"; do
+            if [ "$mode" = ci ]; then
+              export FOUNDATION_SPARK_PROOF_ALLOWANCE=ci; extra=""
+            else
+              export FOUNDATION_SPARK_PROOF_ALLOWANCE=none; extra="--level=2 --timeout=60"
+            fi
+            echo "=========== $mode ($extra)"
+            t0=$(date +%s)
+            # shellcheck disable=SC2086
+            alr -n exec -- gnatprove -P foundation_spark.gpr -j4 -f $extra \
+              -u foundation_spark-aes-spec-properties.ads \
+              -u foundation_spark-aes-spec-properties.adb \
+              -u foundation_spark-hmac-sha256_impl.adb \
+              --report=statistics > "diag-$mode.log" 2>&1 || true
+            echo "== $mode: $(( $(date +%s) - t0 ))s wall-clock"
+            grep -E 'medium:|high:|low:' "diag-$mode.log" || echo "(no unproved checks)"
+            echo "-- the three checks, and every check over 2 s:"
+            grep -E 'properties\.ads:66:|sha256_impl\.adb:137:|sha256_impl\.adb:431:|[0-9]\.[0-9]+ seconds' obj/*/gnatprove/gnatprove.out \
+              | grep -E 'properties\.ads:66:|sha256_impl\.adb:137:|sha256_impl\.adb:431:|max ([2-9]|[1-9][0-9])\.' || true
+            grep -E 'properties\.ads:66:|sha256_impl\.adb:137:|sha256_impl\.adb:431:' "diag-$mode.log" || true
+            grep -E '^Total|^Summary' -A1 obj/*/gnatprove/gnatprove.out | head -n 5 || true
+          done
