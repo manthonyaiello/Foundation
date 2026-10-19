@@ -851,8 +851,10 @@ The lengths reach each case of the padding (55, the longest message whose
 padding fits one block; 56, the shortest that needs two; 64 and 128, whole
 blocks; 119 and 120, the boundary in the second block; 200, four blocks)
 and each case of `HMAC_init` (a key shorter than the block, the block, and
-longer: hashed first). `Compress` takes about 3 s, each `Hash` and
-`HMAC_SHA256` proof under 2 s; `results.txt` has each one's time. Their
+longer: hashed first). `Compress` takes about 3 s; `Hash` 0.2 to
+1.2 s, and `HMAC_SHA256` 0.6 to 1.6 s, except at 0 bytes (2.6 s) and at
+(0, 0) (10 s), where the whole digest is evaluated on constants;
+`results.txt` has each one's time. Their
 leaves:
 
 | Ada | Cryptol | overrides | tactic |
