@@ -1,10 +1,11 @@
 # The campaign plan: SPARK AES, SHA-256 and HMAC against the Cryptol
 
-**Provenance.** Rewritten 2026-10-19. `main` is `ac09517` (the merge of PR
-#52). The board below was counted on it by `spark/scripts/board.py`, after a
-whole-crate `check-proof.sh` (through the scheduler, on `foundation`) and a
-full `check-ffi.sh`. Open: PR #46 (#6, the x86_64 bootstrap), and the
-`x86-proof-margins` work it waits on. Everything else is merged.
+**Provenance.** Rewritten 2026-10-19; updated the same day at `2c596e9`
+(the merge of PR #55). The board below was counted on `ac09517` by
+`spark/scripts/board.py`, after a whole-crate `check-proof.sh` (through the
+scheduler, on `foundation`) and a full `check-ffi.sh`; PRs #54 and #55 since
+added 48 checks (3554) and one FFI property (119), with the board unchanged at
+37/40. **Nothing is open.** E0–E3 are closed; E4 and E5 remain.
 
 **A fresh session starts at "Next".**
 
@@ -59,44 +60,39 @@ The three incomplete rows, honestly so:
 
 | epic | sub-issues | state |
 |---|---|---|
-| **#1** E0 infrastructure | #2 Cryptol/SAW · #3 CI · #4 FFI harness · #5 levels, board · #6 x86_64 bootstrap | #3 #4 #5 closed; #2 open (SAW half); #6 open (PR #46) |
+| **#1** E0 infrastructure | #2 Cryptol/SAW · #3 CI · #4 FFI harness · #5 levels, board · #6 x86_64 bootstrap | all closed |
 | **#7** E1 AES | #8 #9 #10 #11 #12 | all closed |
 | **#13** E2 SHA-256 | #14 #15 #16 #17 | all closed |
 | **#18** E3 HMAC-SHA-256 | #19 #20 | all closed |
 | **#21** E4 SAW | #22 M4.1 spike · #23 M4.2 AES · #24 M4.3 SHA-256 and HMAC | open, paused for GNAT-LLVM |
-| **#48** E5 assurance beyond the proofs | #49 M5.1 coverage · #50 M5.2 constant time · #51 M5.3 binaries and performance | open, new |
+| **#48** E5 assurance beyond the proofs | #49 M5.1 coverage · #50 M5.2 constant time · #51 M5.3 binaries and performance | #49 closed (PR #55); #50, #51 open |
 
 ## Next
 
-1. **Fix the x86_64 proof margins, then merge PR #46 (#6).** #46's bootstrap
-   jobs install everything (toolchain, Cryptol, SAW 1.6; a bare image needs
-   only `ca-certificates curl git libc6-dev python3`), pass FFI, prove the
-   repo's `GF28.saw`/`SBox.saw` with SAW, and match the slow unit's
-   fingerprint on x86_64. But three level-2 checks time out on the x86_64
-   runner under the 10 s CI allowance, though they prove on arm64 and with
-   60 s on x86_64: `AES.Spec.Properties.GF28MultiplicationCorrect`,
-   `HMAC.SHA256_Impl.Lemma_Hash_Ext`, `HMAC.SHA256_Impl.Lemma_HMAC`. The
-   `x86-proof-margins` tick restructures those proofs (or raises the two
-   files to `Level_3` if it must), re-runs the slow proof (properties.ads is
-   one of its inputs), and restacks #46 on top.
-2. **Run `spark-prove-slow.yml` once** on the final `main` (Tony's decision:
-   only after everything is merged). It validates the on-demand workflow; it
-   should reproduce sbox_entries' recorded fingerprint and 2482/2482.
-3. **Move to the x86_64 IOD** (Tony, 2026-10-19): run the bootstrap from
-   `spark/README.md` ("Bootstrapping the x86_64 instance"), confirm the gates.
-   The slow unit's fingerprint already matched on the x86_64 CI runner.
-4. **M4.1 (#22)** on the IOD: GNAT-LLVM + SAW 1.6, one AES leaf
+Done on 2026-10-19: the x86_64 proof margins (#54: three proofs
+restructured, no level raised), the bootstrap (#46, green from a bare x86_64
+image), the one validation run of `spark-prove-slow.yml` (run 39200364449:
+2482/2482, fingerprint reproduced, 77 min on the arm64 runner), and M5.1
+coverage (#55: 300/303 statements, 13/14 decisions, 14/17 MC/DC conditions
+of the executables under the 119 FFI properties; the three uncovered
+statements are contract-only functions, explained in
+`spark/coverage/explained.txt`).
+
+1. **Move to the x86_64 IOD** (Tony, 2026-10-19): run the bootstrap from
+   `spark/README.md` ("Bootstrapping the x86_64 instance"). It needs root or
+   passwordless sudo only if the image lacks `ca-certificates curl git
+   libc6-dev python3`. Cold proof on a 4-vCPU runner is about 35 min.
+2. **M4.1 (#22)** on the IOD: GNAT-LLVM + SAW 1.6, one AES leaf
    (`Sub_Bytes` or `X_Times`) proved by `llvm_verify` against the Cryptol.
    **Blocked on GNAT-LLVM** for x86_64 Linux: a GNAT Pro LLVM build, or a
    source build of `AdaCore/gnat-llvm` (Tony to say which). Template: the
    repository's `algorithms/AES/rust/*/theorems/saw.py` (`mir_verify`,
    leaf lemmas, uninterpreted compositions).
-5. **M4.2 (#23)** AES at k = 128/192/256, then **M4.3 (#24)** SHA-256
+3. **M4.2 (#23)** AES at k = 128/192/256, then **M4.3 (#24)** SHA-256
    `Compress` and HMAC at fixed message sizes.
-6. **E5** when E4 waits on something: **M5.1 (#49)** coverage first (Tony: do
-   it if the queue runs dry), then **M5.2 (#50)** constant time (the AES
+4. **E5** when E4 waits on something: **M5.2 (#50)** constant time (the AES
    table S-box leaks), then **M5.3 (#51)** binaries and performance (on the
-   IOD for x86_64 numbers).
+   IOD for x86_64 numbers; gnatcov and the coverage job already exist).
 
 Small items, any time:
 * **The slow-proof follow-ups** (Open for Tony, below), as one small PR.
@@ -108,6 +104,15 @@ Small items, any time:
 * **`board-rows.txt` row kinds**, if Tony agrees (below).
 * **`#52`'s FFI job was 14m26s against `main`'s 9m55s** with only ~5 s of
   new properties: find out why.
+* **The bootstrap workflow runs on any PR that touches `check-ffi.sh`** (49 min
+  per job, two jobs, seen on #55): narrow its path filter to the bootstrap
+  script, the pins and the workflow.
+* **x86_64 proof margins, next in line** (from #54's measurements): checks
+  at 5.9–8.5 s on the x86_64 runner against the 10 s allowance:
+  `HMAC.SHA256_Impl.Lemma_HMAC_Unfold`'s postcondition (Alt-Ergo),
+  `SBoxCorrect`'s loop invariant (8.3 s), and two assertions at 7.2–7.4 s.
+* **gnatcov in the bootstrap** (`alr -n install gnatcov=26.2.1`) for M5.3 on
+  the IOD.
 * **A cheaper SBoxCorrect proof**: about 7.5 min of its 26 is gnat2why reading
   the 7,700-line generated unit.
 
