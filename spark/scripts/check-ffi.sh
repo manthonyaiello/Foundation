@@ -46,6 +46,12 @@
 #               "FFI enabled" in `cryptol --version`.
 #   FFI_JOBS    gprbuild -j (default: nproc). On a shared machine, set it.
 #   ALR         the alr binary (default: alr).
+#   FFI_LIB     a library already built, to run the properties against
+#               instead of building foundation_spark_ffi.gpr (relative to
+#               spark/). scripts/check-coverage.sh passes the instrumented
+#               one.
+#   FFI_OUT     where the runs and the log go (default: obj/ffi, relative to
+#               spark/).
 #
 # Exit status: 0 when every property passed, 1 when one failed, 2 on a usage
 # or setup error.
@@ -61,7 +67,7 @@ CRYPTOL="${CRYPTOL:-cryptol}"
 JOBS="${FFI_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)}"
 
 PROPS="cryptol/properties.txt"
-OUT="obj/ffi"
+OUT="${FFI_OUT:-obj/ffi}"
 RUN="$OUT/run"
 LOG="$OUT/ffi-results.txt"
 
@@ -69,7 +75,7 @@ case "$(uname -s)" in
   Darwin) EXT=dylib ;;
   *)      EXT=so ;;
 esac
-LIB="$OUT/lib/libfoundation_spark_ffi.$EXT"
+LIB="${FFI_LIB:-obj/ffi/lib/libfoundation_spark_ffi.$EXT}"
 
 die() { echo "check-ffi.sh: $*" >&2; exit 2; }
 trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; printf '%s' "${s%"${s##*[![:space:]]}"}"; }
@@ -81,9 +87,14 @@ command -v "$CRYPTOL" >/dev/null 2>&1 || die "cryptol not found (set CRYPTOL)"
 
 # --- 1. the library ------------------------------------------------------------
 
-echo ">> building the FFI library (foundation_spark_ffi.gpr, -j$JOBS)"
-"$ALR" -n exec -- gprbuild -p -q -s -j"$JOBS" -P foundation_spark_ffi.gpr
-[ -f "$LIB" ] || die "the build did not produce $LIB"
+if [ -n "${FFI_LIB-}" ]; then
+  [ -f "$LIB" ] || die "FFI_LIB: no library $LIB"
+  echo ">> using the library $LIB (FFI_LIB)"
+else
+  echo ">> building the FFI library (foundation_spark_ffi.gpr, -j$JOBS)"
+  "$ALR" -n exec -- gprbuild -p -q -s -j"$JOBS" -P foundation_spark_ffi.gpr
+  [ -f "$LIB" ] || die "the build did not produce $LIB"
+fi
 
 # --- 2. the links ---------------------------------------------------------------
 
