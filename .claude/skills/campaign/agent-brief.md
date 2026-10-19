@@ -11,7 +11,8 @@ Your orchestrator gave you:
 * your branch and worktree names;
 * the board as counted on the BASE;
 * a scratchpad path;
-* the machine: hex, or the x86_64 instance and when it dies.
+* the machine: `foundation` (the long-lived aarch64 container), or the
+  x86_64 IOD instance and when it dies (see "Machines" in the plan).
 
 Read `gh issue view <N> -R manthonyaiello/Foundation --comments`, the
 comments and not just the body, and the parent epic. These issues were filed
@@ -34,14 +35,15 @@ House style is visible in `git log` and in the NSA specs' own comments:
 
 ## Where and how
 
-* The main checkout is `/Users/tony/Local/repos/Foundation`. **Never commit
-  on `main`, never merge, never touch another agent's worktree.**
+* The main checkout is `/work/Foundation` on `foundation`, or the bootstrap's
+  clone on the IOD. **Never commit on `main`, never merge (the orchestrator
+  merges), never touch another agent's worktree.**
 * **Never modify the NSA side**: `algorithms/`, `shared/`, `packaging/`,
   `.ci/`, `.devcontainer/`, NSA's `.github/workflows/*`. Our files are
   `spark/`, `.claude/`, and our own `.github/` files (`spark-*.yml`, our
   actions, `CODEOWNERS`, the PR template).
 * Create the worktree with
-  `git -C /Users/tony/Local/repos/Foundation worktree add .claude/worktrees/<name> -b <branch> origin/<BASE>`,
+  `git -C <main checkout> worktree add .claude/worktrees/<name> -b <branch> origin/<BASE>`,
   and work only inside it.
 * **Bash: one plain command per call.** No `&&`, `;`, loops, or heredocs into
   scripts. The auto-mode classifier blocks them unpredictably. Use
@@ -60,11 +62,12 @@ The Alire workspace is gitignored, so a fresh worktree has none. From the
 worktree's `spark/`:
 
 ```
-PATH=/Users/tony/Local/Software/alr/bin:/Users/tony/.alire/bin:$PATH alr -n build
+alr -n build
 ```
 
-Always `alr -n`. Confirm `gnatprove --version` is FSF 16.1.0. On the x86_64
-instance, use the PATH the bootstrap script (M0.5) prints.
+Always `alr -n`. Confirm `gnatprove --version` is FSF 16.1.0. On `foundation`
+the toolchain is already on PATH. On the IOD, source the `env.sh` the
+bootstrap script (`spark/scripts/bootstrap-x86_64.sh`) writes.
 
 ## Writing the SPARK
 
@@ -86,12 +89,17 @@ instance, use the PATH the bootstrap script (M0.5) prints.
 
 ## Proving
 
-* **On hex, every prover call goes through the pool.** Use
-  `spark/scripts/prove.sh` (M0.4). Before it exists, wrap one unit at a time:
-  `spark-scheduler run --up-to 1 --strategy prove --key foundation|<unit> --variant spark --level <n> -- gnatprove -P foundation_spark.gpr -u <file> --level=<n> -j1`.
-  Never `--up-to N` with `-jN` for N > 1: the scheduler does not tell the
-  child its grant.
-* **On the x86_64 instance**, call gnatprove directly with `-j8`.
+* **On `foundation`, every prover call goes through the scheduler**, with
+  `prove.sh` or `check-proof.sh` as the child and `{tokens}` as the job count:
+  `spark-scheduler run --up-to 6 --key 'foundation|<unit or crate>' --strategy prove --variant spark --level <n> -- env -C <worktree>/spark PROVE_JOBS={tokens} scripts/prove.sh [-u <file>]`.
+  **Start the command with `spark-scheduler`**, with no `cd` or `&&` in front:
+  the permission allow rules match on that prefix. Quote the grant in the PR.
+* **On the IOD** there is no scheduler: run `PROVE_JOBS=$(nproc)
+  scripts/check-proof.sh` directly. The tick is the machine's only user.
+* **Slow units** (`spark/scripts/proof-slow.txt`) are skipped by the gate and
+  proved on demand with `scripts/prove-slow.sh`. If you change one of their
+  inputs, the gate fails STALE: re-run `prove-slow.sh` and commit its
+  manifest update.
 * **Levels.** Prove at the unit's committed level. Never lower it to get a
   green run. Raising it is allowed, in the GPR, with the reason in the
   commit.
@@ -149,7 +157,7 @@ The description carries:
 * what landed, with the `.cry` files it mirrors;
 * the board before → after, with the hole counts (zero stated as zero);
 * the FFI properties and their test counts;
-* what was proved where (hex or the instance), at what level, and the
+* what was proved where (`foundation` or the IOD), at what level, and the
   wall-clock;
 * every skip, with its reason;
 * what was left, and why;
