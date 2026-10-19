@@ -1,16 +1,52 @@
 /*
- * llvm_verify of leaves of Foundation_Spark.AES.Impl (spark/src/aes/
- * foundation_spark-aes-impl.ad[sb]) against NSA's Cryptol, directly: the
- * SPARK spec layer plays no part (M4.1, #22). Each proof is of the
- * bitcode of the crate's own source, at the one fixed size these
- * functions have, for every input.
+ * llvm_verify of Foundation_Spark.AES.Impl (spark/src/aes/foundation_
+ * spark-aes-impl.ad[sb]) against NSA's Cryptol, directly: the SPARK spec
+ * layer plays no part. M4.1 (#22) proved three leaves; M4.2 (#23) proves
+ * the key schedule and both ciphers at k = 128, 192 and 256: Expand_Key
+ * = KeyExpansion.cry's KeyExpansion`{k}, Encrypt_Block = Cipher.cry's
+ * Cipher`{k} and Decrypt_Block = Cipher.cry's InvCipher`{k}.
  *
  * Shaped after algorithms/AES/rust/Cipher/theorems/saw.py: a contract per
- * shape of subprogram, leaves first, and each verified leaf passed as an
- * override to the subprograms that call it.
+ * shape of subprogram, leaves first, each verified leaf passed as an
+ * override to the subprograms that call it, rme for the leaves, and an
+ * SMT solver with the overridden compositions left uninterpreted for the
+ * ciphers. Every proof is of the linked module obj/aes.bc (AES.Impl and
+ * AES.Spec.Types), so the overrides of Spec.Types' Nk, Nr, Split and Join
+ * are proofs, not assumptions: there is no llvm_unsafe_assume_spec here.
  */
 
 include "aes_impl_common.saw";
+
+/* --- AES.Spec.Types: what AES.Impl calls of it ---------------------------- */
+
+/*
+ * Nk and Nr (Types.cry: type Nk k = k / 32, type Nr k = Nk k + 6) under
+ * the precondition Key (K). z3, not rme: rme does not finish on the 32-bit
+ * division.
+ */
+types_nk <- verify_symbol (types_symbol "nk") "spec.types.nk" []
+        (key_size_contract {{ \k -> k / 32 }}) z3 "z3" "\\k -> k / 32 (Types::Nk)";
+types_nr <- verify_symbol (types_symbol "nr") "spec.types.nr" []
+        (key_size_contract {{ \k -> k / 32 + 6 }}) z3 "z3" "\\k -> k / 32 + 6 (Types::Nr)";
+
+/*
+ * Split and Join: Cryptol's split : Block -> [4]AESWord and join : [4]
+ * AESWord -> Block, as Cipher.cry's MixColumns uses them.
+ */
+types_split <- verify_symbol (types_symbol "split") "spec.types.split" []
+           (do {
+              bs <- llvm_fresh_var "bs" block_t;
+              llvm_execute_func [llvm_term bs];
+              llvm_return (llvm_term {{ split bs : [4][4][8] }});
+            }) rme "rme" "split : Block -> [4]AESWord";
+types_join <- verify_symbol (types_symbol "join") "spec.types.join" []
+          (do {
+             ws <- llvm_fresh_var "ws" (llvm_array 4 word_t);
+             llvm_execute_func [llvm_term ws];
+             llvm_return (llvm_term {{ join ws : [16][8] }});
+           }) rme "rme" "join : [4]AESWord -> Block";
+
+/* --- AES.Impl: the leaves ------------------------------------------------- */
 
 /*
  * X_Times = GF28.cry's xTimes [FIPS-PUB-197 Section 4.2.1]:
@@ -20,16 +56,160 @@ x_times <- verify_impl "x_times" [] (byte_to_byte_contract {{ xTimes }})
                        "GF28::xTimes";
 
 /*
- * Sub_Byte = SBox.cry's SBox @ b [FIPS-PUB-197 Table 4]: a lookup in the
- * implementation's own constant table, S_Box.
+ * Sub_Byte and Inv_Sub_Byte = SBox.cry's SBox @ b and InvSBox @ b
+ * [FIPS-PUB-197 Tables 4 and 6]: lookups in the implementation's own
+ * constant tables, S_Box and Inv_S_Box.
  */
 sub_byte <- verify_impl "sub_byte" [] (byte_to_byte_contract {{ \b -> SBox @ b }})
                         "\\b -> SBox::SBox @ b";
+inv_sub_byte <- verify_impl "inv_sub_byte" [] (byte_to_byte_contract {{ \b -> InvSBox @ b }})
+                            "\\b -> SBox::InvSBox @ b";
 
 /*
- * Sub_Bytes = Cipher.cry's SubBytes [FIPS-PUB-197 Section 5.1.1]:
- *   SubBytes bs = SBox @@ bs
- * with Sub_Byte's proof as the override for its 16 calls.
+ * Sub_Bytes and Inv_Sub_Bytes = Cipher.cry's SubBytes and InvSubBytes
+ * [FIPS-PUB-197 Sections 5.1.1 and 5.3.2]: SBox @@ bs and InvSBox @@ bs,
+ * with Sub_Byte's (Inv_Sub_Byte's) proof as the override for the 16
+ * calls.
  */
 sub_bytes <- verify_impl "sub_bytes" [sub_byte] (block_in_out_contract {{ SubBytes }})
                          "Cipher::SubBytes";
+inv_sub_bytes <- verify_impl "inv_sub_bytes" [inv_sub_byte] (block_in_out_contract {{ InvSubBytes }})
+                             "Cipher::InvSubBytes";
+
+/*
+ * Shift_Rows and Inv_Shift_Rows = Cipher.cry's ShiftRows and
+ * InvShiftRows [FIPS-PUB-197 Sections 5.1.2 and 5.3.1]: permutations of
+ * the 16 bytes.
+ */
+shift_rows <- verify_impl "shift_rows" [] (block_in_out_contract {{ ShiftRows }})
+                          "Cipher::ShiftRows";
+inv_shift_rows <- verify_impl "inv_shift_rows" [] (block_in_out_contract {{ InvShiftRows }})
+                              "Cipher::InvShiftRows";
+
+/*
+ * Add_Round_Key = Cipher.cry's AddRoundKey [FIPS-PUB-197 Section 5.1.4]:
+ *   AddRoundKey bs w = bs ^ w
+ */
+add_round_key <- verify_impl "add_round_key" [] (block_key_contract {{ AddRoundKey }})
+                             "Cipher::AddRoundKey";
+
+/*
+ * Mix_Column = Cipher.cry's MixColumnsStep [FIPS-PUB-197 Section 5.1.3],
+ * the products by 0x02 and 0x03 (GF28.cry's •) made with X_Times, whose
+ * proof is the override.
+ */
+mix_column <- verify_impl "mix_column" [x_times] (word_to_word_contract {{ MixColumnsStep }})
+                          "Cipher::MixColumnsStep";
+
+/*
+ * Inv_Mix_Byte, local to the body: one row of Cipher.cry's
+ * InvMixColumnsStep [FIPS-PUB-197 Section 5.3.3], 0x0e • a ^ 0x0b • b ^
+ * 0x0d • c ^ 0x09 • d, with X_Times alone. Inv_Mix_Column calls it on
+ * the column rotated by one byte per row, so its contract is row 0.
+ */
+inv_mix_byte <- verify_impl "inv_mix_byte" [x_times]
+                  (do {
+                     a <- llvm_fresh_var "a" byte_t;
+                     b <- llvm_fresh_var "b" byte_t;
+                     c <- llvm_fresh_var "c" byte_t;
+                     d <- llvm_fresh_var "d" byte_t;
+                     llvm_execute_func [llvm_term a, llvm_term b, llvm_term c, llvm_term d];
+                     llvm_return (llvm_term {{ InvMixColumnsStep [a, b, c, d] @ 0 }});
+                   })
+                  "\\a b c d -> Cipher::InvMixColumnsStep [a, b, c, d] @ 0";
+
+/*
+ * Inv_Mix_Column = Cipher.cry's InvMixColumnsStep: row r is
+ * Inv_Mix_Byte of the column rotated left by r, which is
+ * InvMixColumnsStep's row r because its matrix is circulant.
+ */
+inv_mix_column <- verify_impl "inv_mix_column" [inv_mix_byte] (word_to_word_contract {{ InvMixColumnsStep }})
+                              "Cipher::InvMixColumnsStep";
+
+/*
+ * Mix_Columns and Inv_Mix_Columns = Cipher.cry's MixColumns and
+ * InvMixColumns: join (map MixColumnsStep (split bs)), with Split, Join
+ * and the column step as overrides.
+ */
+mix_columns <- verify_impl "mix_columns" [mix_column, types_split, types_join] (block_in_out_contract {{ MixColumns }})
+                           "Cipher::MixColumns";
+inv_mix_columns <- verify_impl "inv_mix_columns" [inv_mix_column, types_split, types_join] (block_in_out_contract {{ InvMixColumns }})
+                               "Cipher::InvMixColumns";
+
+/* --- AES.Impl: the rounds ------------------------------------------------- */
+
+/*
+ * Round = Cipher.cry's Round [FIPS-PUB-197 Section 5.1]:
+ *   Round xs ki = AddRoundKey (MixColumns (ShiftRows (SubBytes xs))) ki
+ * Inv_Round = Cipher.cry's InvRound [FIPS-PUB-197 Section 5.3]:
+ *   InvRound xs ki = InvMixColumns (AddRoundKey (InvSubBytes (InvShiftRows xs)) ki)
+ * Each by its four steps' proofs as overrides.
+ */
+impl_round <- verify_impl "round" [sub_bytes, shift_rows, mix_columns, add_round_key]
+                     (block_key_contract {{ Round }}) "Cipher::Round";
+inv_round <- verify_impl "inv_round" [inv_shift_rows, inv_sub_bytes, add_round_key, inv_mix_columns]
+                         (block_key_contract {{ InvRound }}) "Cipher::InvRound";
+
+/* --- AES.Impl: the key schedule and the ciphers, k = 128, 192, 256 ------- */
+
+/*
+ * Expand_Key = KeyExpansion.cry's KeyExpansion`{k} [FIPS-PUB-197 Section
+ * 5.2], for each key size: W, a fat pointer to Nr k + 1 blocks, holds
+ * KeyExpansion`{k} key after the call. The 4 * (Nr k + 1) words are
+ * computed with Sub_Byte's proof as the override for its calls (Sub_Word,
+ * Rot_Word, Xor_Word and Rcon, expression functions, are inlined into
+ * Expand_Key's body even at -O0), and with Nk's and Nr's. z3, with
+ * SBox left uninterpreted: both sides index the same table.
+ */
+let verify_expand_key (k : Term) (nk : Term) (nr : Term) (f : Term) (size : String) =
+  verify_symbol (impl_symbol "expand_key") (str_concat "expand_key at K = " size)
+    [types_nk, types_nr, sub_byte]
+    (expand_key_contract k nk nr f) (w4_unint_z3 ["SBox"]) "w4_unint_z3 SBox"
+    (str_concat (str_concat "KeyExpansion::KeyExpansion`{" size) "}");
+
+expand_key_128 <- verify_expand_key {{ 128 : [32] }} {{ 4 : [32] }} {{ 10 : [32] }} {{ KeyExpansion`{128} }} "128";
+expand_key_192 <- verify_expand_key {{ 192 : [32] }} {{ 6 : [32] }} {{ 12 : [32] }} {{ KeyExpansion`{192} }} "192";
+expand_key_256 <- verify_expand_key {{ 256 : [32] }} {{ 8 : [32] }} {{ 14 : [32] }} {{ KeyExpansion`{256} }} "256";
+
+/*
+ * Encrypt_Block = Cipher.cry's Cipher`{k} [FIPS-PUB-197 Section 5.1], for
+ * each key size:
+ *   Cipher ([w0] # ws # [wr]) in =
+ *     AddRoundKey (ShiftRows (SubBytes (foldl Round (AddRoundKey in w0) ws))) wr
+ * with Nr's, Round's, Sub_Bytes', Shift_Rows' and Add_Round_Key's proofs
+ * as overrides, and z3 with those four left uninterpreted (the template's
+ * z3 ["Round", "SubBytes", "ShiftRows"], plus AddRoundKey).
+ */
+let verify_encrypt_block (k : Term) (nr : Term) (f : Term) (size : String) =
+  verify_symbol (impl_symbol "encrypt_block") (str_concat "encrypt_block at K = " size)
+    [types_nr, impl_round, sub_bytes, shift_rows, add_round_key]
+    (cipher_contract k nr f)
+    (w4_unint_z3 ["Round", "SubBytes", "ShiftRows", "AddRoundKey"])
+    "w4_unint_z3 Round SubBytes ShiftRows AddRoundKey"
+    (str_concat (str_concat "Cipher::Cipher`{" size) "}");
+
+encrypt_block_128 <- verify_encrypt_block {{ 128 : [32] }} {{ 10 : [32] }} {{ Cipher`{128} }} "128";
+encrypt_block_192 <- verify_encrypt_block {{ 192 : [32] }} {{ 12 : [32] }} {{ Cipher`{192} }} "192";
+encrypt_block_256 <- verify_encrypt_block {{ 256 : [32] }} {{ 14 : [32] }} {{ Cipher`{256} }} "256";
+
+/*
+ * Decrypt_Block = Cipher.cry's InvCipher`{k} [FIPS-PUB-197 Section 5.3],
+ * for each key size:
+ *   InvCipher ([w0] # ws # [wr]) in =
+ *     AddRoundKey (InvSubBytes (InvShiftRows
+ *       (foldl InvRound (AddRoundKey in wr) (reverse ws)))) w0
+ * with Nr's, Inv_Round's, Inv_Sub_Bytes', Inv_Shift_Rows' and
+ * Add_Round_Key's proofs as overrides, and z3 with those four left
+ * uninterpreted.
+ */
+let verify_decrypt_block (k : Term) (nr : Term) (f : Term) (size : String) =
+  verify_symbol (impl_symbol "decrypt_block") (str_concat "decrypt_block at K = " size)
+    [types_nr, inv_round, inv_sub_bytes, inv_shift_rows, add_round_key]
+    (cipher_contract k nr f)
+    (w4_unint_z3 ["InvRound", "InvSubBytes", "InvShiftRows", "AddRoundKey"])
+    "w4_unint_z3 InvRound InvSubBytes InvShiftRows AddRoundKey"
+    (str_concat (str_concat "Cipher::InvCipher`{" size) "}");
+
+decrypt_block_128 <- verify_decrypt_block {{ 128 : [32] }} {{ 10 : [32] }} {{ InvCipher`{128} }} "128";
+decrypt_block_192 <- verify_decrypt_block {{ 192 : [32] }} {{ 12 : [32] }} {{ InvCipher`{192} }} "192";
+decrypt_block_256 <- verify_decrypt_block {{ 256 : [32] }} {{ 14 : [32] }} {{ InvCipher`{256} }} "256";

@@ -1,0 +1,21 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * Encrypt_Block at K = 256 against Cipher.cry's Cipher`{256} of the round
+ * keys in reverse order, with every override and the tactic of
+ * aes_impl.saw's proof (z3 with Round, SubBytes, ShiftRows and
+ * AddRoundKey uninterpreted). It runs aes_impl.saw first, for the
+ * overrides. The proof must fail with a counterexample, which shows that
+ * the overrides and the uninterpreted functions do not make the cipher
+ * proofs vacuous: which round key each round reads is checked.
+ *
+ * (Encrypt_Block at K = 128 against InvCipher`{128} fails too, but z3
+ * takes about 4 minutes to find a counterexample with Round uninterpreted
+ * on one side and InvRound interpreted on the other: measured once, not
+ * run here.)
+ */
+
+include "../aes_impl.saw";
+
+verify_encrypt_block {{ 256 : [32] }} {{ 14 : [32] }}
+  {{ \w s -> Cipher`{256} (reverse w) s }} "256 (of the reversed round keys)";

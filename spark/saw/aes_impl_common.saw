@@ -4,10 +4,10 @@
  * algorithms/AES/rust/Cipher/theorems/saw.py has one per shape of Rust
  * function).
  *
- * Run from spark/saw/ by spark/scripts/check-saw.sh, which compiles
- * obj/foundation_spark-aes-impl.bc from spark/src/aes/foundation_spark-
- * aes-impl.adb with GNAT Pro's LLVM back end first. Not run by CI: see
- * spark/README.md, "SAW".
+ * Run from spark/saw/ by spark/scripts/check-saw.sh, which first compiles
+ * spark/src/aes/foundation_spark-aes-impl.adb and foundation_spark-aes-
+ * spec-types.ads with GNAT Pro's LLVM back end and links them into
+ * obj/aes.bc. Not run by CI: see spark/README.md, "SAW".
  */
 
 enable_experimental;
@@ -20,6 +20,7 @@ enable_experimental;
 import "../../algorithms/AES/GF28.cry";
 import "../../algorithms/AES/SBox.cry";
 import "../../algorithms/AES/Cipher.cry";
+import "../../algorithms/AES/KeyExpansion.cry";
 
 /*
  * Foundation_Spark.AES.Impl as bitcode, compiled with -O0 and without -g
@@ -35,6 +36,15 @@ aes_impl <- llvm_load_module "obj/aes.bc";
  * needed: the symbols are the crate's own, unchanged.
  */
 let impl_symbol name = str_concat "foundation_spark__aes__impl__" name;
+let types_symbol name = str_concat "foundation_spark__aes__spec__types__" name;
+
+/*
+ * The LLVM types of the Ada ones: Byte is i8, AESWord [4 x i8], Block
+ * [16 x i8], Columns [4 x [4 x i8]], Natural i32.
+ */
+let byte_t = llvm_int 8;
+let word_t = llvm_array 4 byte_t;
+let block_t = llvm_array 16 byte_t;
 
 /*
  * function F (B : Byte) return Byte
@@ -42,7 +52,7 @@ let impl_symbol name = str_concat "foundation_spark__aes__impl__" name;
  * GNAT-LLVM passes and returns a Byte (Interfaces.Unsigned_8) as i8.
  */
 let byte_to_byte_contract (f : Term) = do {
-  b <- llvm_fresh_var "b" (llvm_int 8);
+  b <- llvm_fresh_var "b" byte_t;
   llvm_execute_func [llvm_term b];
   llvm_return (llvm_term {{ f b }});
 };
@@ -56,18 +66,117 @@ let byte_to_byte_contract (f : Term) = do {
  * is that of a function Block -> Block, as Cipher.cry states SubBytes.
  */
 let block_in_out_contract (f : Term) = do {
-  state <- llvm_fresh_var "state" (llvm_array 16 (llvm_int 8));
+  state <- llvm_fresh_var "state" block_t;
   llvm_execute_func [llvm_term state];
   llvm_return (llvm_term {{ f state }});
 };
 
 /*
- * llvm_verify of one Impl subprogram against a Cryptol term, with the
- * overrides given, by rme as the template's leaf lemmas are, and a line
- * check-saw.sh records.
+ * procedure P (State : in out Block; Key : Block)
+ *
+ * Add_Round_Key, Round and Inv_Round: [16 x i8] (state, key) -> the new
+ * state, Cipher.cry's Block -> Block -> Block.
  */
-let verify_impl name overrides contract cryptol = do {
-  result <- llvm_verify aes_impl (impl_symbol name) overrides false contract rme;
-  print (str_concat (str_concat (str_concat "RESULT proved " name) " = ") cryptol);
+let block_key_contract (f : Term) = do {
+  state <- llvm_fresh_var "state" block_t;
+  key <- llvm_fresh_var "key" block_t;
+  llvm_execute_func [llvm_term state, llvm_term key];
+  llvm_return (llvm_term {{ f state key }});
+};
+
+/*
+ * function F (A : AESWord) return AESWord, and
+ * function F (A, B : AESWord) return AESWord.
+ */
+let word_to_word_contract (f : Term) = do {
+  a <- llvm_fresh_var "a" word_t;
+  llvm_execute_func [llvm_term a];
+  llvm_return (llvm_term {{ f a }});
+};
+let word_word_to_word_contract (f : Term) = do {
+  a <- llvm_fresh_var "a" word_t;
+  b <- llvm_fresh_var "b" word_t;
+  llvm_execute_func [llvm_term a, llvm_term b];
+  llvm_return (llvm_term {{ f a b }});
+};
+
+/*
+ * function F (K : Natural) return Positive, with Pre => Key (K):
+ * AES.Spec.Types' Nk and Nr. K is i32. Types.cry has Nk and Nr as type
+ * functions (Nk k = k / 32, Nr k = Nk k + 6), so the Cryptol here is
+ * their value at the key sizes the constraint Key k allows.
+ */
+let key_size_contract (f : Term) = do {
+  k <- llvm_fresh_var "k" (llvm_int 32);
+  llvm_precond {{ k == 128 \/ k == 192 \/ k == 256 }};
+  llvm_execute_func [llvm_term k];
+  llvm_return (llvm_term {{ f k }});
+};
+
+/*
+ * The bounds record of an unconstrained array's fat pointer, { i32, i32 }
+ * (First, Last), allocated read-only: Key_Words and Round_Keys share it.
+ */
+let bounds (first : Term) (last : Term) = do {
+  p <- llvm_alloc_readonly (llvm_alias "foundation_spark__aes__spec__types__round_keys_BOUNDS");
+  llvm_points_to p (llvm_struct_value [llvm_term first, llvm_term last]);
+  return p;
+};
+
+/*
+ * procedure P (K : Natural; W : Round_Keys; State : in out Block)
+ *
+ * Encrypt_Block and Decrypt_Block at one key size k, with Nr = nr rounds:
+ * K is the constant k; W is a fat pointer { data, bounds } to the nr + 1
+ * blocks (read-only) and the bounds {0, nr}, which are Is_Round_Keys (K,
+ * W); the state is passed and returned by value. f is the Cryptol at
+ * that size, Cipher`{k} or InvCipher`{k} : [Nr k + 1]Block -> Block ->
+ * Block, the Rust template's cipher_Contract.
+ */
+let cipher_contract (k : Term) (nr : Term) (f : Term) = do {
+  w <- llvm_fresh_var "w" (llvm_array (eval_int {{ nr + 1 }}) block_t);
+  wp <- llvm_alloc_readonly (llvm_array (eval_int {{ nr + 1 }}) block_t);
+  llvm_points_to wp (llvm_term w);
+  wb <- bounds {{ 0 : [32] }} {{ nr }};
+  state <- llvm_fresh_var "state" block_t;
+  llvm_execute_func [llvm_term {{ k }}, llvm_struct_value [wp, wb], llvm_term state];
+  llvm_return (llvm_term {{ f w state }});
+};
+
+/*
+ * procedure Expand_Key (K : Natural; Key : Key_Words; W : out Round_Keys)
+ *
+ * At one key size k, with nk key words and nr rounds: Key is a fat
+ * pointer to nk words (read-only) with bounds {0, nk - 1}, W one to nr + 1
+ * blocks with bounds {0, nr}, which is Expand_Key's precondition. The
+ * procedure returns void and writes W's data: the postcondition is
+ * llvm_points_to on it. f is KeyExpansion`{k} : [Nk k]AESWord ->
+ * [Nr k + 1]Block.
+ */
+let expand_key_contract (k : Term) (nk : Term) (nr : Term) (f : Term) = do {
+  key <- llvm_fresh_var "key" (llvm_array (eval_int nk) word_t);
+  keyp <- llvm_alloc_readonly (llvm_array (eval_int nk) word_t);
+  llvm_points_to keyp (llvm_term key);
+  keyb <- bounds {{ 0 : [32] }} {{ nk - 1 }};
+  wp <- llvm_alloc (llvm_array (eval_int {{ nr + 1 }}) block_t);
+  wb <- bounds {{ 0 : [32] }} {{ nr }};
+  llvm_execute_func [llvm_term {{ k }}, llvm_struct_value [keyp, keyb], llvm_struct_value [wp, wb]];
+  llvm_points_to wp (llvm_term {{ f key }});
+};
+
+/*
+ * llvm_verify of one subprogram (its LLVM symbol) against a Cryptol term,
+ * with the overrides given and the proof tactic named, timed, and a line
+ * check-saw.sh records: "RESULT proved <name> = <cryptol> [<tactic>]".
+ */
+let verify_symbol symbol name overrides contract tactic tactic_name cryptol = do {
+  result <- time (llvm_verify aes_impl symbol overrides false contract tactic);
+  print (str_concat (str_concat (str_concat (str_concat (str_concat "RESULT proved " name) " = ") cryptol) " [") (str_concat tactic_name "]"));
   return result;
 };
+
+/*
+ * An AES.Impl subprogram, by rme as the template's leaf lemmas are.
+ */
+let verify_impl name overrides contract cryptol =
+  verify_symbol (impl_symbol name) name overrides contract rme "rme" cryptol;

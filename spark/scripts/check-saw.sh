@@ -209,7 +209,12 @@ if ! run_saw aes_impl.saw "$LOG_DIR/aes_impl.log"; then
   die "saw aes_impl.saw FAILED (log: $LOG_DIR/aes_impl.log)"
 fi
 T_PROOFS=$(( $(date +%s) - t ))
-while IFS= read -r line; do PROVED+=("$line"); done < <(sed -n 's/^RESULT proved //p' "$LOG_DIR/aes_impl.log")
+# Each RESULT line, with the time SAW's `time` printed just before it for
+# that llvm_verify (aes_impl_common.saw's verify_symbol).
+while IFS= read -r line; do PROVED+=("$line"); done < <(awk '
+  /^Time: / { t = $2; sub(/s$/, "", t) }
+  /^RESULT proved / { sub(/^RESULT proved /, ""); printf "%s, %.2f s\n", $0, t; t = "" }
+' "$LOG_DIR/aes_impl.log")
 [ "${#PROVED[@]}" -gt 0 ] || die "saw aes_impl.saw proved nothing (log: $LOG_DIR/aes_impl.log)"
 n_succeeded="$(grep -c '^Proof succeeded!' "$LOG_DIR/aes_impl.log" || true)"
 [ "$n_succeeded" -eq "${#PROVED[@]}" ] \

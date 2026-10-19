@@ -1,0 +1,15 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * Expand_Key at K = 128 against KeyExpansion.cry's KeyExpansion`{128} of
+ * the key words in reverse order, with every override and the tactic of
+ * aes_impl.saw's proof (z3 with SBox uninterpreted). It runs aes_impl.saw
+ * first, for the overrides. The proof must fail with a counterexample
+ * key, which shows that the contract's llvm_points_to on W's data checks
+ * the round keys written, word order included.
+ */
+
+include "../aes_impl.saw";
+
+verify_expand_key {{ 128 : [32] }} {{ 4 : [32] }} {{ 10 : [32] }}
+  {{ \key -> KeyExpansion`{128} (reverse key) }} "128 (of the reversed key)";
