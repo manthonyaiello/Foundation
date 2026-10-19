@@ -1,0 +1,343 @@
+/*
+ * What the AES spec layer's SAW script shares: the bitcode of the ghost
+ * spec units, NSA's Cryptol, and the contracts, one per shape of Ada
+ * subprogram.
+ *
+ * Run from spark/saw/ by spark/scripts/check-saw.sh, which first compiles
+ * the spec units (AES.Spec.Types, .GF28, .GF2, .SBox, .Cipher,
+ * .KeyExpansion) with GNAT Pro's LLVM back end, ghost code enabled
+ * (saw/spec.adc) and inlining off, into obj/spec/, and links them into
+ * obj/spec/aes_spec.bc. Not run by CI: see spark/README.md, "SAW".
+ */
+
+enable_experimental;
+
+/*
+ * NSA's Cryptol, imported unmodified. CRYPTOLPATH is the repository's
+ * root (check-saw.sh sets it). GF2.cry is imported for the names SBox.cry
+ * uses and does not re-export. Its operators (^*) = pmult, (^/) = pdiv
+ * and (^%) = pmod are Cryptol's primitives renamed, and SAWScript's
+ * import list takes no operator, so the contracts name the primitives.
+ */
+import "../../algorithms/AES/GF28.cry";
+import "../../algorithms/AES/SBox.cry";
+import "../../algorithms/AES/Cipher.cry";
+import "../../algorithms/AES/KeyExpansion.cry";
+import "../../shared/algebra/Polynomial/GF2.cry" (pdeg, pgcd, inverse);
+
+/*
+ * The spec units as bitcode, compiled with -O0, without -g and with
+ * -fno-inline (spark/README.md, "SAW", says why), linked by llvm-link.
+ */
+aes_spec <- llvm_load_module "obj/spec/aes_spec.bc";
+
+/*
+ * The Ada names as LLVM symbols: GNAT's external names, unchanged for
+ * ghost entities too (GNAT-LLVM 27 adds no ___ghost_ prefix; README "The
+ * bitcode ABI").
+ */
+let spec_symbol name = str_concat "foundation_spark__aes__spec__" name;
+
+/*
+ * The LLVM types of the Ada ones: Byte is i8, a Boolean i8 (0 or 1),
+ * Natural and Integer i32, GF28.Poly and GF2.Poly i16, GF2.Product i32,
+ * AESWord [4 x i8], Block [16 x i8], Columns [4 x [4 x i8]],
+ * GF2.Poly_State [6 x i16], GF2.Pgcd_Result [5 x i16].
+ */
+let byte_t = llvm_int 8;
+let poly_t = llvm_int 16;
+let word_t = llvm_array 4 byte_t;
+let block_t = llvm_array 16 byte_t;
+
+/*
+ * The bounds record { i32, i32 } (First, Last) of Key_Words' and
+ * Round_Keys' fat pointers. After llvm-link the two types are one, named
+ * after the first the linker met.
+ */
+let bounds_t = llvm_alias "foundation_spark__aes__spec__types__key_words_BOUNDS";
+let bounds (first : Term) (last : Term) = do {
+  p <- llvm_alloc_readonly bounds_t;
+  llvm_points_to p (llvm_struct_value [llvm_term first, llvm_term last]);
+  return p;
+};
+
+/*
+ * The bounds of a slice: GNAT builds them in a stack temporary of the
+ * caller, writable and 1-byte aligned (alloca ..., align 1), so the
+ * record is allocated writable and with alignment 1: an override's
+ * read-only or 4-byte aligned allocation does not match it. The contract
+ * states it unchanged after the call.
+ */
+let slice_bounds (first : Term) (last : Term) = do {
+  p <- llvm_alloc_aligned 1 bounds_t;
+  llvm_points_to p (llvm_struct_value [llvm_term first, llvm_term last]);
+  return p;
+};
+
+/*
+ * The secondary stack: secondary_stack, ss_at and the rest
+ * (secondary_stack.saw).
+ */
+include "secondary_stack.saw";
+
+/*
+ * llvm_verify of one spec subprogram (its LLVM symbol) against a Cryptol
+ * term, with the overrides given and the proof tactic named, timed, and a
+ * line check-saw.sh records: "RESULT proved <name> = <cryptol> [<tactic>]".
+ */
+let verify_spec name overrides contract tactic tactic_name cryptol = do {
+  result <- time (llvm_verify aes_spec (spec_symbol name) overrides false contract tactic);
+  print (str_concat (str_concat (str_concat (str_concat (str_concat "RESULT proved " name) " = ") cryptol) " [") (str_concat tactic_name "]"));
+  return result;
+};
+
+/*
+ * The same, without the RESULT line: for the members of a group of proofs
+ * that one RESULTS line reports (an exhaustive proof, value by value).
+ */
+let verify_quiet name overrides contract tactic =
+  llvm_verify aes_spec (spec_symbol name) overrides false contract tactic;
+
+/*
+ * " a b c" of ["a", "b", "c"], for the tactics' names.
+ */
+rec names (xs : [String]) : String =
+  if null xs then "" else str_concat (str_concat " " (head xs)) (names (tail xs));
+
+/*
+ * "RESULTS <n> proved <name> = <cryptol> [<tactic>]": n proofs, recorded
+ * as one line. check-saw.sh counts n against SAW's "Proof succeeded!".
+ */
+let print_results (n : Int) name cryptol tactic_name =
+  print (str_concat (str_concat (str_concat (str_concat (str_concat (str_concat
+    (str_concat "RESULTS " (show n)) " proved ") name) " = ") cryptol) " [") (str_concat tactic_name "]"));
+
+/* --- contracts ------------------------------------------------------------ */
+
+/*
+ * function F (B : Byte) return Byte, and the same returning a Boolean
+ * (i8 0 or 1).
+ */
+let byte_to_byte_contract (f : Term) = do {
+  b <- llvm_fresh_var "b" byte_t;
+  llvm_execute_func [llvm_term b];
+  llvm_return (llvm_term {{ f b }});
+};
+
+/*
+ * function F (B, C : Byte) return R.
+ */
+let byte_byte_contract (f : Term) = do {
+  b <- llvm_fresh_var "b" byte_t;
+  c <- llvm_fresh_var "c" byte_t;
+  llvm_execute_func [llvm_term b, llvm_term c];
+  llvm_return (llvm_term {{ f b c }});
+};
+
+/*
+ * function F (Bs : Block) return Block, F (S : AESWord) return AESWord,
+ * F (A, B : AESWord) return AESWord, F (Bs, W : Block) return Block:
+ * constrained arrays by value.
+ */
+let block_contract (f : Term) = do {
+  bs <- llvm_fresh_var "bs" block_t;
+  llvm_execute_func [llvm_term bs];
+  llvm_return (llvm_term {{ f bs }});
+};
+let word_contract (f : Term) = do {
+  s <- llvm_fresh_var "s" word_t;
+  llvm_execute_func [llvm_term s];
+  llvm_return (llvm_term {{ f s }});
+};
+let word_word_contract (f : Term) = do {
+  a <- llvm_fresh_var "a" word_t;
+  b <- llvm_fresh_var "b" word_t;
+  llvm_execute_func [llvm_term a, llvm_term b];
+  llvm_return (llvm_term {{ f a b }});
+};
+let block_block_contract (f : Term) = do {
+  bs <- llvm_fresh_var "bs" block_t;
+  w <- llvm_fresh_var "w" block_t;
+  llvm_execute_func [llvm_term bs, llvm_term w];
+  llvm_return (llvm_term {{ f bs w }});
+};
+
+/*
+ * function F (K : Natural) return Positive, with Pre => Key (K):
+ * AES.Spec.Types' Nk and Nr, as aes_impl_common.saw states them.
+ */
+let key_size_contract (f : Term) = do {
+  k <- llvm_fresh_var "k" (llvm_int 32);
+  llvm_precond {{ k == 128 \/ k == 192 \/ k == 256 }};
+  llvm_execute_func [llvm_term k];
+  llvm_return (llvm_term {{ f k }});
+};
+
+/*
+ * function Foldl_<Round> (Z : Block; Xs : Round_Keys) return Block, Xs of
+ * length M: Cryptol's foldl f z xs over [M]Block.
+ *
+ * Xs is a slice of the round keys: its fat pointer's data points to its
+ * first element and its bounds are {First, First + M - 1}, First
+ * symbolic, 1 <= First <= 15 - M (Cipher passes W (1 .. Nr - 1), and
+ * each call the rest of its slice: First grows by one per call, Last is
+ * Nr - 1, and Nr <= 14). The data is allocated writable, and stated
+ * unchanged after the call: InvCipher's is on the secondary stack (the
+ * reversed keys), writable, which a read-only allocation does not match.
+ */
+let foldl_contract_rhs (m : Int) (rhs : Term) = do {
+  z <- llvm_fresh_var "z" block_t;
+  xs <- llvm_fresh_var "xs" (llvm_array m block_t);
+  xsp <- llvm_alloc (llvm_array m block_t);
+  llvm_points_to xsp (llvm_term xs);
+  first <- llvm_fresh_var "first" (llvm_int 32);
+  llvm_precond {{ first >= 1 /\ first <= 15 - `m }};
+  xsb <- slice_bounds first {{ first + `m - 1 }};
+  llvm_execute_func [llvm_term z, llvm_struct_value [xsp, xsb]];
+  llvm_points_to xsp (llvm_term xs);
+  llvm_points_to xsb (llvm_struct_value [llvm_term first, llvm_term {{ first + `m - 1 }}]);
+  llvm_return (llvm_term {{ rhs z xs }});
+};
+let foldl_contract (m : Int) (f : Term) =
+  foldl_contract_rhs m {{ \(z : [16][8]) (xs : [m][16][8]) -> foldl f z xs }};
+
+/*
+ * The fold lemmas, one per length M in m .. 13 (Cipher at k = 256 folds
+ * 13 round keys), each with the round's lemma and the lemma at M - 1 as
+ * the overrides for its calls, by z3 with the round (named cry in the
+ * Cryptol) uninterpreted. Returns all, M = 0 .. 13, after those in all.
+ */
+rec foldls (name : String) (round : LLVMSpec) (f : Term) (cry : String) (m : Int) (prev : [LLVMSpec]) (all : [LLVMSpec]) : TopLevel [LLVMSpec] = do {
+  lemma <- verify_spec name (concat prev [round]) (foldl_contract m f)
+             (w4_unint_z3 [cry]) (str_concat "w4_unint_z3 " cry)
+             (str_concat (str_concat (str_concat "M = " (show m)) ": foldl Cipher::") cry);
+  if eval_bool {{ `m == (13 : Integer) }} then return (concat all [lemma])
+  else foldls name round f cry (eval_int {{ `m + 1 : [32] }}) [lemma] (concat all [lemma]);
+};
+
+/*
+ * function Cipher (K : Natural; W : Round_Keys; Input : Block) return
+ * Block, at one key size k with Nr = nr: W is a fat pointer to the nr + 1
+ * round keys with bounds {0, nr}, which is Is_Round_Keys (K, W), as
+ * aes_impl_common.saw's cipher_contract, but both writable and stated
+ * unchanged: the fold lemmas take a writable slice, and Main's Encrypt
+ * passes the round keys KeyExpansion leaves on the secondary stack. With ss, the
+ * secondary stack is set up first (InvCipher and InvCipher' use it). f is
+ * the Cryptol at that size.
+ */
+let spec_cipher_contract_ss (ss : Bool) (k : Int) (nr : Int) (f : Term) = do {
+  if ss then do { secondary_stack; return (); } else return ();
+  w <- llvm_fresh_var "w" (llvm_array (eval_int {{ `nr + 1 : [32] }}) block_t);
+  wp <- llvm_alloc (llvm_array (eval_int {{ `nr + 1 : [32] }}) block_t);
+  llvm_points_to wp (llvm_term w);
+  wb <- slice_bounds {{ 0 : [32] }} {{ `nr : [32] }};
+  input <- llvm_fresh_var "input" block_t;
+  llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [wp, wb], llvm_term input];
+  llvm_points_to wp (llvm_term w);
+  llvm_points_to wb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
+  llvm_return (llvm_term {{ f w input }});
+};
+let spec_cipher_contract = spec_cipher_contract_ss false;
+
+/*
+ * function Reverse_Keys (Xs : Round_Keys) return Round_Keys, at length m
+ * with bounds {1, m} (InvCipher's W (1 .. Nr - 1)): the result is on the
+ * secondary stack, its bounds then its data.
+ */
+let reverse_keys_contract (m : Int) = do {
+  stack <- secondary_stack;
+  xs <- llvm_fresh_var "xs" (llvm_array m block_t);
+  xsp <- llvm_alloc_readonly (llvm_array m block_t);
+  llvm_points_to xsp (llvm_term xs);
+  xsb <- bounds {{ 1 : [32] }} {{ `m : [32] }};
+  llvm_execute_func [llvm_struct_value [xsp, xsb]];
+  llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 1 : [32] }}, llvm_term {{ `m : [32] }}]);
+  llvm_points_to_untyped (ss_at stack 8) (llvm_term {{ reverse xs }});
+  llvm_return (llvm_struct_value [ss_at stack 8, ss_at stack 0]);
+};
+
+/*
+ * function KeyExpansion (K : Natural; Key : Key_Words) return Round_Keys
+ * at key size k: Key as in w_contract; the result is on the secondary
+ * stack, its bounds {0, nr} then the nr + 1 round keys.
+ */
+let keyexpansion_contract (k : Int) (nk : Int) (nr : Int) = do {
+  stack <- secondary_stack;
+  key <- llvm_fresh_var "key" (llvm_array nk word_t);
+  keyp <- llvm_alloc (llvm_array nk word_t);
+  llvm_points_to keyp (llvm_term key);
+  keyb <- slice_bounds {{ 0 : [32] }} {{ `nk - 1 : [32] }};
+  llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [keyp, keyb]];
+  llvm_points_to keyp (llvm_term key);
+  llvm_points_to keyb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
+  llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
+  llvm_points_to_untyped (ss_at stack 8) (llvm_term {{ KeyExpansion`{k} key }});
+  llvm_return (llvm_struct_value [ss_at stack 8, ss_at stack 0]);
+};
+
+/*
+ * function W (K : Natural; Key : Key_Words; I : Natural) return AESWord
+ * at key size k (nk key words) and index i: Key is a fat pointer to the
+ * nk words with bounds {0, nk - 1} (Is_Key_Words (K, Key)), both writable
+ * and stated unchanged (Main's Encrypt passes the key words Split_Key
+ * leaves on the secondary stack).
+ * W's recursive calls pass the same fat pointer, so each lemma's Key is
+ * its caller's.
+ *
+ * The Cryptol is KeyExpansion.cry's w @ i, the element i of the expanded
+ * key in KeyExpansion's where clause [FIPS-PUB-197 Section 5.2]. w is
+ * local to KeyExpansion, so it is read back from KeyExpansion's result,
+ * of which it is the words: KeyExpansion key = split (split (join (join
+ * w))), so w = groupBy`{4} (join (KeyExpansion key)).
+ */
+let w_contract (k : Int) (nk : Int) (i : Int) (key_of : Term) = do {
+  key <- llvm_fresh_var "key" (llvm_array nk word_t);
+  keyp <- llvm_alloc (llvm_array nk word_t);
+  llvm_points_to keyp (llvm_term key);
+  keyb <- slice_bounds {{ 0 : [32] }} {{ `nk - 1 : [32] }};
+  llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [keyp, keyb], llvm_term {{ `i : [32] }}];
+  llvm_points_to keyp (llvm_term key);
+  llvm_points_to keyb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
+  llvm_return (llvm_term {{ (groupBy`{4} (join (KeyExpansion`{k} (key_of key)))) @ (`i : [32]) }});
+};
+
+/*
+ * The W lemmas at key size k, one per index i .. last, never unfolding
+ * W's recursion: the lemma at I has the lemmas at the nk indices below it
+ * (window) as the overrides for its two recursive calls, at I - 1 and
+ * I - Nk (SAW applies the one whose index matches), and the leaves'
+ * (Nk's, RotWord's, SubWord's, "xor"'s) for its other calls. z3 with
+ * SubWord uninterpreted: the Cryptol's w @ i, evaluated, is then
+ * w @ (i - Nk) ^ SubWord (RotWord (w @ (i - 1))) ^ Rcon @ (i / Nk) (or
+ * the case that applies) over the same terms as the overrides'. Returns
+ * all the lemmas, those in all first.
+ */
+rec w_lemmas (leaves : [LLVMSpec]) (k : Int) (nk : Int) (last : Int) (i : Int) (window : [LLVMSpec]) (all : [LLVMSpec]) : TopLevel [LLVMSpec] = do {
+  lemma <- verify_spec "keyexpansion__w" (concat window leaves)
+             (w_contract k nk i {{ \(key : [nk][4][8]) -> key }}) (w4_unint_z3 ["SubWord"]) "w4_unint_z3 SubWord"
+             (str_concat (str_concat (str_concat (str_concat "K = " (show k)) ", I = ") (show i))
+                ": (groupBy`{4} (join (KeyExpansion::KeyExpansion`{K} key))) @ I (KeyExpansion's w @ i)");
+  let len = length window;
+  let next = if eval_bool {{ (`len : Integer) == `nk }} then concat (tail window) [lemma]
+             else concat window [lemma];
+  if eval_bool {{ `i == (`last : Integer) }} then return (concat all [lemma])
+  else w_lemmas leaves k nk last (eval_int {{ `i + 1 : [32] }}) next (concat all [lemma]);
+};
+
+/*
+ * function F (A : Byte; P : Poly) return R, and function Affine (B :
+ * Byte) return Byte, at one concrete byte a and the modulus
+ * SBoxPolynomial (the exhaustive proofs).
+ */
+let pgcd_contract (a : Term) = do {
+  llvm_execute_func [llvm_term a, llvm_term {{ zext SBoxPolynomial : [16] }}];
+  llvm_return (llvm_term {{ [ zext p | p <- pgcd`{7, 8} a SBoxPolynomial ] : [5][16] }});
+};
+let inverse_contract (a : Term) = do {
+  llvm_execute_func [llvm_term a, llvm_term {{ zext SBoxPolynomial : [16] }}];
+  llvm_return (llvm_term {{ inverse a SBoxPolynomial }});
+};
+let affine_contract (b : Term) (f : Term) = do {
+  llvm_execute_func [llvm_term b];
+  llvm_return (llvm_term {{ f b }});
+};

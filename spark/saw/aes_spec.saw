@@ -1,0 +1,58 @@
+/*
+ * llvm_verify of the SPARK AES spec layer (spark/src/aes/foundation_spark-
+ * aes-spec-*.ads, ghost) against NSA's Cryptol: M4.4 (#59). Where M4.1 and
+ * M4.2 prove the implementation equal to the Cryptol, this proves the spec
+ * layer equal to it, so that spec = Cryptol is a proof at these sizes and
+ * not only the FFI check's tests.
+ *
+ * The spec layer's recursions are never unfolded. A recursive ghost
+ * function whose variant is a size (the folds Pmult_Fold, Pmod_Fold,
+ * Pdiv_Fold, Foldl_Round and the rest; KeyExpansion's W) is proved one
+ * index at a time, each lemma with the lemmas at the smaller indices it
+ * calls as overrides, as algorithms/AES/rust/Cipher/theorems/saw.py
+ * composes its leaf lemmas. GF2's Inner, whose variant is a value (the
+ * degree of r'), has no such index: Pgcd and Inverse, which call it, are
+ * proved exhaustively, for each of the 256 bytes, on concrete values.
+ *
+ * The lemmas are in four files, so that a negative control can include
+ * what it needs: aes_spec_gf.saw (Types, GF28, GF2), aes_spec_cipher.saw
+ * (the rounds, the folds, the ciphers), aes_spec_keyexpansion.saw (W,
+ * KeyExpansion) and aes_spec_main.saw (Main.cry's bit-vector Encrypt and
+ * Decrypt); aes_spec_common.saw has the contracts. The exhaustive proofs
+ * are here.
+ */
+
+include "aes_spec_common.saw";
+include "aes_spec_gf.saw";
+include "aes_spec_cipher.saw";
+include "aes_spec_keyexpansion.saw";
+include "aes_spec_main.saw";
+
+/* --- GF2.cry's pgcd and inverse, and SBox.cry's affine: exhaustive --------- */
+
+/*
+ * Pgcd (A, SBoxPolynomial) = GF2.cry's pgcd a SBoxPolynomial at a : [8]
+ * (wa = 7, wb = 8), Inverse (A, SBoxPolynomial) = GF2.cry's inverse a
+ * SBoxPolynomial, and Affine (B) = SBox.cry's affine b
+ * [FIPS-PUB-197 Sections 4.4 and 5.1.1], for each of the 256 bytes.
+ *
+ * pgcd's inner, and the spec's Inner that mirrors it, recurse on the
+ * value of r' (Inner's variant is the polynomial S (3)), not on a size,
+ * so there is no index to prove them at one at a time; and with a
+ * symbolic byte the Cryptol's inner does not terminate under SAW's
+ * symbolic evaluation. So the three are proved on each concrete byte:
+ * 3 x 256 llvm_verify, which together are the proof for every byte. Each
+ * value's Pgcd is proved with Pdiv's lemma as the override (Inner runs on
+ * the concrete states), its Inverse with its Pgcd, and its Affine with
+ * its Inverse. The modulus is SBoxPolynomial, the only one SBox.cry (and
+ * the spec's Affine) passes.
+ */
+t_exhaustive <- time (for (eval_list {{ [0 .. 255] : [256][8] }}) (\a -> do {
+  pgcd_a <- verify_quiet "gf2__pgcd" [gf2_pdiv] (pgcd_contract a) rme;
+  inverse_a <- verify_quiet "gf2__inverse" [pgcd_a] (inverse_contract a) rme;
+  affine_a <- verify_quiet "sbox__affine" [inverse_a, gf28_bit] (affine_contract a {{ affine }}) rme;
+  return inverse_a;
+}));
+print_results 256 "gf2__pgcd" "\\a -> [zext p | p <- GF2::pgcd`{7, 8} a SBox::SBoxPolynomial], every a : [8]" "rme";
+print_results 256 "gf2__inverse" "\\a -> GF2::inverse a SBox::SBoxPolynomial, every a : [8]" "rme";
+print_results 256 "sbox__affine" "SBox::affine, every b : [8]" "rme";

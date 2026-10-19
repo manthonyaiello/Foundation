@@ -1,0 +1,30 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's Step against SHA256Main's step with the feed-forward
+ * adding the incoming hash value's words in reverse order, `step h m - h
+ * + reverse h`, as negative/compress_reversed_feed_forward.saw does for
+ * the implementation's Compress (it says why no stronger control of a
+ * 64-round term is run), with the overrides of sha256_spec.saw's proof
+ * (Foldl_Step3's lemma at 64, which rests on the per-round lemmas, and
+ * "+"'s) and its tactic (z3 with the SIGMA and sigma functions
+ * uninterpreted). It runs sha256_spec_step.saw first, for the lemmas.
+ * The proof must fail with a counterexample.
+ */
+
+include "../sha256_spec_common.saw";
+include "../sha256_spec_step.saw";
+
+verify_spec "sha256__step" [i_foldl_step3_64, i_add]
+  (do {
+     h <- llvm_fresh_var "h" hash_value_t;
+     hp <- llvm_alloc hash_value_t;
+     llvm_points_to hp (llvm_term h);
+     m <- llvm_fresh_var "m" block_t;
+     mp <- llvm_alloc block_t;
+     llvm_points_to mp (llvm_term m);
+     llvm_execute_func [hp, mp];
+     llvm_points_to hp (llvm_term h);
+     llvm_points_to mp (llvm_term m);
+     llvm_return (llvm_term {{ step h m - h + reverse h }});
+   }) unint_sigmas unint_sigmas_name "\\h m -> SHA256Main::step h m - h + reverse h";

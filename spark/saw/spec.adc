@@ -1,0 +1,11 @@
+--  Configuration pragmas of the spec layer's bitcode for SAW (M4.4, #59),
+--  given to llvm-gcc with -gnatec by scripts/check-saw.sh: ghost code is
+--  compiled, and every other assertion kind (Assert, Pre, Post,
+--  Loop_Invariant, Subprogram_Variant, ...) is ignored, so that the
+--  bitcode is the spec functions' bodies and nothing else. The two
+--  pragmas in this order are Assertion_Policy (Ghost => Check, others =>
+--  Ignore), which GNAT does not accept as written ("others" is not an
+--  assertion kind).
+
+pragma Assertion_Policy (Ignore);
+pragma Assertion_Policy (Ghost => Check);

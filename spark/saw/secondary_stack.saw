@@ -1,0 +1,90 @@
+/*
+ * The secondary stack in the spec layer's contracts (M4.4, #59; README
+ * "SAW", "The secondary stack"), included by aes_spec_common.saw and
+ * sha256_spec_common.saw.
+ *
+ * A function that returns an unconstrained array allocates its result
+ * with GNAT Pro's System.Secondary_Stack.SS_Allocate, which check-saw.sh
+ * compiles from the runtime's sources into each spec module, and which is
+ * executed, not assumed. A contract of such a function sets the stack up
+ * as the runtime's SS_Init leaves the environment task's, one static
+ * chunk, with `used` bytes already allocated (0 for an empty stack):
+ *  - the soft link System.Soft_Links.Get_Sec_Stack set to
+ *    SAW_Soft_Links.Get_Sec_Stack (saw/saw_soft_links.ads), which returns
+ *    NT_TSD.Sec_Stack_Ptr as the default target Get_Sec_Stack_NT does;
+ *  - NT_TSD.Sec_Stack_Ptr (field 2 of the record) pointing to the stack;
+ *  - the stack, an SS_Stack record (s-secsta.ads) whose static chunk is
+ *    ss_chunk_size bytes, laid out as GNAT-LLVM lays it out: at 0 the
+ *    record's Default_Chunk_Size, Freeable (False), High_Water_Mark and
+ *    Top (Byte, Chunk); at 48 the Static_Chunk's Size, Next (null) and
+ *    Size_Up_To_Chunk (0); at 80 its Memory (1 .. ss_chunk_size).
+ * With `used` bytes allocated, Top is byte used + 1 of the static chunk
+ * and High_Water_Mark is used: the state after allocations and no
+ * release. An allocation at that point is at Memory (used + 1), offset
+ * 80 + used (ss_at stack used). Each SS_Allocate rounds its size up to a
+ * multiple of 16 (Standard'Maximum_Alignment).
+ *
+ * A contract's postcondition states the header again (ss_header) with
+ * the bytes used after the call: a caller that allocates next reads Top.
+ */
+let ss_chunk_size = 65536;
+let ss_header stack (used : Int) =
+  llvm_points_to_untyped (llvm_elem stack 0)
+    (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_term {{ 0 : [8] }},
+                               llvm_term {{ 0 : [8] }}, llvm_term {{ 0 : [16] }}, llvm_term {{ 0 : [32] }},
+                               llvm_term {{ `used : [64] }},
+                               llvm_packed_struct_value [llvm_term {{ `used + 1 : [64] }}, llvm_elem stack 48]]);
+let secondary_stack_used (used : Int) = do {
+  llvm_alloc_global "system__soft_links__get_sec_stack";
+  llvm_points_to (llvm_global "system__soft_links__get_sec_stack") (llvm_global "saw_soft_links__get_sec_stack");
+  stack <- llvm_alloc_aligned 16 (llvm_array (eval_int {{ 80 + `ss_chunk_size : [64] }}) (llvm_int 8));
+  ss_header stack used;
+  llvm_points_to_untyped (llvm_elem stack 48)
+    (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_null, llvm_term {{ 0 : [64] }}]);
+  llvm_alloc_global "system__soft_links__nt_tsd";
+  llvm_points_to (llvm_elem (llvm_global "system__soft_links__nt_tsd") 2) stack;
+  return stack;
+};
+let secondary_stack = secondary_stack_used 0;
+let ss_at stack (offset : Int) = llvm_elem stack (eval_int {{ 80 + `offset : [64] }});
+
+/*
+ * The postcondition of a lemma used as an override, by a caller that
+ * allocates after it: SAW invalidates, when it applies an override, every
+ * writable allocation and global of the precondition that the
+ * postcondition does not describe, so the postcondition states the soft
+ * link, NT_TSD's stack pointer, the stack's header (with `used` bytes
+ * allocated) and its static chunk's header again. What the callee left on the stack below is described
+ * by the contract itself (its result, and what it was given: keep).
+ */
+let ss_post stack (used : Int) = do {
+  ss_header stack used;
+  llvm_points_to_untyped (llvm_elem stack 48)
+    (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_null, llvm_term {{ 0 : [64] }}]);
+  llvm_points_to (llvm_global "system__soft_links__get_sec_stack") (llvm_global "saw_soft_links__get_sec_stack");
+  llvm_points_to (llvm_elem (llvm_global "system__soft_links__nt_tsd") 2) stack;
+};
+
+/*
+ * The first n bytes of the stack's memory, as found and left: what a
+ * caller allocated before the call, which the call must not change. In a
+ * precondition it binds them (keep_pre), in the postcondition it states
+ * them unchanged (keep_post).
+ */
+let keep_pre stack (n : Int) = do {
+  if eval_bool {{ `n == (0 : Integer) }} then return {{ [] : [0][8] }}
+  else do {
+    kept <- llvm_fresh_var "kept" (llvm_array n (llvm_int 8));
+    llvm_points_to_untyped (ss_at stack 0) (llvm_term kept);
+    return kept;
+  };
+};
+let keep_post stack (n : Int) (kept : Term) =
+  if eval_bool {{ `n == (0 : Integer) }} then return ()
+  else llvm_points_to_untyped (ss_at stack 0) (llvm_term kept);
+
+/*
+ * The bytes SS_Allocate takes for an unconstrained result of n bytes of
+ * data after a bounds record of b bytes: b + n rounded up to 16.
+ */
+let ss_size (b : Int) (n : Int) = eval_int {{ ((`b + `n + 15) / 16) * 16 : [64] }};

@@ -1,0 +1,115 @@
+/*
+ * The AES spec layer's bit-vector interface, Foundation_Spark.AES.Spec.Main
+ * (spark/src/aes/foundation_spark-aes-spec-main.ads): the splits of
+ * algorithms/AES/Main.cry's Encrypt and Decrypt, at k = 128, 192 and 256.
+ * Encrypt and Decrypt themselves are not proved (below). Included by
+ * aes_spec.saw after aes_spec_common.saw and aes_spec_gf.saw.
+ *
+ * Main.cry's bit sequences [n] are the spec's ghost Boolean arrays Bits,
+ * indexed by a 128-bit integer (README "The bitcode ABI"): an Ada Boolean
+ * is a byte, 0 or 1, so a [n] is n bytes, each holding one bit, the
+ * Cryptol's first (most significant) bit first. The contracts take the
+ * bytes as fresh variables under the precondition that each is 0 or 1
+ * (the validity of an Ada Boolean), and read them as Cryptol bits with
+ * bits_of. Unconstrained bit sequences (the key) are fat pointers whose
+ * bounds record is two i128, {First, Last}; Block_Bits, Bits (0 .. 127),
+ * is passed by reference.
+ */
+
+let bits_bounds_t = llvm_alias "foundation_spark__aes__spec__main__bits_BOUNDS";
+let bits_t (n : Int) = llvm_array n byte_t;
+
+/* Bytes, each 0 or 1, as Cryptol bits. */
+let bits_of = {{ \bs -> [ b == (1 : [8]) | b <- bs ] }};
+
+/*
+ * n bytes, each 0 or 1, read-only: an Ada Bits of length n.
+ */
+let fresh_bits (name : String) (n : Int) = do {
+  bs <- llvm_fresh_var name (bits_t n);
+  llvm_precond {{ all (\b -> b <= 1) bs }};
+  p <- llvm_alloc_readonly (bits_t n);
+  llvm_points_to p (llvm_term bs);
+  return (bs, p);
+};
+
+/*
+ * A fat pointer to n bits with bounds {0, n - 1} (i128), read-only.
+ */
+let fresh_bits_fp (name : String) (n : Int) = do {
+  (bs, p) <- fresh_bits name n;
+  b <- llvm_alloc_readonly bits_bounds_t;
+  llvm_points_to b (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `n - 1 : [128] }}]);
+  return (bs, llvm_struct_value [p, b]);
+};
+
+/* --- the bit-level helpers ---------------------------------------------- */
+
+/*
+ * Bit_Of (B, J) = b @ j (Cryptol's join places byte i's bit j at 8 i + j),
+ * for every J in 0 .. 7.
+ */
+m_bit_of <- verify_spec "main__bit_of" []
+              (do {
+                 b <- llvm_fresh_var "b" byte_t;
+                 j <- llvm_fresh_var "j" (llvm_int 32);
+                 llvm_precond {{ j < 8 }};
+                 llvm_execute_func [llvm_term b, llvm_term j];
+                 llvm_return (llvm_term {{ if b @ j then 1 else 0 : [8] }});
+               }) z3 "z3" "\\b j -> b @ j, j < 8";
+
+/*
+ * Byte_At (Bs, From) = the [8] at bits From .. From + 7 of Bs, which
+ * Cryptol's split takes as one byte: take`{8} (bs << from), at the
+ * lengths it is called at (128, 192, 256), From symbolic.
+ */
+let verify_byte_at (n : Int) =
+  verify_spec "main__byte_at" []
+    (do {
+       (bs, fp) <- fresh_bits_fp "bs" n;
+       from <- llvm_fresh_var "from" (llvm_int 128);
+       llvm_precond {{ from <= `n - 8 }};
+       llvm_execute_func [fp, llvm_term from];
+       llvm_return (llvm_term {{ take`{8} ((bits_of bs) << from) }});
+     }) z3 "z3" (str_concat (str_concat "\\bs from -> take`{8} (bs << from), bs : [" (show n)) "]");
+m_byte_at_128 <- verify_byte_at 128;
+m_byte_at_192 <- verify_byte_at 192;
+m_byte_at_256 <- verify_byte_at 256;
+
+/*
+ * Split_Block = Main.cry's split in : [128] -> Block.
+ */
+m_split_block <- verify_spec "main__split_block" [m_byte_at_128]
+                   (do {
+                      (bs, p) <- fresh_bits "bs" 128;
+                      llvm_execute_func [p];
+                      llvm_return (llvm_term {{ split (bits_of bs) : [16][8] }});
+                    }) z3 "z3" "split : [128] -> Block";
+
+/*
+ * Split_Key (K, Key) = Main.cry's split (split key) : [Nk k]AESWord, at
+ * k = 128, 192, 256; the result is on the secondary stack.
+ */
+let verify_split_key (k : Int) (nk : Int) (byte_at : LLVMSpec) =
+  verify_spec "main__split_key" [types_nk, byte_at]
+    (do {
+       stack <- secondary_stack;
+       (key, fp) <- fresh_bits_fp "key" k;
+       llvm_execute_func [llvm_term {{ `k : [32] }}, fp];
+       llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
+       llvm_points_to_untyped (ss_at stack 8) (llvm_term {{ split (split (bits_of key)) : [nk][4][8] }});
+       llvm_return (llvm_struct_value [ss_at stack 8, ss_at stack 0]);
+     }) z3 "z3" (str_concat (str_concat "split (split key) : [" (show k)) "] -> [Nk k]AESWord");
+m_split_key_128 <- verify_split_key 128 4 m_byte_at_128;
+m_split_key_192 <- verify_split_key 192 6 m_byte_at_192;
+m_split_key_256 <- verify_split_key 256 8 m_byte_at_256;
+
+/*
+ * Not proved: Join_Block, and so Encrypt, Decrypt and the AES128, AES192
+ * and AES256 packages' functions, which call it. Join_Block's aggregate
+ * indexes its Block_Bits result, a constrained array, by the 128-bit
+ * Bit_Index directly (getelementptr [128 x i8], ptr, i64 0, i128 %n),
+ * and SAW 1.6's simulator rejects a getelementptr index wider than 64
+ * bits ("Invalid index value in GEP") when it translates the function, so
+ * Join_Block can be neither executed nor proved (README "SAW").
+ */

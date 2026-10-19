@@ -1,0 +1,25 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * One of aes_spec.saw's per-index lemmas of KeyExpansion's W with the
+ * wrong Cryptol: W at K = 128, I = 4 against w @ 4 of the key words
+ * reversed, with the overrides of the lemma at I = 4 (the lemmas at
+ * I = 0 .. 3, proved here as aes_spec_keyexpansion.saw proves them, and
+ * the leaves') and its tactic (z3 with SubWord uninterpreted). It runs
+ * aes_spec_gf.saw first, for Nk's lemma. The proof must fail with a
+ * counterexample key, which shows that the overrides of W's recursive
+ * calls, and SubWord uninterpreted, do not make the per-index lemmas
+ * vacuous: which key words the recursion reads is checked.
+ */
+
+include "../aes_spec_common.saw";
+include "../aes_spec_gf.saw";
+
+ke_rotword <- verify_spec "keyexpansion__rotword" [] (word_contract {{ RotWord }}) rme "rme" "KeyExpansion::RotWord";
+ke_subword <- verify_spec "keyexpansion__subword" [] (word_contract {{ SubWord }}) rme "rme" "KeyExpansion::SubWord";
+ke_xor <- verify_spec "keyexpansion__Oxor" [] (word_word_contract {{ \a b -> a ^ b }}) rme "rme" "\\a b -> a ^ b : AESWord";
+let leaves = [types_nk, ke_rotword, ke_subword, ke_xor];
+w_0_3 <- w_lemmas leaves 128 4 3 0 [] [];
+verify_spec "keyexpansion__w" (concat w_0_3 leaves)
+  (w_contract 128 4 4 {{ \(key : [4][4][8]) -> reverse key }}) (w4_unint_z3 ["SubWord"]) "w4_unint_z3 SubWord"
+  "K = 128, I = 4: w @ 4 of the reversed key";

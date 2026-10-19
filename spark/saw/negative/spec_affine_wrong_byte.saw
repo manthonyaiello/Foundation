@@ -1,0 +1,20 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * One of aes_spec.saw's exhaustive proofs with the wrong Cryptol: the
+ * spec layer's Affine at b = 0x53 against SBox.cry's affine 0x52, with
+ * the overrides of the exhaustive proof at 0x53 (Inverse's lemma at 0x53,
+ * proved with Pgcd's at 0x53, proved with Pdiv's). It runs
+ * aes_spec_gf.saw first, for Pdiv's lemma. The input is concrete, so the
+ * goal has no variable and the counterexample is empty; the proof must
+ * fail, which shows that the concrete proofs compare the two results and
+ * are not vacuous.
+ */
+
+include "../aes_spec_common.saw";
+include "../aes_spec_gf.saw";
+
+pgcd_53 <- verify_quiet "gf2__pgcd" [gf2_pdiv] (pgcd_contract {{ 0x53 : [8] }}) rme;
+inverse_53 <- verify_quiet "gf2__inverse" [pgcd_53] (inverse_contract {{ 0x53 : [8] }}) rme;
+verify_spec "sbox__affine" [inverse_53, gf28_bit] (affine_contract {{ 0x53 : [8] }} {{ \(b : [8]) -> affine (b - 1) }})
+  rme "rme" "\\b -> SBox::affine (b - 1), at b = 0x53";

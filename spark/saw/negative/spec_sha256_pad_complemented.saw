@@ -1,0 +1,39 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's Pad at l = 8 bits (a 1-byte message) against
+ * Preprocessing.cry's pad of the message's bits complemented, with the
+ * overrides of sha256_spec.saw's proof at that length (Small_K's, Zero's
+ * and To_Bits' chain's lemmas, proved here as it proves them), in the
+ * module's load with lax arithmetic. The proof must fail with a
+ * counterexample message, which shows that the Pad proofs, whose callees
+ * leave their results on the secondary stack, compare the padded message
+ * itself.
+ */
+
+include "../sha256_spec_common.saw";
+let verify_spec = verify_spec_lax;
+include "../sha256_spec_pad.saw";
+
+let k = small_k 8;
+sk <- verify_small_k 8;
+z <- verify_zero k;
+tb <- to_bits_lemmas (ss_size 32 k) (eval_int {{ 32 + `k : [64] }}) 0 [];
+verify_spec "sha256__pad" [sk, z, tb]
+  (do {
+     let len = eval_int {{ 8 + 1 + `k + 64 : [64] }};
+     let uz = ss_size 32 k;
+     let t64 = to_bits_used 64;
+     let at = eval_int {{ `uz + `t64 : [64] }};
+     let data = eval_int {{ `at + 32 : [64] }};
+     stack <- secondary_stack;
+     msg <- llvm_fresh_var "msg" (llvm_array 8 (llvm_int 8));
+     llvm_precond {{ all (\b -> b <= 1) msg }};
+     mp <- llvm_alloc_readonly (llvm_array 8 (llvm_int 8));
+     llvm_points_to mp (llvm_term msg);
+     mb <- llvm_alloc_readonly bits_bounds_t;
+     llvm_points_to mb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 7 : [128] }}]);
+     llvm_execute_func [llvm_struct_value [mp, mb]];
+     llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (pad`{512, 32, 8, k} (~ (bits_of msg))) }});
+     llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
+   }) z3 "z3" "l = 8: Preprocessing::pad of the complemented message";

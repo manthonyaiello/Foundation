@@ -1,0 +1,131 @@
+/*
+ * The AES spec layer's round transformations and cipher,
+ * Foundation_Spark.AES.Spec.Cipher (spark/src/aes/foundation_spark-aes-
+ * spec-cipher.ads), against algorithms/AES/Cipher.cry. Included by
+ * aes_spec.saw (and two negative controls) after aes_spec_common.saw and
+ * aes_spec_gf.saw (whose Types and Dot lemmas it uses).
+ */
+
+/* --- AES.Spec.Cipher (Cipher.cry): the round transformations ---------------- */
+
+/*
+ * SubBytes, InvSubBytes, ShiftRows, InvShiftRows, AddRoundKey
+ * [FIPS-PUB-197 Sections 5.1.1, 5.3.2, 5.1.2, 5.3.1, 5.1.4]: the spec's
+ * S-box tables and index lists read by the bitcode, against Cipher.cry's
+ * SBox @@ bs, InvSBox @@ bs, the two permutations and bs ^ w.
+ */
+c_subbytes <- verify_spec "cipher__subbytes" [] (block_contract {{ SubBytes }}) rme "rme" "Cipher::SubBytes";
+c_invsubbytes <- verify_spec "cipher__invsubbytes" [] (block_contract {{ InvSubBytes }}) rme "rme" "Cipher::InvSubBytes";
+c_shiftrows <- verify_spec "cipher__shiftrows" [] (block_contract {{ ShiftRows }}) rme "rme" "Cipher::ShiftRows";
+c_invshiftrows <- verify_spec "cipher__invshiftrows" [] (block_contract {{ InvShiftRows }}) rme "rme" "Cipher::InvShiftRows";
+c_addroundkey <- verify_spec "cipher__addroundkey" [] (block_block_contract {{ AddRoundKey }}) rme "rme" "Cipher::AddRoundKey";
+
+/*
+ * MixColumnsStep and InvMixColumnsStep [FIPS-PUB-197 Sections 5.1.3,
+ * 5.3.3], with Dot's lemma as the override for their products, and
+ * MixColumns and InvMixColumns, join (map step (split bs)), with the
+ * step's, Split's and Join's.
+ */
+c_mixcolumnsstep <- verify_spec "cipher__mixcolumnsstep" [gf28_dot] (word_contract {{ MixColumnsStep }})
+                      rme "rme" "Cipher::MixColumnsStep";
+c_invmixcolumnsstep <- verify_spec "cipher__invmixcolumnsstep" [gf28_dot] (word_contract {{ InvMixColumnsStep }})
+                         rme "rme" "Cipher::InvMixColumnsStep";
+c_mixcolumns <- verify_spec "cipher__mixcolumns" [c_mixcolumnsstep, types_split, types_join] (block_contract {{ MixColumns }})
+                  rme "rme" "Cipher::MixColumns";
+c_invmixcolumns <- verify_spec "cipher__invmixcolumns" [c_invmixcolumnsstep, types_split, types_join] (block_contract {{ InvMixColumns }})
+                     rme "rme" "Cipher::InvMixColumns";
+
+/*
+ * Round, InvRound and InvRound' [FIPS-PUB-197 Sections 5.1, 5.3], each by
+ * its four steps' lemmas as overrides. InvRound' by z3 with the steps
+ * uninterpreted: it applies the S-box after InvMixColumns, to bytes that
+ * each depend on four, and rme's normal form of that does not finish.
+ */
+c_round <- verify_spec "cipher__round" [c_subbytes, c_shiftrows, c_mixcolumns, c_addroundkey]
+             (block_block_contract {{ Round }}) rme "rme" "Cipher::Round";
+c_invround <- verify_spec "cipher__invround" [c_invshiftrows, c_invsubbytes, c_addroundkey, c_invmixcolumns]
+                (block_block_contract {{ InvRound }}) rme "rme" "Cipher::InvRound";
+c_invround_prime <- verify_spec "cipher__invround_prime" [c_addroundkey, c_invmixcolumns, c_invshiftrows, c_invsubbytes]
+                      (block_block_contract {{ InvRound' }})
+                      (w4_unint_z3 ["InvSubBytes", "InvShiftRows", "InvMixColumns", "AddRoundKey"])
+                      "w4_unint_z3 InvSubBytes InvShiftRows InvMixColumns AddRoundKey" "Cipher::InvRound'";
+
+/*
+ * Foldl_Round, Foldl_InvRound and Foldl_InvRound_Prime: Cryptol's foldl
+ * Round, foldl InvRound, foldl InvRound' over [M]Block, the folds in
+ * Cipher, InvCipher and InvCipher', one lemma per length M in 0 .. 13
+ * (aes_spec_common.saw's foldls and foldl_contract). Each is the list of
+ * its 14 lemmas.
+ */
+c_foldl_round <- foldls "cipher__foldl_round" c_round {{ Round }} "Round" 0 [] [];
+c_foldl_invround <- foldls "cipher__foldl_invround" c_invround {{ InvRound }} "InvRound" 0 [] [];
+c_foldl_invround_prime <- foldls "cipher__foldl_invround_prime" c_invround_prime {{ InvRound' }} "InvRound'" 0 [] [];
+
+/*
+ * Cipher = Cipher.cry's Cipher`{k} [FIPS-PUB-197 Section 5.1], at k = 128,
+ * 192 and 256:
+ *   Cipher ([w0] # ws # [wr]) in =
+ *     AddRoundKey (ShiftRows (SubBytes (foldl Round (AddRoundKey in w0) ws))) wr
+ * The overrides are Nr's, Foldl_Round's (SAW applies the one at length
+ * Nr - 1; it calls the shorter ones), SubBytes', ShiftRows' and
+ * AddRoundKey's, and z3 leaves the four Cryptol functions uninterpreted.
+ */
+let verify_spec_cipher (k : Int) (nr : Int) =
+  verify_spec "cipher__cipher" (concat c_foldl_round [types_nr, c_subbytes, c_shiftrows, c_addroundkey])
+    (spec_cipher_contract k nr {{ Cipher`{k} }})
+    (w4_unint_z3 ["Round", "SubBytes", "ShiftRows", "AddRoundKey"])
+    "w4_unint_z3 Round SubBytes ShiftRows AddRoundKey"
+    (str_concat (str_concat "Cipher::Cipher`{" (show k)) "}");
+c_cipher_128 <- verify_spec_cipher 128 10;
+c_cipher_192 <- verify_spec_cipher 192 12;
+c_cipher_256 <- verify_spec_cipher 256 14;
+
+/*
+ * Reverse_Keys = Cryptol's reverse at [m]Block, at the lengths InvCipher
+ * and InvCipher' reverse (Nr - 1 = 9, 11, 13), with bounds {1, m}. The
+ * result is on the secondary stack (README "SAW", "The secondary
+ * stack"), whose SS_Allocate (GNAT Pro's) is executed.
+ */
+let verify_reverse_keys (m : Int) =
+  verify_spec "cipher__reverse_keys" [] (reverse_keys_contract m) z3 "z3"
+    (str_concat (str_concat "reverse : [" (show m)) "]Block, bounds {1, M}");
+c_reverse_keys_9 <- verify_reverse_keys 9;
+c_reverse_keys_11 <- verify_reverse_keys 11;
+c_reverse_keys_13 <- verify_reverse_keys 13;
+
+/*
+ * InvCipher = Cipher.cry's InvCipher`{k} and InvCipher_Prime =
+ * Cipher.cry's InvCipher'`{k} [FIPS-PUB-197 Section 5.3], at k = 128, 192
+ * and 256:
+ *   InvCipher ([w0] # ws # [wr]) in =
+ *     AddRoundKey (InvSubBytes (InvShiftRows
+ *       (foldl InvRound (AddRoundKey in wr) (reverse ws)))) w0
+ *   InvCipher' ([w0] # ws # [wr]) in =
+ *     AddRoundKey (foldl InvRound' (InvSubBytes (InvShiftRows
+ *       (AddRoundKey in wr))) (reverse ws)) w0
+ * Both mark the secondary stack, reverse ws onto it (Reverse_Keys,
+ * executed: its lemma's result is at the stack's first free byte, and
+ * the mark leaves that byte where it was), fold, and release the mark.
+ * The overrides are Nr's, the fold's (SAW applies the one at length
+ * Nr - 1, whose data is the reversed keys on the secondary stack), and
+ * the steps', with z3 leaving the Cryptol functions uninterpreted.
+ */
+let verify_spec_invcipher (name : String) (folds : [LLVMSpec]) (steps : [LLVMSpec]) (f : Term) (unint : [String])
+                          (cry : String) (k : Int) (nr : Int) =
+  verify_spec name (concat folds (concat [types_nr] steps))
+    (spec_cipher_contract_ss true k nr f) (w4_unint_z3 unint) (str_concat "w4_unint_z3" (names unint))
+    (str_concat (str_concat (str_concat "Cipher::" cry) "`{") (str_concat (show k) "}"));
+let inv_unint = ["InvRound", "InvSubBytes", "InvShiftRows", "AddRoundKey"];
+c_invcipher_128 <- verify_spec_invcipher "cipher__invcipher" c_foldl_invround [c_invsubbytes, c_invshiftrows, c_addroundkey]
+                     {{ InvCipher`{128} }} inv_unint "InvCipher" 128 10;
+c_invcipher_192 <- verify_spec_invcipher "cipher__invcipher" c_foldl_invround [c_invsubbytes, c_invshiftrows, c_addroundkey]
+                     {{ InvCipher`{192} }} inv_unint "InvCipher" 192 12;
+c_invcipher_256 <- verify_spec_invcipher "cipher__invcipher" c_foldl_invround [c_invsubbytes, c_invshiftrows, c_addroundkey]
+                     {{ InvCipher`{256} }} inv_unint "InvCipher" 256 14;
+let inv_prime_unint = ["InvRound'", "InvSubBytes", "InvShiftRows", "AddRoundKey"];
+c_invcipher_prime_128 <- verify_spec_invcipher "cipher__invcipher_prime" c_foldl_invround_prime [c_invsubbytes, c_invshiftrows, c_addroundkey]
+                           {{ InvCipher'`{128} }} inv_prime_unint "InvCipher'" 128 10;
+c_invcipher_prime_192 <- verify_spec_invcipher "cipher__invcipher_prime" c_foldl_invround_prime [c_invsubbytes, c_invshiftrows, c_addroundkey]
+                           {{ InvCipher'`{192} }} inv_prime_unint "InvCipher'" 192 12;
+c_invcipher_prime_256 <- verify_spec_invcipher "cipher__invcipher_prime" c_foldl_invround_prime [c_invsubbytes, c_invshiftrows, c_addroundkey]
+                           {{ InvCipher'`{256} }} inv_prime_unint "InvCipher'" 256 14;

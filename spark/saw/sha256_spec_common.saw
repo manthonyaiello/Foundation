@@ -1,0 +1,61 @@
+/*
+ * What the SHA-256 spec layer's SAW scripts share (sha256_spec.saw and
+ * the negative controls negative/spec_sha256_*.saw): NSA's Cryptol, our
+ * copy of `step`'s locals (SHA256Step.cry), the bitcode, and the shapes.
+ * Run from spark/saw/ by scripts/check-saw.sh, on obj/spec/sha256_spec.bc
+ * (the units SHA2, SHA2.Functions, SHA2.Preprocessing and the instance
+ * SHA2.SHA256, compiled with ghost code on and inlining off, and the
+ * secondary stack; README "SAW").
+ */
+
+enable_experimental;
+
+import "SHA256Main.cry" (step, hash);
+import "SHA256Step.cry" (Ws, T1, T2, step3);
+import "../../algorithms/SHA2/Notation.cry";
+import "../../algorithms/SHA2/Functions.cry";
+import "../../algorithms/SHA2/Preprocessing.cry" (pad, parse, H0_256);
+
+include "secondary_stack.saw";
+
+sha256_spec <- llvm_load_module "obj/spec/sha256_spec.bc";
+
+let spec_symbol name = str_concat "foundation_spark__sha2__" name;
+
+/*
+ * llvm_verify of one spec subprogram of module m against a Cryptol term,
+ * timed, with the RESULT line check-saw.sh records (as
+ * aes_spec_common.saw's), the name followed by tag.
+ */
+let verify_spec_tagged (m : LLVMModule) (tag : String) name overrides contract tactic tactic_name cryptol = do {
+  result <- time (llvm_verify m (spec_symbol name) overrides false contract tactic);
+  print (str_concat (str_concat (str_concat (str_concat (str_concat (str_concat "RESULT proved " name) tag) " = ") cryptol) " [") (str_concat tactic_name "]"));
+  return result;
+};
+let verify_spec = verify_spec_tagged sha256_spec "";
+
+/*
+ * Unsigned_32 is i32; Hash_Value (Words_32 (0 .. 7)) [8 x i32] and Block
+ * (Words_32 (0 .. 15)) [16 x i32], both passed by reference (a pointer),
+ * as README "The bitcode ABI" has them for the implementation. Every
+ * array the contracts take by reference is allocated writable and stated
+ * unchanged after the call: the callers pass temporaries of their own
+ * (Foldl_Step3's result to Step3, the fold's to "+") and blocks on the
+ * secondary stack (Hash's parsed message to Foldl_Step and Step), and an
+ * override's read-only allocation does not match a writable one.
+ */
+let word_t = llvm_int 32;
+let hash_value_t = llvm_array 8 word_t;
+let block_t = llvm_array 16 word_t;
+
+let sigmas = ["SIGMA_256_0", "SIGMA_256_1", "sigma_256_0", "sigma_256_1"];
+let unint_sigmas = w4_unint_z3 sigmas;
+let unint_sigmas_name = "w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1";
+
+/*
+ * The module loaded again with lax arithmetic, for Pad and Hash
+ * (sha256_spec_pad.saw says why), and the RESULT lines of its proofs.
+ */
+enable_lax_arithmetic;
+sha256_spec_lax <- llvm_load_module "obj/spec/sha256_spec.bc";
+let verify_spec_lax = verify_spec_tagged sha256_spec_lax " (lax arithmetic module)";

@@ -1,0 +1,19 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's Dot against pmod (pmult b c) with the modulus
+ * x^^8 + x^^4 + x^^3 + x^^2 + 1 instead of GF28.cry's m = x^^8 + x^^4 +
+ * x^^3 + x + 1, with the overrides of aes_spec.saw's proof (Pmult's and
+ * Pmod's lemmas, which rest on the per-N fold lemmas) and its tactic
+ * (rme). It runs aes_spec_gf.saw first, for the overrides. The proof must
+ * fail with a counterexample, which shows that the fold lemmas, as
+ * overrides, do not make Dot's proof vacuous: the modulus Dot passes to
+ * Pmod is checked.
+ */
+
+include "../aes_spec_common.saw";
+include "../aes_spec_gf.saw";
+
+verify_spec "gf28__dot" [gf28_pmult, gf28_pmod]
+  (byte_byte_contract {{ \b c -> pmod (pmult b c) <| x^^8 + x^^4 + x^^3 + x^^2 + 1 |> : [8] }})
+  rme "rme" "\\b c -> pmod (pmult b c) <| x^^8 + x^^4 + x^^3 + x^^2 + 1 |>";

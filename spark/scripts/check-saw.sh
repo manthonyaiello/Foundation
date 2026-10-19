@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
 # check-saw.sh -- SAW's llvm_verify of the SPARK AES, SHA-256 and
-# HMAC-SHA-256 implementations against NSA's Cryptol, on GNAT-LLVM bitcode
-# of the crate's own sources (E4, #21; M4.1 #22, M4.2 #23, M4.3 #24).
-# README "SAW".
+# HMAC-SHA-256 implementations, and of the AES and SHA-256 spec layers,
+# against NSA's Cryptol, on GNAT-LLVM bitcode of the crate's own sources
+# (E4, #21; M4.1 #22, M4.2 #23, M4.3 #24, M4.4 #59). README "SAW".
 #
 # LOCAL ONLY: never wired into a CI workflow. It needs GNAT Pro's LLVM back
 # end (llvm-gcc), which CI does not have and which nobody without GNAT Pro
@@ -26,6 +26,15 @@
 #   3. refuses any llvm_unsafe_assume_spec in saw/ (every override must be
 #      a proof), then runs saw/<module>_impl.saw, every llvm_verify of
 #      which must succeed;
+# then, for each module of SPEC_MODULES (aes_spec, sha256_spec), the spec
+# layer (M4.4):
+#   1. compiles its units the same way plus -fno-inline and the
+#      configuration pragmas of saw/spec.adc (ghost code on, every other
+#      assertion kind off) to saw/obj/spec/<unit>.bc, and links them into
+#      saw/obj/spec/<module>.bc;
+#   2. checks the opposite of the implementation's step 2: the bitcode
+#      defines the spec layer's ghost symbols;
+#   3. runs saw/<module>.saw, every llvm_verify of which must succeed;
 # and then:
 #   4. runs each saw/negative/*.saw, every one of which must FAIL with a
 #      counterexample (the negative controls);
@@ -160,7 +169,59 @@ UNITS_sha256=(
 #   with a .bc name ("incorrect object file extension").
 SWITCHES=(-c -gnat2022 -gnatp -gnatVn -O0 -emit-llvm)
 
-# The ghost entities: none of their symbols may appear in the bitcode.
+# The spec layer's modules (M4.4, #59), each the units listed linked into
+# saw/obj/spec/<module>.bc, and the script of proofs run on it,
+# saw/<module>.saw.
+SPEC_MODULES=(aes_spec sha256_spec)
+
+# aes_spec: the AES spec layer's units whose functions the script proves
+# (all ghost but AES.Spec.Types).
+UNITS_aes_spec=(
+  aes/foundation_spark-aes-spec-types.ads
+  aes/foundation_spark-aes-spec-gf28.ads
+  aes/foundation_spark-aes-spec-gf2.ads
+  aes/foundation_spark-aes-spec-sbox.ads
+  aes/foundation_spark-aes-spec-cipher.ads
+  aes/foundation_spark-aes-spec-keyexpansion.ads
+  aes/foundation_spark-aes-spec-main.ads
+)
+
+# sha256_spec: the SHA-256 instance of the generic SHA2.Main (its ghost
+# functions are the spec layer), with the SHA2 root (To_Bits, Ceil_Div,
+# Ceil_Mod), SHA2.Functions and SHA2.Preprocessing (H0_256), which it
+# calls or reads.
+UNITS_sha256_spec=(
+  sha2/foundation_spark-sha2.ads
+  sha2/foundation_spark-sha2-functions.ads
+  sha2/foundation_spark-sha2-preprocessing.ads
+  sha2/foundation_spark-sha2-sha256.ads
+)
+
+# The spec layer's switches: the implementation's, plus
+# -fno-inline: GNAT-LLVM marks every expression function alwaysinline, and
+#   the spec layer is expression functions: inlined, a recursive fold's
+#   call to its round function, or KeyExpansion's W's to SubWord, is no
+#   call, and no lemma can be its override. -fno-inline keeps each a call
+#   (noinline) and changes nothing else.
+# -gnatec=saw/spec.adc: Assertion_Policy Ghost => Check and everything
+#   else Ignore: the ghost code is compiled, and no contract or assertion.
+SPEC_OBJ_DIR="$OBJ_DIR/spec"
+SPEC_ADC="$SAW_DIR/spec.adc"
+SPEC_SWITCHES=("${SWITCHES[@]}" -fno-inline "-gnatec=$SPEC_ADC")
+
+# Linked into every spec module: the spec functions that return an
+# unconstrained array do so on the secondary stack, so the module carries
+# GNAT Pro's own System.Secondary_Stack and System.Soft_Links, compiled
+# from the runtime's sources as the runtime is (-gnatg), and the harness
+# adapter saw/saw_soft_links.ads (README "SAW", "The secondary stack").
+RTS_SRC="$(dirname "$(find "$GNAT_LLVM_DIR/lib/gnat-llvm" -path '*/rts-native/adainclude/s-secsta.adb' -print -quit)")"
+[ -f "$RTS_SRC/s-secsta.adb" ] || die "no rts-native/adainclude/s-secsta.adb under $GNAT_LLVM_DIR/lib/gnat-llvm"
+RTS_UNITS=(s-secsta.adb s-soflin.adb)
+RTS_SWITCHES=(-c -gnatg -gnatp -O0 -emit-llvm)
+HARNESS_UNITS=(saw_soft_links.ads)
+
+# The ghost entities: none of their symbols may appear in the
+# implementation's bitcode (the spec layer's must define them).
 #  - AES: the spec layer's units and the lemmas (all ghost);
 #  - SHA-256 and HMAC: the ghost units SHA2.SHA256_Blocks, HMAC.Main and
 #    its instance HMAC.SHA256; the ghost functions of the units that also
@@ -193,8 +254,9 @@ CRYPTOL_FILES=(
   algorithms/SHA2/Preprocessing.cry
   algorithms/HMAC/Main.cry
 )
-# Our own Cryptol in saw/: instantiations of NSA's, recorded by sha256.
-OUR_CRYPTOL=(spark/saw/SHA256Main.cry)
+# Our own Cryptol in saw/, recorded by sha256: an instantiation of NSA's,
+# and a copy of the local definitions of its step (sha256_spec.saw).
+OUR_CRYPTOL=(spark/saw/SHA256Main.cry spark/saw/SHA256Step.cry)
 
 T0="$(date +%s)"
 COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
@@ -227,10 +289,18 @@ $ghost"
   echo ">> $(basename "$bc"): $(printf '%s\n' "$syms" | grep -c ' [TtDdRrBb] ') symbols defined, none of a ghost entity; undefined: $(printf '%s\n' "$syms" | awk '$1 == "U" {print $2}' | tr '\n' ' ')"
 }
 
+has_ghost() {  # has_ghost BC: die unless BC defines ghost entities' symbols
+  local bc="$1" syms ghost
+  syms="$("$LLVM_NM" "$bc")"
+  ghost="$(printf '%s\n' "$syms" | awk '$(NF-1) ~ /^[TtDdRrBb]$/ {print $NF}' | grep -cE "$GHOST_RE" || true)"
+  [ "$ghost" -gt 0 ] || die "no ghost symbol defined in $(basename "$bc"): is ghost code compiled?"
+  echo ">> $(basename "$bc"): $(printf '%s\n' "$syms" | grep -c ' [TtDdRrBb] ') symbols defined, $ghost of them ghost; undefined: $(printf '%s\n' "$syms" | awk '$1 == "U" {print $2}' | tr '\n' ' ')"
+}
+
 rm -rf "$OBJ_DIR"
-mkdir -p "$OBJ_DIR"
+mkdir -p "$OBJ_DIR" "$SPEC_OBJ_DIR"
 BITCODE=()
-ALL_UNITS=()
+ALL_ALIS=()
 for mod in "${MODULES[@]}"; do
   declare -n units="UNITS_$mod"
   mod_bc=()
@@ -241,13 +311,52 @@ for mod in "${MODULES[@]}"; do
     [ -f "$bc" ] || die "llvm-gcc wrote no $bc"
     no_ghost "$bc"
     mod_bc+=("$bc")
-    ALL_UNITS+=("$u")
+    ALL_ALIS+=("${bc%.bc}.ali")
   done
   unset -n units
   echo ">> llvm-link ${mod_bc[*]##*/} -o $mod.bc"
   "$LLVM_LINK" "${mod_bc[@]}" -o "$OBJ_DIR/$mod.bc"
   no_ghost "$OBJ_DIR/$mod.bc"
   BITCODE+=("${mod_bc[@]}" "$OBJ_DIR/$mod.bc")
+done
+
+# The secondary stack, compiled once and linked into each spec module.
+SS_BC=()
+for u in "${RTS_UNITS[@]}"; do
+  echo ">> llvm-gcc ${RTS_SWITCHES[*]} <runtime>/adainclude/$u"
+  (cd "$SPEC_OBJ_DIR" && "$LLVM_GCC" "${RTS_SWITCHES[@]}" "$RTS_SRC/$u")
+  bc="$SPEC_OBJ_DIR/${u%.*}.bc"
+  [ -f "$bc" ] || die "llvm-gcc wrote no $bc"
+  SS_BC+=("$bc")
+  ALL_ALIS+=("${bc%.bc}.ali")
+done
+for u in "${HARNESS_UNITS[@]}"; do
+  echo ">> llvm-gcc ${SPEC_SWITCHES[*]} saw/$u"
+  (cd "$SPEC_OBJ_DIR" && "$LLVM_GCC" "${SPEC_SWITCHES[@]}" -gnatwI "$SAW_DIR/$u")
+  bc="$SPEC_OBJ_DIR/${u%.*}.bc"
+  [ -f "$bc" ] || die "llvm-gcc wrote no $bc"
+  SS_BC+=("$bc")
+  ALL_ALIS+=("${bc%.bc}.ali")
+done
+BITCODE+=("${SS_BC[@]}")
+
+# The spec layer: ghost code compiled, so its symbols are expected.
+for mod in "${SPEC_MODULES[@]}"; do
+  declare -n units="UNITS_$mod"
+  mod_bc=()
+  for u in "${units[@]}"; do
+    echo ">> llvm-gcc ${SPEC_SWITCHES[*]} src/$u"
+    (cd "$SPEC_OBJ_DIR" && "$LLVM_GCC" "${SPEC_SWITCHES[@]}" "${INCLUDES[@]}" "$SPARK_DIR/src/$u")
+    bc="$SPEC_OBJ_DIR/$(basename "${u%.*}").bc"
+    [ -f "$bc" ] || die "llvm-gcc wrote no $bc"
+    mod_bc+=("$bc")
+    ALL_ALIS+=("${bc%.bc}.ali")
+  done
+  unset -n units
+  echo ">> llvm-link ${mod_bc[*]##*/} ${SS_BC[*]##*/} -o spec/$mod.bc"
+  "$LLVM_LINK" "${mod_bc[@]}" "${SS_BC[@]}" -o "$SPEC_OBJ_DIR/$mod.bc"
+  has_ghost "$SPEC_OBJ_DIR/$mod.bc"
+  BITCODE+=("${mod_bc[@]}" "$SPEC_OBJ_DIR/$mod.bc")
 done
 
 # --- 3. the proofs ---------------------------------------------------------------------
@@ -274,9 +383,14 @@ run_saw() {  # run_saw FILE LOG: saw FILE from saw/, capped, its output in LOG; 
 
 PROVED=()
 T_PROOFS=()
-for mod in "${MODULES[@]}"; do
-  script="${mod}_impl.saw"
-  log="$LOG_DIR/${mod}_impl.log"
+N_PROVED=0
+N_SPEC=0
+SCRIPTS=()
+for mod in "${MODULES[@]}"; do SCRIPTS+=("${mod}_impl"); done
+for mod in "${SPEC_MODULES[@]}"; do SCRIPTS+=("$mod"); done
+for name in "${SCRIPTS[@]}"; do
+  script="$name.saw"
+  log="$LOG_DIR/$name.log"
   echo ">> saw $script"
   t="$(date +%s)"
   status=0
@@ -288,18 +402,34 @@ for mod in "${MODULES[@]}"; do
   fi
   T_PROOFS+=("$(( $(date +%s) - t )) s for $script")
   # Each RESULT line, with the time SAW's `time` printed just before it for
-  # that llvm_verify (the common files' verify_symbol).
+  # that llvm_verify (the common files' verify_symbol). A RESULTS line
+  # ("RESULTS <n> proved ...", the spec scripts' print_results) stands for
+  # n proofs of one subprogram, one per value of its argument; the time
+  # before the first of a run of them is the whole run's.
+  case "$name" in
+    *_impl) prefix="" ;;
+    *) prefix="spec layer: " ;;
+  esac
   mod_proved=()
-  while IFS= read -r line; do mod_proved+=("$line"); done < <(awk '
+  while IFS= read -r line; do mod_proved+=("$line"); done < <(awk -v prefix="$prefix" '
     /^Time: / { t = $2; sub(/s$/, "", t) }
-    /^RESULT proved / { sub(/^RESULT proved /, ""); printf "%s, %.2f s\n", $0, t; t = "" }
+    /^RESULT proved / { sub(/^RESULT proved /, ""); printf "1 %s%s, %.2f s\n", prefix, $0, t; t = "" }
+    /^RESULTS [0-9]+ proved / {
+      n = $2; sub(/^RESULTS [0-9]+ proved /, "")
+      if (t != "") printf "%d %s%s (%d proofs, one per value), %.2f s with the lines below\n", n, prefix, $0, n, t
+      else printf "%d %s%s (%d proofs, one per value), timed with the line above\n", n, prefix, $0, n
+      t = ""
+    }
   ' "$log")
   [ "${#mod_proved[@]}" -gt 0 ] || die "saw $script proved nothing (log: $log)"
+  n_lines=0
+  for p in "${mod_proved[@]}"; do n_lines=$(( n_lines + ${p%% *} )); done
   n_succeeded="$(grep -c '^Proof succeeded!' "$log" || true)"
-  [ "$n_succeeded" -eq "${#mod_proved[@]}" ] \
-    || die "$script: $n_succeeded proofs succeeded but ${#mod_proved[@]} RESULT lines"
-  for p in "${mod_proved[@]}"; do echo "   proved $p"; done
-  PROVED+=("${mod_proved[@]}")
+  [ "$n_succeeded" -eq "$n_lines" ] \
+    || die "$script: $n_succeeded proofs succeeded but the RESULT lines count $n_lines"
+  N_PROVED=$(( N_PROVED + n_lines ))
+  [ -z "$prefix" ] || N_SPEC=$(( N_SPEC + n_lines ))
+  for p in "${mod_proved[@]}"; do echo "   proved ${p#* }"; PROVED+=("${p#* }"); done
 done
 
 # --- 4. the negative controls ---------------------------------------------------------------
@@ -334,9 +464,10 @@ record() {
   echo "# saw/results.txt -- written by scripts/check-saw.sh; do not edit."
   echo "#"
   echo "# SAW llvm_verify of the SPARK AES, SHA-256 and HMAC-SHA-256"
-  echo "# implementations' bitcode against NSA's Cryptol. Local only (GNAT Pro"
-  echo "# LLVM), never run by CI: this record is the provenance of the result."
-  echo "# README \"SAW\"."
+  echo "# implementations' bitcode, and of the AES and SHA-256 spec layers'"
+  echo "# (lines \"proved spec layer: ...\"), against NSA's Cryptol. Local only"
+  echo "# (GNAT Pro LLVM), never run by CI: this record is the provenance of"
+  echo "# the result. README \"SAW\"."
   echo
   echo "commit      $COMMIT$DIRTY"
   echo "date        $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -349,27 +480,33 @@ record() {
   echo "solvers     rme (SAW's built-in); z3 on PATH: $V_Z3 (each proof's below)"
   echo "memory cap  $CAP_NOTE"
   echo "switches    ${SWITCHES[*]}"
+  echo "spec layer  ${SPEC_SWITCHES[*]/#-gnatec=$SAW_DIR\//-gnatec=saw/}"
+  echo "spec.adc    $(sha "$SPEC_ADC") saw/spec.adc: $(grep '^pragma' "$SPEC_ADC" | tr '\n' ' ' | sed 's/ $//')"
   for bc in "${BITCODE[@]}"; do
-    echo "bitcode     $(sha "$bc") $(basename "$bc")"
+    echo "bitcode     $(sha "$bc") ${bc#"$OBJ_DIR"/}"
   done
   # The sources the front end read for the units (their ALIs' D lines),
   # each once: ours by sha256; the GNAT Pro runtime's by name and the ALI's
   # checksum.
-  for u in "${ALL_UNITS[@]}"; do
-    grep '^D ' "$OBJ_DIR/$(basename "${u%.*}").ali"
+  for ali in "${ALL_ALIS[@]}"; do
+    grep '^D ' "$ali"
   done | awk '!seen[$2]++' | while read -r _ file _ cksum _; do
-    src="$(find "$SPARK_DIR/src" -name "$file" -print -quit)"
+    src="$(find "$SPARK_DIR/src" "$SAW_DIR" -maxdepth 3 -name "$file" -print -quit)"
     if [ -n "$src" ]; then
       echo "source      $(sha "$src") ${src#"$SPARK_DIR"/}"
     else
       echo "runtime     $cksum $file"
     fi
   done
+  # The runtime units compiled into the spec modules, by sha256.
+  for u in "${RTS_UNITS[@]}"; do
+    echo "runtime src $(sha "$RTS_SRC/$u") ${RTS_SRC#"$GNAT_LLVM_DIR"/}/$u (compiled: ${RTS_SWITCHES[*]})"
+  done
   for f in "${CRYPTOL_FILES[@]}"; do
     echo "cryptol     $(sha "$ROOT_DIR/$f") $f"
   done
   for f in "${OUR_CRYPTOL[@]}"; do
-    echo "cryptol     $(sha "$ROOT_DIR/$f") $f (ours: an instantiation)"
+    echo "cryptol     $(sha "$ROOT_DIR/$f") $f (ours)"
   done
   for p in "${PROVED[@]}"; do
     echo "proved      $p"
@@ -387,4 +524,4 @@ else
   record > "$RESULTS"
   echo ">> wrote ${RESULTS#"$ROOT_DIR"/}"
 fi
-echo ">> SAW: ${#PROVED[@]} proved, ${#NEGATIVE[@]} negative controls failed as they must (${T_TOTAL} s)"
+echo ">> SAW: $N_PROVED proved ($N_SPEC of the spec layer, in ${#PROVED[@]} lines), ${#NEGATIVE[@]} negative controls failed as they must (${T_TOTAL} s)"
