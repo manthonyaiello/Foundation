@@ -1,169 +1,246 @@
 # The campaign plan: SPARK AES, SHA-256 and HMAC against the Cryptol
 
-**Provenance.** Started 2026-10-16, before any issue was built. `main` is
-`a24edbf` (the crate scaffolding). Nothing is open. The issues are
-filed on `manthonyaiello/Foundation` as five epics with GitHub
-sub-issues, #1–#24 (table below). Milestone ids (M1.4) are in the issue
-titles and are how the issues refer to each other.
+**Provenance.** Rewritten 2026-10-19. `main` is `ac09517` (the merge of PR
+#52). The board below was counted on it by `spark/scripts/board.py`, after a
+whole-crate `check-proof.sh` (through the scheduler, on `foundation`) and a
+full `check-ffi.sh`. Open: PR #46 (#6, the x86_64 bootstrap), and the
+`x86-proof-margins` work it waits on. Everything else is merged.
 
 **A fresh session starts at "Next".**
 
 ## What the campaign is
 
-Foundation (NSA's Cryptol specifications, forked) has Cryptol specs and
-SAW proofs, and Rust behind a few fixed-size primitives. This campaign
-adds SPARK implementations of AES, SHA-256 and HMAC-SHA-256, proved
-**platinum**: every check proved, against a SPARK spec layer, with no
-assumptions.
+Foundation (NSA's Cryptol specifications, forked) has Cryptol specs and SAW
+proofs, and Rust behind a few fixed-size primitives. The campaign adds SPARK
+implementations of AES, SHA-256 and HMAC-SHA-256, proved **platinum**: every
+check proved, against a SPARK spec layer, with no assumptions.
 
-Two layers per algorithm, and two kinds of check:
-
-* **The spec layer** mirrors the Cryptol at minimal *semantic* distance:
-  Cryptol's types (bit sequences where the Cryptol has bits), its
-  iteration structure (`foldl` as a recursive ghost fold, `W@t` as a
-  recursive ghost function) and its parameterization. Representation
-  changes (bits to bytes, streaming) are not here.
-* **The implementation layer** is executable, and is proved equal to the
-  spec layer by gnatprove. Refinement layers in between (SHA-256's byte
-  level) are proved the same way.
-* **gnatprove** proves implementation = spec for all inputs.
-* **The FFI check** shows spec = Cryptol: the SPARK functions are
-  exported through C and called from Cryptol by `foreign`, and
-  equivalence properties are run with `:exhaust` or `:check`. It is
-  testing, not proof, and it is the only check of the spec layer's
-  faithfulness. SAW (E4) later proves implementation = Cryptol directly at
-  fixed sizes.
-
-## The issues
-
-| epic | sub-issues |
-|---|---|
-| **#1** E0 infrastructure | #2 M0.1 Cryptol/SAW on hex · #3 M0.2 CI · #4 M0.3 FFI harness · #5 M0.4 levels, pool, board · #6 M0.5 x86_64 bootstrap |
-| **#7** E1 AES | #8 M1.1 types, GF(2^8), S-boxes, transformations · #9 M1.2 KeyExpansion · #10 M1.3 Cipher, InvCipher, Main · #11 M1.4 implementation · #12 M1.5 (stretch) the Cryptol properties |
-| **#13** E2 SHA-256 | #14 M2.1 primitives and `step` · #15 M2.2 pad, parse, hash over bits · #16 M2.3 byte-level refinement · #17 M2.4 streaming implementation |
-| **#18** E3 HMAC-SHA-256 | #19 M3.1 spec · #20 M3.2 implementation |
-| **#21** E4 SAW | #22 M4.1 GNAT-LLVM/SAW spike · #23 M4.2 AES · #24 M4.3 SHA-256 and HMAC |
+* **The spec layer** mirrors the Cryptol at minimal semantic distance:
+  Cryptol's types (ghost Boolean arrays for arbitrary bit sequences), its
+  iteration structure (recursive ghost folds and functions), its names and its
+  parameterization (generics). Representation changes are separate layers.
+* **The implementation layer** is executable SPARK, proved equal to the spec
+  layer by gnatprove.
+* **The FFI check** tests spec = Cryptol: the SPARK is exported through C and
+  called from Cryptol by `foreign`, and equivalence properties run with
+  `:exhaust` or `:check`. Testing, not proof.
+* **SAW (E4)** is to prove implementation = Cryptol directly at fixed sizes,
+  on GNAT-LLVM bitcode.
 
 ## The board
 
-Counted by `spark/scripts/board.py` once M0.4 exists. Until then: no
-SPARK units, no FFI checks. CI: none yet (M0.2).
+Counted on `main` at `ac09517`:
 
-| function | spec | FFI-checked | impl proved | SAW |
-|---|---|---|---|---|
-| (none yet) | | | | |
+* **37 of 40 functions complete** (spec exists and is FFI-checked,
+  implementation proved, no holes).
+* **53 units, 3506 checks in the default gate: 3506 proved**, 0 justified,
+  0 unproved. Plus one slow unit proved on demand:
+  `foundation_spark-aes-spec-properties-sbox_entries`, 2482/2482, proved at
+  `46c5799`, fingerprint current.
+* **Holes:** 0 assumes, 0 justifications, 0 `SPARK_Mode Off`, 0 warning
+  suppressions, 0 check suppressions. 21 foreign bindings (the FFI export
+  units, each justified in `spark/scripts/trust-surface.txt`).
+* **FFI:** 118 properties, all passing (50+ AES, SHA-256, HMAC; see
+  `spark/cryptol/properties.txt`). CI FFI job about 10–14 min on x86_64.
+* **SAW:** not run (E4).
 
-A function's row is complete when the spec exists and is FFI-checked,
-its implementation is proved with zero unproved checks, assumptions and
-justifications, and (E4) SAW proves it at each fixed size. Always report
-the assumption and justification counts, even when they are zero.
+The three incomplete rows, honestly so:
+
+| row | why |
+|---|---|
+| `AES::SBox::affine` | ghost-only by design (#12); the implementation reads the S-box table |
+| `GF2::inverse (AES)` | same |
+| `SHA2::Preprocessing::pad` | no executable counterpart: `Final` writes only the last one or two padded blocks, proved through `Hash` |
+
+`Ch`, `Maj`, Σ, σ are "impl = spec" rows: the spec functions are non-ghost
+`Unsigned_32` functions that `Compress` calls at run time.
+
+## The issues
+
+| epic | sub-issues | state |
+|---|---|---|
+| **#1** E0 infrastructure | #2 Cryptol/SAW · #3 CI · #4 FFI harness · #5 levels, board · #6 x86_64 bootstrap | #3 #4 #5 closed; #2 open (SAW half); #6 open (PR #46) |
+| **#7** E1 AES | #8 #9 #10 #11 #12 | all closed |
+| **#13** E2 SHA-256 | #14 #15 #16 #17 | all closed |
+| **#18** E3 HMAC-SHA-256 | #19 #20 | all closed |
+| **#21** E4 SAW | #22 M4.1 spike · #23 M4.2 AES · #24 M4.3 SHA-256 and HMAC | open, paused for GNAT-LLVM |
+| **#48** E5 assurance beyond the proofs | #49 M5.1 coverage · #50 M5.2 constant time · #51 M5.3 binaries and performance | open, new |
 
 ## Next
 
-1. **M0.2 (#3)** CI on the memcp model: the trust-surface gate, the proof gate
-   and the cached prove workflow, green on the scaffold. First, because
-   every later PR is reviewed against it. It needs no Cryptol.
-2. **M0.1 (#2)** Cryptol and SAW on hex. Needs Tony only if an install needs a
-   password.
-3. **M0.3 (#4)** the FFI harness, with `xTimes` and `•` across, and its CI job.
-4. **M0.4 (#5)** levels, the pool, and the board.
-5. **M1.1 (#8) → M1.2 (#9) → M1.3 (#10) → M1.4 (#11)**, in order. AES calibrates every later
-   estimate and tests the unconstrained-array decision.
-6. **M2.1 (#14) → M2.2 (#15) → M2.3 (#16) → M2.4 (#17)**, then **M3.1 (#19) → M3.2 (#20)**.
-7. **M1.5 (#12)** (stretch) when a tick needs a break from E2, or after E3.
+1. **Fix the x86_64 proof margins, then merge PR #46 (#6).** #46's bootstrap
+   jobs install everything (toolchain, Cryptol, SAW 1.6; a bare image needs
+   only `ca-certificates curl git libc6-dev python3`), pass FFI, prove the
+   repo's `GF28.saw`/`SBox.saw` with SAW, and match the slow unit's
+   fingerprint on x86_64. But three level-2 checks time out on the x86_64
+   runner under the 10 s CI allowance, though they prove on arm64 and with
+   60 s on x86_64: `AES.Spec.Properties.GF28MultiplicationCorrect`,
+   `HMAC.SHA256_Impl.Lemma_Hash_Ext`, `HMAC.SHA256_Impl.Lemma_HMAC`. The
+   `x86-proof-margins` tick restructures those proofs (or raises the two
+   files to `Level_3` if it must), re-runs the slow proof (properties.ads is
+   one of its inputs), and restacks #46 on top.
+2. **Run `spark-prove-slow.yml` once** on the final `main` (Tony's decision:
+   only after everything is merged). It validates the on-demand workflow; it
+   should reproduce sbox_entries' recorded fingerprint and 2482/2482.
+3. **Move to the x86_64 IOD** (Tony, 2026-10-19): run the bootstrap from
+   `spark/README.md` ("Bootstrapping the x86_64 instance"), confirm the gates.
+   The slow unit's fingerprint already matched on the x86_64 CI runner.
+4. **M4.1 (#22)** on the IOD: GNAT-LLVM + SAW 1.6, one AES leaf
+   (`Sub_Bytes` or `X_Times`) proved by `llvm_verify` against the Cryptol.
+   **Blocked on GNAT-LLVM** for x86_64 Linux: a GNAT Pro LLVM build, or a
+   source build of `AdaCore/gnat-llvm` (Tony to say which). Template: the
+   repository's `algorithms/AES/rust/*/theorems/saw.py` (`mir_verify`,
+   leaf lemmas, uninterpreted compositions).
+5. **M4.2 (#23)** AES at k = 128/192/256, then **M4.3 (#24)** SHA-256
+   `Compress` and HMAC at fixed message sizes.
+6. **E5** when E4 waits on something: **M5.1 (#49)** coverage first (Tony: do
+   it if the queue runs dry), then **M5.2 (#50)** constant time (the AES
+   table S-box leaks), then **M5.3 (#51)** binaries and performance (on the
+   IOD for x86_64 numbers).
 
-Off the main line:
-* **M0.5 (#6)** (the x86_64 bootstrap) and then **M4.1 (#22)** (the GNAT-LLVM/SAW
-  spike), when Tony brings up the 8-CPU instance. They depend on nothing
-  but M0.3. **M4.2 (#23)** follows M1.4, and **M4.3 (#24)** follows M2.4 and M3.2.
+Small items, any time:
+* **The slow-proof follow-ups** (Open for Tony, below), as one small PR.
+* **Scheduler inside `prove.sh`**: use `spark-scheduler` when on PATH, direct
+  otherwise (CI, IOD), so the long wrapper command goes away.
+* **One bit-sequence type**: `AES.Spec.Main.Bits` (index `0 .. 2**127-1`) and
+  `SHA2.Bits` (`0 .. 2**126`) duplicate each other. Unify into a common unit.
+  Touches sbox_entries' inputs? Check with `slow_proofs.py inputs` first.
+* **`board-rows.txt` row kinds**, if Tony agrees (below).
+* **`#52`'s FFI job was 14m26s against `main`'s 9m55s** with only ~5 s of
+  new properties: find out why.
+* **A cheaper SBoxCorrect proof**: about 7.5 min of its 26 is gnat2why reading
+  the 7,700-line generated unit.
 
 Not yet, and not filed:
-* A T-table AES, proved equal to the spec. Only if the byte-wise
-  implementation's speed matters to someone.
-* `FinalBits` for SHA-256 (RFC 6234's trailing partial byte). Cheap once
-  M2.3 states the padding lemma for general bit lengths.
+* A T-table AES (only if speed matters; M5.3 will say).
+* `FinalBits` for SHA-256 (trailing partial byte): cheap, since the padding
+  lemma already covers every bit length.
 * SHA-224/384/512 instances of the E2 generic.
-* Keccak/SHA-3, KW/KWP. ECDSA is out of scope (bignum arithmetic).
+* HMAC with truncated output (λ < 256).
+
+## Machines
+
+* **`foundation`**: an aarch64 Linux container on niss, 11 CPUs, long-lived.
+  Main checkout `/work/Foundation`. alr 2.1.1, gnatprove FSF 16.1.0,
+  gprbuild 26.0.1 on PATH; Cryptol 3.6.0 built from source with FFI
+  (`~/.local/bin/cryptol`; headers in `~/.local/sysroot`). **No system C
+  toolchain**: GNAT's gcc is the only one. No SAW, no GNAT-LLVM (neither
+  exists for aarch64 Linux). `/tmp` is a ramfs. `spark-scheduler` pool of 10.
+* **The x86_64 IOD**: dies 24 hours after it starts. Bootstrap with
+  `spark/scripts/bootstrap-x86_64.sh` (PR #46). No scheduler: gnatprove with
+  `PROVE_JOBS=$(nproc)`. **Push after every commit.** Cryptol and SAW are
+  the x86_64 releases. Needs root or passwordless sudo only if the image lacks
+  the apt prerequisites the script names.
 
 ## How the ticks run
 
 * The `campaign` skill's procedure holds, with `agent-brief.md`.
-* **Stacking.** The first tick targets `main`. Each later tick targets
-  the tick below it, unless Tony has merged the stack. Check the PRs
-  first.
-* **Two machines.** Proofs and FFI checks run on hex, through
-  `spark-scheduler`. GNAT-LLVM and SAW-on-SPARK run on the ephemeral
-  x86_64 instance, which dies 24 hours after it starts: on it, **push
-  after every commit**, and gnatprove calls `-j8` directly (the tick
-  is the machine's only user).
-* **CI is the floor** once M0.2 lands: a tick's PR is not reported done
-  until its checks are green on the PR's head (`gh pr checks`). Green CI
-  is necessary, not sufficient: the issue's own numbers still go in the
-  PR.
-* **Controls.** A tick that changes a shared unit (`Foundation_Spark`
-  root, the common types, the FFI shims or the scripts) re-runs the
-  board and `check-ffi.sh` for every unit already on it. A unit that
-  lost a proved check, or a property that stopped passing, is a
-  regression.
+* **Parallel ticks** are fine; each proves through the scheduler on
+  `foundation`. Parallel ticks are siblings; restack into one line before
+  merging.
+* **The orchestrator merges** verified PRs, bottom up, merge commits,
+  retargeting each to `main` first.
+* **CI is the floor**: trust surface, GNATdoc, proof (arm64), FFI (x86_64).
+  PR proof job timeout 30 min. Green CI is necessary, not sufficient.
 
 ## Decisions taken — do not re-ask
 
-* **Crate.** One Alire crate at `spark/` (`foundation_spark`), not one per
-  algorithm. gnat_native 16.1.0, SPARKlib 16.1.0, gnatprove FSF 16.1.0.
-* **Faithfulness.** The spec layer stays semantically close to the
-  Cryptol. Representation changes go in separately proved layers.
-* **FFI.** Our Cryptol modules live in `spark/cryptol/` and declare
-  `spark_<Name>` foreign functions. The NSA `.cry` files and their Rust
-  `.dylib`s are never modified or replaced.
-* **AES key sizes.** Unconstrained arrays with `Key k` as a precondition.
-  Fallback, if that proves rough: a generic per key size. M1.4
-  records which.
-* **SHA-2 generality.** A generic mirroring `SHA2::Main`'s parameters,
-  instantiated for SHA-256 only.
-* **Bit sequences.** Ghost Boolean arrays, 128-bit integer index,
-  `Length < 2**64`. Zero runtime cost; the FFI build runs them with
-  ghost code enabled.
-* **Byte-only implementation.** SHA-256 and HMAC hash whole bytes. The
-  padding lemma covers general bit lengths.
-* **Pool.** gnatprove goes through `spark-scheduler` on hex. M0.4 settles
-  the grant policy.
-* **CI.** On the memcp model, in workflow files of our own: a trust-surface
-  manifest with a justification per site, a proof gate with an (empty)
-  xfail list, a file-based proof cache that PRs restore and only `main`
-  saves, a daily cold reprove, and memcp's GNATdoc gate (every entity
-  documented, every doc block on the right declaration). Placed first in
-  the queue.
-* **Upstream workflows** are disabled on the fork (`gh workflow disable`,
-  files untouched) once Actions are enabled. Only our `spark-*` workflows
-  run.
-* **Plan location.** This file, committed. There is one `PLAN.md`, and its
-  history is git's.
-* **Epics.** One parent issue per epic (E0–E4), with GitHub sub-issues.
+* **Crate.** One Alire crate at `spark/` (`foundation_spark`). gnat_native
+  16.1.0, SPARKlib 16.1.0, gnatprove FSF 16.1.0. Pins live in
+  `spark/scripts/toolchain-pins.env` (with PR #46).
+* **Faithfulness.** The spec layer stays semantically close to the Cryptol.
+  Representation changes go in separately proved layers. Renamings forced by
+  Ada or gnatdoc are recorded in the source comment that cites the `.cry`.
+* **FFI.** Our Cryptol modules live in `spark/cryptol/` and declare body-less
+  `spark_<Name>` foreigns. The NSA `.cry` files and libraries are never
+  modified. `check-ffi.sh` requires each of our modules to load its library
+  and fails if any NSA module loads one. Ghost spec functions are exported
+  through a ghost shim plus a non-ghost export unit that Imports the
+  `___ghost_`-prefixed link name; executables are exported directly and
+  built without `-gnata`. Always name type parameters in properties.
+* **FFI testing is targeted** (Tony): boundary cases, KATs, bulk random
+  samples on the executables proved equal to the spec (so faithfulness is
+  checked transitively), a few direct tests per ghost spec export. A long run
+  at large N is deferred to times Tony chooses.
+* **AES key sizes.** Unconstrained arrays with an explicit `K` and
+  `Is_Key_Words`/`Is_Round_Keys` preconditions. Held through M1.4; no generic.
+* **SHA-2 generality.** A generic mirroring `SHA2::Main`, instantiated for
+  SHA-256 only. Library-level instances need `pragma SPARK_Mode (On)`.
+* **Bit sequences.** Ghost Boolean arrays, 128-bit index, length < 2**64.
+* **Streaming.** GNAT 16 rejects ghost record components, so streaming
+  contexts carry their message through ghost lemmas (`Lemma_Update`,
+  `Lemma_Final`) called after each operation.
+* **Machines.** As above. No scheduler on the IOD. The scheduler's grant goes
+  to gnatprove through `{tokens}`.
+* **Levels.** Committed per file in the GPR through `Level_2/3/4` switch
+  lists, never literal `--level`/`--timeout`. CI adds a wall-clock allowance
+  (`FOUNDATION_SPARK_PROOF_ALLOWANCE=ci`).
+* **Slow proofs** (Tony): units in `spark/scripts/proof-slow.txt` are proved
+  on demand (`prove-slow.sh`, `spark-prove-slow.yml`), not by the default
+  gate, which instead checks a fingerprint of their inputs and fails STALE on
+  any change.
+* **CI.** Arm64 runners for the gates, x86_64 for FFI. The proof cache is
+  saved only by `main`; the cold refresh is scheduled.
+* **Merging** (Tony, 2026-10-18): the orchestrator merges.
+* **E4 waits for GNAT-LLVM**, on the x86_64 IOD.
+* **Plan location.** This file. There is one `PLAN.md`; its history is git's.
 
 ## Open for Tony
 
-* Enable Actions on the fork (Actions tab) when M0.2's PR is ready. That
-  is UI-only, and the tick disables NSA's workflows right after.
-* Bring up the 8-CPU x86_64 instance when M0.5 is next. Say when its
-  24 hours start.
-* GNAT-LLVM source for x86_64 (M4.1): a GNAT Pro LLVM build, or a
-  source build?
+* **GNAT-LLVM for x86_64 Linux** (blocks #22): a Pro build, or try building
+  `AdaCore/gnat-llvm` from source on the IOD?
+* **Slow-proof follow-ups** (from PR #44), with my recommendations:
+  1. the gate's `-u` run passes `-A=generic-not-analyzed` (a command-line
+     warning tag the trust gate does not see): accept;
+  2. the fingerprint closure includes bodies, not only specs: keep
+     (conservative);
+  3. fingerprint `alire.toml` (it pins SPARKlib): add it;
+  4. timeouts 30 min (PR proof) and 60 min (refresh): keep.
+* **Board row kinds**: a fourth field in `board-rows.txt`: `impl` (default),
+  `spec-only` (with a reason; out of the denominator, counted separately),
+  `subsumed-by <row>` (`pad` → `hash`)? And should `affine` and
+  `GF2::inverse` get FFI properties?
+* **"impl = spec" rows** (`Ch`, `Maj`, Σ, σ): acceptable as complete?
+* **AES bytes as `Unsigned_8`** with a Cryptol-order bit accessor, rather
+  than ghost Boolean arrays, for fixed 8-bit words: acceptable?
 
 ## Live ambushes
 
-* `alr` (`~/Local/Software/alr/bin`) and `gnatprove` (`~/.alire/bin`)
-  are not on PATH. Prepend both.
-* `alr init` without `-n` hangs on a prompt. Use `alr -n` always.
-* zsh treats a word starting with `=` as a command lookup: `echo =====`
-  fails. Quote separators.
-* `spark-scheduler run` does not tell its child how many tokens it got.
-  `--up-to N -- gnatprove -jN` can oversubscribe.
-* Cryptol finds a `foreign` library by the module file's name, next to
-  the file. For a `foreign` with a Cryptol body, a library named wrong
-  is not loaded, Cryptol evaluates the Cryptol definition instead, and
-  the check compares the Cryptol with itself. Our modules declare
-  `foreign` without a body so that a missing library is a load error.
-  This is believed, not yet seen: M0.3 confirms it for Cryptol 3.6.
-* `gh pr create` on a fork defaults to the upstream
-  (`NationalSecurityAgency/Foundation`). Always pass
+* **The auto-mode permission classifier** blocks wrapper commands it has no
+  allow rule for (`spark-scheduler run ... -- env ...`), and then grows
+  suspicious of nearby commands. `.claude/settings.local.json` on `foundation`
+  (untracked, Tony's) allows `spark-scheduler run/status`,
+  `[spark/]scripts/prove.sh`, `[spark/]scripts/check-*.sh`,
+  `python3 [spark/]scripts/board.py`. Start commands with those prefixes.
+  The classifier refuses to let the orchestrator edit settings itself.
+* **A fresh worktree has no Alire workspace**: `alr -n build` in its
+  `spark/` before any proof, or gnatprove fails at once on sparklib's lib
+  dir.
+* **A hand re-run replays cached proofs** (about 2 s); `prove.sh` refuses
+  `-f`. CI's run is the cold one.
+* **gnatdoc 26 crashes** on: `declare` expressions; a line break right after
+  `for X in A .. B =>` in an aggregate; an iterated aggregate nested in
+  another expression; package renamings; `is` alone on its line before an
+  iterated aggregate; a private-part expression function whose quantified
+  expression breaks after `=>`. It rejects `@formal` on generic-subprogram
+  formals. gnatdoc is not on PATH on `foundation` (a copy lives in a
+  session scratchpad; the CI action installs it).
+* **gnat1 16.1 (aarch64) crashes** (`Storage_Error`) on an iterated aggregate
+  over a 64- or 128-bit index range written `[for N in T range A .. B => …]`;
+  use `[for N in Subtype'Range => …]`.
+* **The provers do not treat Ada array `=` as equality.** Extensionality and
+  congruence lemmas (`*_Ext` in SHA-2, `*_Eq` in AES) are routinely needed.
+* **x86_64 provers are slower on some goals than arm64**: three checks that
+  prove in under 10 s on arm64 need up to 60 s on the x86_64 runner. A green
+  arm64 gate does not imply a green x86_64 gate; the bootstrap job runs the
+  x86_64 gate.
+* **Executing ghost recursions is exponential** (`KeyExpansion.W`, SHA-2's
+  `W`): never put a large-N FFI property on a ghost spec export.
+* **Cryptol `[l /^ 8][8]`** does not determine `l`: pass `` `{l} ``.
+* **zsh**: a word starting with `=` is a command lookup; `$var` with spaces
+  is not word-split (use `${(f)...}` arrays); `for` loops over a string
+  of names need splitting.
+* **`gh pr create` on a fork** defaults to the upstream. Always
   `--repo manthonyaiello/Foundation`.
+* **Subagent reports call `foundation` "hex"** out of habit: the numbers are
+  from `foundation`.

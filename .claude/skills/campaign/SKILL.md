@@ -14,7 +14,11 @@ A tick is **one coding agent in its own worktree**, reading `agent-brief.md`
 beside this file. It writes the SPARK, the FFI properties and the proof, and it
 opens the PR. You do not write the code.
 
-**Tony merges. The campaign never merges.**
+**Merging.** Since 2026-10-18 Tony has the orchestrator merge, once a PR is
+verified: bottom up, `gh pr edit <n> --base main` then `gh pr merge <n>
+--merge` (merge commits, never squash: squashing breaks the stacked
+branches), so each PR's `Closes #N` fires. A tick never merges. Do not delete
+a merged branch while a running tick is based on it.
 
 ## Continuing
 
@@ -31,11 +35,9 @@ On "continue the campaign" / "/campaign", in this order:
    `git log --oneline -1 origin/main`,
    `gh pr list -R manthonyaiello/Foundation`, `git worktree list`. A plan that
    says "N PRs open" may describe a world Tony has since merged.
-4. **Check the machine.** `spark-scheduler status`. Other sessions
-   (spark-houdini, spark-corpus, spark-iglm, spark-mc) prove through the same
-   pool. That does not stop a tick, but it goes in the tick's wall-clock note,
-   and a proving tick does not start while another of *this* campaign's
-   proving runs is live. For an x86_64 tick, ask Tony when the instance's 24
+4. **Check the machine** (the plan's "Machines" section). On `foundation`:
+   `spark-scheduler status`; ticks share its pool, and that goes in each
+   tick's wall-clock note. On the x86_64 IOD: ask Tony when the instance's 24
    hours started, and do not launch a tick that cannot finish and push inside
    them.
 5. **Check the next item's premise before building on it.** These issues were
@@ -52,12 +54,13 @@ to ask whether to continue.
 
 ## A code tick
 
-One agent, one worktree, one PR. **One proving tick at a time on hex.** Prover
-capacity is pooled through `spark-scheduler`, so two runs would not corrupt
-each other outright. But GNATprove's `--level` is a wall-clock timeout, so a
-loaded machine can turn a slow proof into an unproved check, and two ticks'
-results on one board cannot be attributed to one change. A tick on the x86_64
-instance (M0.5, E4) may run alongside a hex tick.
+One agent, one worktree, one PR. **Ticks may run in parallel** (Tony,
+2026-10-18), each proving through `spark-scheduler` on `foundation`, which
+passes the grant to gnatprove (`-j{tokens}`). GNATprove's `--level` is a
+wall-clock timeout, so a loaded machine can turn a slow proof into an
+unproved check: re-run an unproved check once before concluding, and treat
+CI as the authoritative gate. Parallel ticks are siblings; restack them into
+one line before merging so each PR's delta is its own.
 
 Launch the coding agent (`general-purpose`, no model override) with a prompt
 that says:
@@ -65,7 +68,7 @@ that says:
 * the branch and worktree names (`issue-<n>-<slug>`, under `.claude/worktrees/`);
 * the board as you counted it on the BASE;
 * a scratchpad path;
-* which machine (hex, or the x86_64 instance and when it dies);
+* which machine (`foundation`, or the x86_64 IOD and when it dies);
 * anything the plan says about this item.
 
 Tell it to read `.claude/skills/campaign/agent-brief.md` first.
@@ -80,7 +83,7 @@ tick), and the plan says when they do.
 Inspect the worktree yourself (`git log`, `git status --porcelain`, whether the
 branch is pushed), then resume it with SendMessage, pasting the state you
 verified. Tell it to commit in small working increments, so the next stall
-costs nothing. On the x86_64 instance, a stall near hour 24 means the
+costs nothing. On the x86_64 IOD, a stall near hour 24 means the
 instance may be gone: what is pushed is all there is.
 
 ## What to run, and what not to re-run

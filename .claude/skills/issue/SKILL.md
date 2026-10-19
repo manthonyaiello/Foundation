@@ -52,8 +52,8 @@ An issue is not done when the code compiles. It is done when it has a
    gate, M0.2, fails on an undocumented entity or a doc block on the wrong
    declaration). A spec-layer comment names the `.cry` declaration it mirrors.
 6. **CI green** on the PR's head (`gh pr checks <n> -R manthonyaiello/Foundation`).
-   It is necessary, not sufficient: CI's proof runs on a slower runner than hex,
-   so a proof that passes on hex and times out in CI is a failure to fix (raise
+   It is necessary, not sufficient: CI's proof runs on a slower runner than
+   `foundation`, so a proof that passes locally and times out in CI is a failure to fix (raise
    the unit's level, or simplify the proof), not to explain away.
 
 The issue body's "Done when" adds to this list, never subtracts. Until M0.2–M0.4
@@ -85,35 +85,33 @@ Pass `--repo manthonyaiello/Foundation --base <BASE>` explicitly.
 `alr -n build` from the worktree's `spark/` (always `-n`: without it, alr may
 wait on a prompt forever).
 
-**The toolchain is not on PATH.** Prepend on the same command:
-
-```
-PATH=/Users/tony/Local/Software/alr/bin:/Users/tony/.alire/bin:$PATH
-```
-
-Confirm with `gnatprove --version` (FSF 16.1.0). On the x86_64 instance, the
-bootstrap script (M0.5) prints the PATH it set up.
+**The toolchain.** On `foundation`, alr, gnatprove and Cryptol are on PATH
+(`~/.local/bin/cryptol` was built from source). On the x86_64 IOD, source the
+`env.sh` that `spark/scripts/bootstrap-x86_64.sh` writes. Confirm with
+`gnatprove --version` (FSF 16.1.0).
 
 **Cryptol must load our library, not fall back.** Cryptol finds a `foreign`
-function's library by the module file's name, beside the file. Our modules
-declare `foreign` functions without a Cryptol body, so a missing library is a
-load error rather than a silent fallback to the Cryptol definition (which
-would compare the Cryptol with itself). Never give a `spark_*` foreign a body.
-(M0.3 confirms this behaviour of Cryptol 3.6. If it differs, the harness must
-check the load itself.)
+function's library by the module file's name, beside the file. In Cryptol 3.6
+a body-less `foreign` whose library is missing still *loads* (with a warning),
+and only its calls fail; NSA's foreign-with-body modules silently run their
+Cryptol body. `check-ffi.sh` therefore requires the "Loading dynamic library"
+line for each of our modules and fails if any NSA module loads a library.
+Never give a `spark_*` foreign a body, and always name a property's type
+parameters (`` `{k} ``, `` `{l} ``) explicitly: `[l /^ 8][8]` does not fix `l`.
 
 ## Proving
 
-* **Through the pool, on hex.** Every gnatprove call goes through
-  `spark-scheduler` (`spark/scripts/prove.sh`, from M0.4). `spark-scheduler
-  run` does not tell its child how many tokens it was granted, so never pair
-  `--up-to N` with `-jN` for N > 1. For one unit by hand:
-  `spark-scheduler run --up-to 1 --strategy prove --key foundation|<unit> --variant spark --level <n> -- gnatprove -P foundation_spark.gpr -u <file> --level=<n> -j1`.
-  `spark-scheduler status` shows who else is on the machine (spark-houdini,
-  spark-corpus and others share it). That goes in the PR's wall-clock note.
-* **On the x86_64 instance**, the tick is the only user. gnatprove runs
-  `-j8` directly, and **every commit is pushed at once**: the machine dies
-  24 hours after it starts, and nothing unpushed survives.
+* **Through the scheduler, on `foundation`.**
+  `spark-scheduler run --up-to 6 --key 'foundation|<unit or crate>' --strategy prove --variant spark --level <n> -- env -C <worktree>/spark PROVE_JOBS={tokens} scripts/prove.sh [-u <file>]`
+  (or `scripts/check-proof.sh` for the gate). The scheduler substitutes the
+  grant for `{tokens}`. Start the command with `spark-scheduler`: the
+  permission allow rules match that prefix. `spark-scheduler status` shows
+  who else is proving; that goes in the PR's wall-clock note.
+* **On the x86_64 IOD**, the tick is the only user: `PROVE_JOBS=$(nproc)
+  scripts/check-proof.sh` directly, and **every commit is pushed at once**:
+  the machine dies 24 hours after it starts, and nothing unpushed survives.
+* **Slow units** in `spark/scripts/proof-slow.txt` are proved on demand
+  (`scripts/prove-slow.sh`); the gate checks their input fingerprint.
 * **Levels.** Each unit proves at its committed level. Do not lower one to go
   faster, and do not quote a result at another level as if it were the result.
   Raising a unit's level is allowed. It goes in the GPR in the same PR, with
