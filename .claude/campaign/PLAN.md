@@ -1,13 +1,14 @@
 # The campaign plan: SPARK AES, SHA-256 and HMAC against the Cryptol
 
-**Provenance.** Rewritten 2026-10-19 (evening, UTC) at `b82c62c` (the merge
-of PR #60), on the x86_64 IOD. The gnatprove board was re-counted that day on
-`ec57e9e` on the IOD with FSF 16.1 (`check-proof.sh`, `-j8`, CI allowance:
-3554/3554, 786 s); PRs #57, #58 and #60 since changed no `spark/src`,
-`spark/cryptol` or FFI script. The SAW numbers are `spark/saw/results.txt` at
-`b82c62c`, re-run by the orchestrator at the head of each PR. **Open: #59
-(M4.4) in flight** on branch `issue-59-saw-spec`, and this plan's own PR.
-E0–E3 and #22–#24 of E4 are closed; #59 (E4) and E5 remain.
+**Provenance.** Rewritten 2026-10-19 (evening, UTC); updated 2026-10-20
+(00:00 UTC) at `b1c9666` (the merge of PR #63), on the x86_64 IOD. The
+gnatprove board was re-counted on 2026-10-19 on `ec57e9e` on the IOD with FSF
+16.1 (`check-proof.sh`, `-j8`, CI allowance: 3554/3554, 786 s); PRs #57–#63
+since changed no `spark/src`, `spark/cryptol` or FFI script. The SAW numbers
+are `spark/saw/results.txt` at `b1c9666`, re-run by the orchestrator at the
+head of each PR. **Nothing is open** but this plan's own PR. E0–E3 and
+#22–#24 of E4 are closed; #59 (E4, mostly done by PR #63) and E5 remain.
+**The day's measurements** are in `.claude/campaign/measurements/2026-10-19-iod.md`.
 
 **A fresh session starts at "Next".**
 
@@ -28,25 +29,25 @@ check proved, against a SPARK spec layer, with no assumptions.
   called from Cryptol by `foreign`, and equivalence properties run with
   `:exhaust` or `:check`. Testing, not proof.
 * **SAW (E4)** proves implementation = Cryptol directly at fixed sizes, on
-  bitcode from GNAT Pro 27's LLVM back end (#22–#24, done), and is to prove
-  spec layer = Cryptol the same way (#59). Local only: nobody without GNAT Pro
+  bitcode from GNAT Pro 27's LLVM back end (#22–#24, done), and spec layer =
+  Cryptol the same way (#59, mostly done). Local only: nobody without GNAT Pro
   can reproduce it, so CI never runs it and `spark/saw/results.txt` records
   its provenance.
 
 ## The board
 
-Counted on `main` (gnatprove at `ec57e9e`, unchanged since; SAW at `b82c62c`):
+Counted on `main` (gnatprove at `ec57e9e`, unchanged since; SAW at `b1c9666`):
 
 * **37 of 40 functions complete** (spec exists and is FFI-checked,
   implementation proved, no holes).
-* **53 units, 3506 checks in the default gate: 3506 proved**, 0 justified,
+* **53 units, 3554 checks in the default gate: 3554 proved**, 0 justified,
   0 unproved. Plus one slow unit proved on demand:
   `foundation_spark-aes-spec-properties-sbox_entries`, 2482/2482, proved at
   `46c5799`, fingerprint current.
 * **Holes:** 0 assumes, 0 justifications, 0 `SPARK_Mode Off`, 0 warning
   suppressions, 0 check suppressions. 21 foreign bindings (the FFI export
   units, each justified in `spark/scripts/trust-surface.txt`).
-* **FFI:** 118 properties, all passing (50+ AES, SHA-256, HMAC; see
+* **FFI:** 119 properties, all passing (50+ AES, SHA-256, HMAC; see
   `spark/cryptol/properties.txt`). CI FFI job about 10–14 min on x86_64.
 * **SAW (implementation layer, local, GNAT Pro 27 LLVM bitcode, -O0):**
   87 proved, 8 negative controls fail as they must, 0 assumed specs
@@ -57,8 +58,20 @@ Counted on `main` (gnatprove at `ec57e9e`, unchanged since; SAW at `b82c62c`):
   119, 120, 128, 200 bytes; HMAC at (key, text) = (0,0), (32,3), (32,32),
   (64,3), (64,32), (65,3), (100,32). **4 of them (Hash at 0/64/128, HMAC
   (0,0)) are in a lax-arithmetic module** (null-range poison, below): there,
-  absence of overflow rests on gnatprove, not SAW. 156 s in all; peak well
-  under 1 GB. `board.py`'s SAW column still prints "not run".
+  absence of overflow rests on gnatprove, not SAW (accepted, below).
+* **SAW (spec layer, #59, PR #63):** 2162 proved, 9 more negative controls,
+  0 assumed specs. AES 1064: GF(2)/GF(2^8), **`Affine` and `GF2::inverse`
+  for every byte** (the two rows below that have no implementation), the
+  round functions, `KeyExpansion.W` per index (44/52/60 lemmas, never
+  unfolded), KeyExpansion, Cipher, InvCipher, InvCipher' at 128/192/256.
+  SHA-256 1098: `W` per index, `Step` = NSA's `step`, **`Pad` at the 12 M4.3
+  lengths**, `Hash` at 9 lengths (0–119 bytes). **832 of them lax** (`Pad`,
+  `Hash` and their lemmas). Spec-layer rows SAW-proved: 34 of 40. Not proved:
+  `Join_Block` and so `Encrypt`/`Decrypt` (SAW 1.6 rejects an i128 GEP
+  index), `Hash` at 120/128/200 bytes, the HMAC spec layer.
+* **SAW in all:** 2249 proved, 17 negative controls, 2723 s, peak 2.5 GB
+  (orchestrator's re-run at `18b8dc2`). `board.py`'s SAW column still prints
+  "not run".
 
 The three incomplete rows, honestly so:
 
@@ -79,7 +92,7 @@ The three incomplete rows, honestly so:
 | **#7** E1 AES | #8 #9 #10 #11 #12 | all closed |
 | **#13** E2 SHA-256 | #14 #15 #16 #17 | all closed |
 | **#18** E3 HMAC-SHA-256 | #19 #20 | all closed |
-| **#21** E4 SAW | #22 M4.1 spike · #23 M4.2 AES · #24 M4.3 SHA-256 and HMAC · #59 M4.4 spec layer | #22 (PR #57), #23 (PR #58), #24 (PR #60) closed; #59 in flight |
+| **#21** E4 SAW | #22 M4.1 spike · #23 M4.2 AES · #24 M4.3 SHA-256 and HMAC · #59 M4.4 spec layer | #22 (PR #57), #23 (PR #58), #24 (PR #60) closed; #59 open (PR #63 merged; 3 gaps left) |
 | **#48** E5 assurance beyond the proofs | #49 M5.1 coverage · #50 M5.2 constant time · #51 M5.3 binaries and performance | #49 closed (PR #55); #50, #51 open |
 
 ## Next
@@ -97,18 +110,23 @@ Done on 2026-10-19, on the x86_64 IOD with Tony's GNAT Pro 27.0 install:
   the units with a pinned `llvm-link` 21.1.8 (LLVM's own release).
 * **#24 M4.3** (PR #60): SHA-256 `Compress` for all inputs, `Hash` and HMAC
   at fixed sizes; `check-saw.sh` caps every SAW run at 10 GB.
-* **#59 M4.4 filed** and started: SAW of the spec layer.
+* **#59 M4.4** (PR #63, `Part of #59`): the spec layer, 2162 results (board
+  above). Spec bitcode: `saw/spec.adc` (`Assertion_Policy (Ignore)` then
+  `(Ghost => Check)`; GNAT rejects the `others =>` form), `-gnatp`,
+  `-fno-inline` (GNAT-LLVM marks expression functions `alwaysinline`).
+  GNAT's runtime (`s-secsta`, `s-soflin`) is compiled and executed for the
+  secondary stack; `saw/saw_soft_links.ads` is a one-line trusted harness
+  adapter (static chain). `saw/SHA256Step.cry` copies `step`'s local
+  definitions, tied to NSA's `step` by the `Step` proof. A full
+  `check-saw.sh` now takes about 45 min.
 
-1. **#59 M4.4** (in flight on `issue-59-saw-spec`): the spec layer's ghost
-   code compiled to bitcode (`Assertion_Policy (Ghost => Check, others =>
-   Ignore)`, `-gnatp`), proved against the Cryptol at fixed sizes. AES first;
-   `affine` and `GF2::inverse` (ghost-only rows) are the most valuable
-   results. Recursive ghost functions (`KeyExpansion.W`, SHA-2's `W`) by
-   per-index overrides, never unfolded (Tony: unfolding should never be
-   needed). Check its PR for the lax-arithmetic count.
-2. **Before the IOD dies** (about 14:00 UTC 2026-10-20): everything pushed;
-   nothing about the SAW work lives only on the instance (the tool setup is
-   in "Machines").
+1. **Before the IOD dies** (about 14:00 UTC 2026-10-20): everything pushed;
+   Tony retrieves `repos/Foundation` at shutdown, which carries the untracked
+   raw logs (`.claude/campaign/runs/2026-10-19-iod/`).
+2. **#59's three gaps**, if wanted (they need a machine with GNAT Pro):
+   `Join_Block`'s i128 GEP index (a SAW issue upstream, or a route around
+   it), `Hash` at 3–4 blocks (cost, about 30 min per run), the HMAC spec
+   layer and `SHA256_Bytes`.
 3. **E5**: **M5.2 (#50)** constant time (the AES table S-box leaks), then
    **M5.3 (#51)** binaries and performance (x86_64 numbers need an IOD).
    Neither needs GNAT Pro.
@@ -125,7 +143,14 @@ Small items, any time:
   at `hmac-sha256_impl.adb:263` (FSF 16.1 does not). Making these robust
   across both toolchains is the repair.
 * **`board.py`'s SAW column**: read `spark/saw/results.txt` instead of
-  printing "not run"; count lax-module results separately.
+  printing "not run"; count lax-module results separately, and the spec
+  layer's rows apart from the implementation's.
+* **Why SAW of the spec layer is so much harder** (Tony: interesting, worth
+  an analysis): 87 results in about 36 s and 0.3 GB for the implementation
+  against 2162 in about 1885 s and 2.5 GB for the spec layer, with 4 against
+  832 lax. Numbers and first hypotheses in the measurements file. Relevant
+  to C-to-SPARK translation equivalence, where the same contrast (code
+  written to be clear against code written to run) will recur.
 * **SAW's unproved pieces**, if wanted: `InvCipher'` (`Decrypt_Block_Prime`,
   `Inv_Round_Prime`), `Dot`; SHA-256's `Load_Block`, `To_Digest`, `Init`,
   `Update`, `Final` on their own, `Hash_Chunked`, and the incremental HMAC
