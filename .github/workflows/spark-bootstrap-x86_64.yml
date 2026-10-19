@@ -1,0 +1,163 @@
+name: SPARK bootstrap x86_64
+
+# Tests spark/scripts/bootstrap-x86_64.sh (issue #6, M0.5), the one command
+# that takes the ephemeral x86_64 instance from a bare Ubuntu 24.04 to a green
+# check-ffi.sh. The instance dies 24 hours after it starts, so the script has
+# to work the first time there; this is where it is shown to.
+#
+# bare       a GitHub ubuntu-24.04 (x86_64) runner with NO setup action and
+#            no checkout: the script is fetched as the README's one command
+#            fetches it, and installs and clones everything itself. Then it
+#            runs again (--no-checks), to show the tool phases are idempotent,
+#            and a SAW smoke test runs two of NSA's small AES SAW scripts.
+# container  the same script in a plain ubuntu:24.04 container (root, nothing
+#            installed): the strictest bare image, and the one that measures
+#            what the script must apt-install, i.e. what needs sudo on the
+#            instance.
+# lint       shellcheck.
+#
+# Both bootstrap jobs prove with FOUNDATION_SPARK_PROOF_ALLOWANCE=ci (the
+# script's default, and spark-prove.yml's), and cold: no proof cache.
+on:
+  pull_request:
+    paths:
+      - 'spark/scripts/bootstrap-x86_64.sh'
+      - 'spark/scripts/toolchain-pins.env'
+      - '.github/workflows/spark-bootstrap-x86_64.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The commit under test: the PR's head, or the dispatched ref's.
+  FOUNDATION_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+  FOUNDATION_REMOTE: https://github.com/${{ github.repository }}.git
+  FOUNDATION_SPARK_PROOF_ALLOWANCE: ci
+
+jobs:
+  lint:
+    name: shellcheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: shellcheck
+        run: shellcheck -x spark/scripts/bootstrap-x86_64.sh
+
+  bare:
+    name: Bootstrap (bare ubuntu-24.04 runner)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      # As the README's one command does, from the commit under test.
+      - name: Fetch the script
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/bootstrap-x86_64.sh" \
+            "https://raw.githubusercontent.com/${{ github.repository }}/$FOUNDATION_REF/spark/scripts/bootstrap-x86_64.sh"
+
+      - name: Bootstrap
+        run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh"
+
+      # The steps below run even when a check of the bootstrap failed: they
+      # need only the tools, and they answer questions of their own.
+      - name: Bootstrap again (idempotent, no checks)
+        if: ${{ !cancelled() }}
+        run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh" --no-checks
+
+      # Diagnostic only, and only when the proof gate failed: the three
+      # level-2 checks that run out of time on x86_64 (#46), proved with
+      # more time, to tell what raising their units would buy. It calls
+      # gnatprove directly, because prove.sh rightly refuses --level and
+      # --timeout; its result gates nothing.
+      - name: Diagnose x86_64 proof timeouts (not a gate)
+        if: ${{ failure() }}
+        continue-on-error: true
+        working-directory: /home/runner/Foundation/spark
+        run: |
+          . "$HOME/foundation-tools/env.sh"
+          for sw in "--level=2 --timeout=60" "--level=3 --timeout=60" "--level=4 --timeout=120"; do
+            echo "== $sw"
+            t0=$(date +%s)
+            # shellcheck disable=SC2086
+            alr -n exec -- gnatprove -P foundation_spark.gpr -j4 -f $sw \
+              -u foundation_spark-aes-spec-properties.ads \
+              -u foundation_spark-hmac-sha256_impl.adb \
+              --report=fail > diag.log 2>&1 || true
+            grep -E '(medium|high|low):|^Summary' diag.log || true
+            grep -E '^Total' obj/*/gnatprove/gnatprove.out || true
+            echo "== $sw: $(( $(date +%s) - t0 ))s"
+          done
+
+      # Two of NSA's small AES SAW scripts, both `rme` proofs: SAW 1.6 runs,
+      # and the repository's SAW scripts load and prove under it. Not the
+      # big ones (all.saw, Cipher.saw).
+      - name: SAW smoke test
+        if: ${{ !cancelled() }}
+        run: |
+          . "$HOME/foundation-tools/env.sh"
+          saw --version
+          export CRYPTOLPATH="$HOME/Foundation"
+          cd "$HOME/Foundation/algorithms/AES/theorems"
+          for f in GF28.saw SBox.saw; do
+            echo "== saw $f"
+            t0=$(date +%s)
+            status=0
+            saw "$f" > "$RUNNER_TEMP/saw-$f.log" 2>&1 || status=$?
+            cat "$RUNNER_TEMP/saw-$f.log"
+            secs=$(( $(date +%s) - t0 ))
+            echo "== saw $f: exit $status, ${secs}s"
+            echo "| \`saw $f\` | exit $status | ${secs}s |" >> "$RUNNER_TEMP/saw-summary.md"
+            [ "$status" -eq 0 ] || exit "$status"
+          done
+          {
+            echo "### SAW smoke test ($(saw --version | sed -n 1p))"
+            echo
+            echo "| script | result | wall-clock |"
+            echo "|---|---|---|"
+            cat "$RUNNER_TEMP/saw-summary.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bootstrap-bare
+          path: |
+            ~/foundation-tools/bootstrap-times.txt
+            ~/Foundation/spark/obj/prove.log
+            ~/Foundation/spark/obj/ffi/ffi-results.txt
+            ${{ runner.temp }}/saw-*.log
+          if-no-files-found: ignore
+
+  container:
+    name: Bootstrap (ubuntu:24.04 container, root)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    container: ubuntu:24.04
+    steps:
+      # The image has no curl and no git, so the script comes from a checkout
+      # (actions/checkout falls back to the REST API without git). It is not
+      # a git checkout, so the script clones the fork into ~/Foundation.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.FOUNDATION_REF }}
+
+      - name: Bootstrap
+        run: bash spark/scripts/bootstrap-x86_64.sh
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bootstrap-container
+          path: |
+            ~/foundation-tools/bootstrap-times.txt
+            ~/Foundation/spark/obj/prove.log
+            ~/Foundation/spark/obj/ffi/ffi-results.txt
+          if-no-files-found: ignore

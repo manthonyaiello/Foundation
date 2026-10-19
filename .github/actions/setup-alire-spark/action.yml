@@ -2,18 +2,24 @@
 # cannot drift apart. Adapted from memcp's .github/actions/setup-alire.
 #
 # The caller must run actions/checkout first: a local composite action is
-# resolved from the workspace.
+# resolved from the workspace, and the pins are read from it.
 #
-# Everything is pinned to the versions the campaign decided on
-# (.claude/campaign/PLAN.md, "Decisions taken"): Alire 2.1.1, gnat_native
-# 16.1.0 (sparklib ^16.1.0 needs GNAT 16), gprbuild 26.0.1, gnatprove 16.1.0,
-# gnatdoc_bin 26.0.0 (the generation that pairs with gnat_native 16.1.0). The
-# set of proved checks and of doc warnings IS the gate, so an index update
-# must not be able to change what CI accepts without a commit saying so.
+# Every version is pinned in spark/scripts/toolchain-pins.env, which the
+# x86_64 bootstrap (spark/scripts/bootstrap-x86_64.sh) reads too, so CI and
+# the instance cannot drift apart: Alire 2.1.1, gnat_native 16.1.0 (sparklib
+# ^16.1.0 needs GNAT 16), gprbuild 26.0.1, gnatprove 16.1.0, gnatdoc_bin
+# 26.0.0 (the generation that pairs with gnat_native 16.1.0), and Cryptol's
+# and SAW's release assets with their sha256. The set of proved checks and of
+# doc warnings IS the gate, so an index update must not be able to change
+# what CI accepts without a commit saying so.
 #
-# All five have aarch64-linux builds in the Alire index, which is why the
-# workflows run on ubuntu-24.04-arm: the same architecture, and so the same
-# prover binaries, as the campaign's own machine.
+# The pins are also exported to the job's environment ($GITHUB_ENV), so a
+# later step can use them (spark-ci.yml's ffi job installs Cryptol with
+# $CRYPTOL_TARBALL and $CRYPTOL_SHA256).
+#
+# All five Alire crates have aarch64-linux builds in the Alire index, which is
+# why the workflows run on ubuntu-24.04-arm: the same architecture, and so the
+# same prover binaries, as the campaign's own machine.
 name: Set up Alire for the SPARK crate
 description: Install alr, the GNAT toolchain, and optionally gnatprove and gnatdoc.
 inputs:
@@ -26,11 +32,18 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Read the toolchain pins
+      id: pins
+      shell: bash
+      run: |
+        pins="$GITHUB_WORKSPACE/spark/scripts/toolchain-pins.env"
+        grep -E '^[A-Z0-9_]+=' "$pins" | tee -a "$GITHUB_OUTPUT" >> "$GITHUB_ENV"
+
     - name: Install Alire and the toolchain
       uses: alire-project/setup-alire@v6.0.0
       with:
-        version: 2.1.1
-        toolchain: gnat_native=16.1.0 gprbuild=26.0.1
+        version: ${{ steps.pins.outputs.ALR_VERSION }}
+        toolchain: gnat_native=${{ steps.pins.outputs.GNAT_NATIVE_VERSION }} gprbuild=${{ steps.pins.outputs.GPRBUILD_VERSION }}
 
     # Tools, not crate dependencies: putting them in alire.toml would make
     # every build fetch them. `alr install` puts them in ~/.alire/bin.
@@ -38,12 +51,12 @@ runs:
       if: inputs.gnatprove == 'true'
       shell: bash
       run: |
-        alr -n install gnatprove=16.1.0
+        alr -n install "gnatprove=$GNATPROVE_VERSION"
         echo "$HOME/.alire/bin" >> "$GITHUB_PATH"
 
     - name: Install gnatdoc
       if: inputs.gnatdoc == 'true'
       shell: bash
       run: |
-        alr -n install gnatdoc_bin=26.0.0
+        alr -n install "gnatdoc_bin=$GNATDOC_VERSION"
         echo "$HOME/.alire/bin" >> "$GITHUB_PATH"
