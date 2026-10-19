@@ -1,0 +1,35 @@
+/*
+ * llvm_verify of leaves of Foundation_Spark.AES.Impl (spark/src/aes/
+ * foundation_spark-aes-impl.ad[sb]) against NSA's Cryptol, directly: the
+ * SPARK spec layer plays no part (M4.1, #22). Each proof is of the
+ * bitcode of the crate's own source, at the one fixed size these
+ * functions have, for every input.
+ *
+ * Shaped after algorithms/AES/rust/Cipher/theorems/saw.py: a contract per
+ * shape of subprogram, leaves first, and each verified leaf passed as an
+ * override to the subprograms that call it.
+ */
+
+include "aes_impl_common.saw";
+
+/*
+ * X_Times = GF28.cry's xTimes [FIPS-PUB-197 Section 4.2.1]:
+ *   xTimes b = b << 1 ^ (if head b then 0x1b else 0x00)
+ */
+x_times <- verify_impl "x_times" [] (byte_to_byte_contract {{ xTimes }})
+                       "GF28::xTimes";
+
+/*
+ * Sub_Byte = SBox.cry's SBox @ b [FIPS-PUB-197 Table 4]: a lookup in the
+ * implementation's own constant table, S_Box.
+ */
+sub_byte <- verify_impl "sub_byte" [] (byte_to_byte_contract {{ \b -> SBox @ b }})
+                        "\\b -> SBox::SBox @ b";
+
+/*
+ * Sub_Bytes = Cipher.cry's SubBytes [FIPS-PUB-197 Section 5.1.1]:
+ *   SubBytes bs = SBox @@ bs
+ * with Sub_Byte's proof as the override for its 16 calls.
+ */
+sub_bytes <- verify_impl "sub_bytes" [sub_byte] (block_in_out_contract {{ SubBytes }})
+                         "Cipher::SubBytes";
