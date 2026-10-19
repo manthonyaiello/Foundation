@@ -250,6 +250,10 @@ Not yet, and not filed:
   overrides are proved, not assumed: zero `llvm_unsafe_assume_spec`, and the
   script refuses one. A lax-arithmetic module is allowed only where
   null-range poison forces it, and each such result is marked.
+* **Lax-arithmetic SAW results are accepted** (Tony, 2026-10-19): in them SAW
+  proves the functional equality and gnatprove proves absence of overflow.
+  Tony: this is good for highlighting the value of SPARK. Keep them marked
+  and counted separately.
 * **The spec layer keeps Cryptol's meaning, not its evaluation strategy.**
   Recursive definitions stay recursive ghost functions (e.g.
   `KeyExpansion.W`); sharing is the implementation's job, and SAW gets it by
@@ -258,10 +262,6 @@ Not yet, and not filed:
 
 ## Open for Tony
 
-* **Lax arithmetic in 4 SAW proofs** (`Hash` at 0/64/128 bytes, HMAC
-  (0,0)): acceptable as recorded (absence of overflow by gnatprove, SAW
-  proves the functional equality), or should those sizes be dropped until
-  SAW's poison handling allows them strictly?
 * **The bootstrap fetches llvm-link** (2 GB LLVM release tarball, sha256
   pinned, only `bin/llvm-link` kept): the orchestrator's default, not asked
   first.
