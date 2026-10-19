@@ -19,6 +19,7 @@
 #
 SPARK/AES/GF28.cry | prop_xTimes | AES::GF28::xTimes | exhaust | 256
 SPARK/AES/GF28.cry | prop_Dot    | AES::GF28::(•)    | exhaust | 65536
+SPARK/AES/GF28.cry | prop_Impl_Dot | AES::GF28::(•)  | exhaust | 65536
 SPARK/AES/SBox.cry         | prop_SBox                   | AES::SBox::SBox                 | exhaust | 256
 SPARK/AES/SBox.cry         | prop_InvSBox                | AES::SBox::InvSBox              | exhaust | 256
 SPARK/AES/Cipher.cry       | prop_SubBytes               | AES::Cipher::SubBytes           | check   | 10000

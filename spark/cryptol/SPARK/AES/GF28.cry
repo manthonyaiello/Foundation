@@ -29,6 +29,13 @@ foreign spark_xTimes : [8] -> [8]
 foreign spark_Dot : [8] -> [8] -> [8]
 
 /**
+ * Foundation_Spark.FFI.AES_Impl.Dot: the executable AES.Impl.Dot, proved
+ * equal to the spec's Dot. The ciphers do not call it, so this is the only
+ * property that runs it (found by the coverage run, #49).
+ */
+foreign spark_Impl_Dot : [8] -> [8] -> [8]
+
+/**
  * The SPARK xTimes is GF28.cry's xTimes on every byte (256 tests).
  */
 prop_xTimes : [8] -> Bit
@@ -39,3 +46,10 @@ property prop_xTimes b = spark_xTimes b == xTimes b
  */
 prop_Dot : [8] -> [8] -> Bit
 property prop_Dot b c = spark_Dot b c == b • c
+
+/**
+ * The executable Dot is GF28.cry's (•) on every pair of bytes (65,536
+ * tests).
+ */
+prop_Impl_Dot : [8] -> [8] -> Bit
+property prop_Impl_Dot b c = spark_Impl_Dot b c == b • c

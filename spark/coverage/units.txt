@@ -1,0 +1,17 @@
+Foundation_Spark.AES.Impl
+Foundation_Spark.AES.Impl.Main
+Foundation_Spark.SHA2.SHA256_Stream
+Foundation_Spark.HMAC.SHA256_Impl
+Foundation_Spark.FFI.AES_Impl
+Foundation_Spark.FFI.SHA2_SHA256_Stream
+Foundation_Spark.FFI.HMAC_SHA256_Impl
+Foundation_Spark.FFI.AES_GF28_Exports
+Foundation_Spark.FFI.AES_SBox_Exports
+Foundation_Spark.FFI.AES_Cipher_Exports
+Foundation_Spark.FFI.AES_KeyExpansion_Exports
+Foundation_Spark.FFI.AES_Main_Exports
+Foundation_Spark.FFI.SHA2_Functions_Exports
+Foundation_Spark.FFI.SHA2_Preprocessing_Exports
+Foundation_Spark.FFI.SHA2_SHA256_Exports
+Foundation_Spark.FFI.HMAC_SHA256_Exports
+Foundation_Spark.SHA2.Functions

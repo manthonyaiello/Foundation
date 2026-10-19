@@ -1,11 +1,12 @@
 --  The exports Cryptol calls for the executable AES, AES.Impl: the key
 --  schedule Expand_Key, and Encrypt_Block, Decrypt_Block and
---  Decrypt_Block_Prime of one block, and AES.Impl.Main's Encrypt and
---  Decrypt of a key and a block. They are checked against
---  KeyExpansion.cry's KeyExpansion and Cipher.cry's Cipher, InvCipher and
---  InvCipher' by spark/cryptol/SPARK/AES/KeyExpansion.cry and
---  spark/cryptol/SPARK/AES/Cipher.cry, and against Main.cry's Encrypt and
---  Decrypt by spark/cryptol/SPARK/AES/Main.cry.
+--  Decrypt_Block_Prime of one block, AES.Impl.Main's Encrypt and
+--  Decrypt of a key and a block, and the multiplication Dot. They are
+--  checked against KeyExpansion.cry's KeyExpansion and Cipher.cry's
+--  Cipher, InvCipher and InvCipher' by spark/cryptol/SPARK/AES/
+--  KeyExpansion.cry and spark/cryptol/SPARK/AES/Cipher.cry, against
+--  Main.cry's Encrypt and Decrypt by spark/cryptol/SPARK/AES/Main.cry, and
+--  against GF28.cry's (•) by spark/cryptol/SPARK/AES/GF28.cry.
 --
 --  The implementation is not ghost, so these need no ghost shim: they call
 --  it directly, and their names are the ones Cryptol looks up. They take
@@ -127,5 +128,18 @@ is
    --  @param Input The ciphertext block.
    --  @param Output The plaintext block, written through Cryptol's output
    --  pointer.
+
+   function Dot (B, C : Byte) return Byte
+   with
+     Export,
+     Convention    => C,
+     External_Name => "spark_Impl_Dot";
+   --  Cryptol's foreign spark_Impl_Dot : [8] -> [8] -> [8]. The executable
+   --  AES.Impl.Dot, proved equal to the spec's Dot. The ciphers do not call
+   --  it (they multiply by X_Times), so no other property runs it: the
+   --  coverage of the FFI properties (#49) found it never executed.
+   --  @param B The first factor.
+   --  @param C The second factor.
+   --  @return AES.Impl.Dot (B, C).
 
 end Foundation_Spark.FFI.AES_Impl;

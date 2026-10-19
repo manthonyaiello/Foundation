@@ -58,4 +58,6 @@ is
            Input);
    end Decrypt;
 
+   function Dot (B, C : Byte) return Byte is (AES.Impl.Dot (B, C));
+
 end Foundation_Spark.FFI.AES_Impl;

@@ -8,10 +8,11 @@
 # x86_64 bootstrap (spark/scripts/bootstrap-x86_64.sh) reads too, so CI and
 # the instance cannot drift apart: Alire 2.1.1, gnat_native 16.1.0 (sparklib
 # ^16.1.0 needs GNAT 16), gprbuild 26.0.1, gnatprove 16.1.0, gnatdoc_bin
-# 26.0.0 (the generation that pairs with gnat_native 16.1.0), and Cryptol's
-# and SAW's release assets with their sha256. The set of proved checks and of
-# doc warnings IS the gate, so an index update must not be able to change
-# what CI accepts without a commit saying so.
+# 26.0.0 (the generation that pairs with gnat_native 16.1.0), gnatcov 26.2.1
+# (the coverage job, #49), and Cryptol's and SAW's release assets with their
+# sha256. The set of proved checks and of doc warnings IS the gate, so an
+# index update must not be able to change what CI accepts without a commit
+# saying so.
 #
 # The pins are also exported to the job's environment ($GITHUB_ENV), so a
 # later step can use them (spark-ci.yml's ffi job installs Cryptol with
@@ -21,13 +22,16 @@
 # why the workflows run on ubuntu-24.04-arm: the same architecture, and so the
 # same prover binaries, as the campaign's own machine.
 name: Set up Alire for the SPARK crate
-description: Install alr, the GNAT toolchain, and optionally gnatprove and gnatdoc.
+description: Install alr, the GNAT toolchain, and optionally gnatprove, gnatdoc and gnatcov.
 inputs:
   gnatprove:
     description: Install gnatprove and put it on PATH.
     default: 'false'
   gnatdoc:
     description: Install gnatdoc and put it on PATH.
+    default: 'false'
+  gnatcov:
+    description: Install gnatcov (GNATcoverage) and put it on PATH.
     default: 'false'
 runs:
   using: composite
@@ -59,4 +63,11 @@ runs:
       shell: bash
       run: |
         alr -n install "gnatdoc_bin=$GNATDOC_VERSION"
+        echo "$HOME/.alire/bin" >> "$GITHUB_PATH"
+
+    - name: Install gnatcov
+      if: inputs.gnatcov == 'true'
+      shell: bash
+      run: |
+        alr -n install "gnatcov=$GNATCOV_VERSION"
         echo "$HOME/.alire/bin" >> "$GITHUB_PATH"
