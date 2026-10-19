@@ -1,0 +1,16 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * Decrypt_Block at K = 128 against Cipher.cry's InvCipher`{128} of the
+ * round keys in reverse order, with every override and the tactic of
+ * aes_impl.saw's proof (z3 with InvRound, InvSubBytes, InvShiftRows and
+ * AddRoundKey uninterpreted). It runs aes_impl.saw first, for the
+ * overrides. The proof must fail with a counterexample, which shows that
+ * the overrides and the uninterpreted functions do not make the cipher
+ * proofs vacuous: which round key each round reads is checked.
+ */
+
+include "../aes_impl.saw";
+
+verify_decrypt_block {{ 128 : [32] }} {{ 10 : [32] }}
+  {{ \w s -> InvCipher`{128} (reverse w) s }} "128 (of the reversed round keys)";

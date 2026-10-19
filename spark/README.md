@@ -640,7 +640,7 @@ timed at the end of the run:
 | `alire` | alr 2.1.1, `alr toolchain --select` gnat_native 16.1.0 and gprbuild 26.0.1, `alr install` gnatprove 16.1.0 and gnatdoc_bin 26.0.0 |
 | `cryptol` | Cryptol 3.6.0, `ubuntu-24.04-X64-with-solvers` release |
 | `saw` | SAW 1.6, `ubuntu-24.04-X64-with-solvers` release |
-| `gnat-llvm` | no download: checks the GNAT Pro LLVM install that `GNAT_LLVM_DIR` names, and writes `GNAT_LLVM_DIR` to `env.sh`; skipped, with a note, when it is unset ("SAW") |
+| `gnat-llvm` | checks the GNAT Pro LLVM install that `GNAT_LLVM_DIR` names (nothing of it is downloaded), installs `llvm-link` from LLVM's own 21.1.8 release (2 GB tarball, sha256 checked, `bin/llvm-link` alone extracted), and writes `GNAT_LLVM_DIR` and `LLVM_LINK_DIR` to `env.sh`; skipped, with a note, when `GNAT_LLVM_DIR` is unset ("SAW") |
 | `build` | `alr -n build` |
 | `proof` | `scripts/check-proof.sh`, slow units skipped as in CI ("Slow proofs"), under CI's allowance (`FOUNDATION_SPARK_PROOF_ALLOWANCE=ci` unless set); retried once on failure, and then reported as "ok on retry" |
 | `ffi` | `scripts/check-ffi.sh` |
@@ -773,16 +773,45 @@ totals.
 E4 (#21) proves the **implementation** layer equal to NSA's Cryptol
 directly, with SAW's `llvm_verify` on LLVM bitcode of the crate's own
 sources, independently of the SPARK spec layer and of gnatprove. M4.1 (#22)
-does it for three leaves of `Foundation_Spark.AES.Impl`:
+proved three leaves of `Foundation_Spark.AES.Impl`; M4.2 (#23) proves the
+key schedule and both ciphers at each key size, against
+`algorithms/AES/KeyExpansion.cry` and `Cipher.cry`, imported unmodified:
 
-| Ada (`AES.Impl`) | Cryptol | overrides |
-|---|---|---|
-| `X_Times` | `GF28.cry`: `xTimes` | |
-| `Sub_Byte` | `SBox.cry`: `\b -> SBox @ b` | |
-| `Sub_Bytes` | `Cipher.cry`: `SubBytes` | `Sub_Byte` |
+| Ada (`AES.Impl`) | Cryptol | k | overrides | tactic |
+|---|---|---|---|---|
+| `Expand_Key` | `KeyExpansion.cry`: ``KeyExpansion`{k}`` | 128, 192, 256 | `Nk`, `Nr`, `Sub_Byte` | z3, `SBox` uninterpreted |
+| `Encrypt_Block` | `Cipher.cry`: ``Cipher`{k}`` | 128, 192, 256 | `Nr`, `Round`, `Sub_Bytes`, `Shift_Rows`, `Add_Round_Key` | z3, `Round`, `SubBytes`, `ShiftRows`, `AddRoundKey` uninterpreted |
+| `Decrypt_Block` | `Cipher.cry`: ``InvCipher`{k}`` | 128, 192, 256 | `Nr`, `Inv_Round`, `Inv_Sub_Bytes`, `Inv_Shift_Rows`, `Add_Round_Key` | z3, `InvRound`, `InvSubBytes`, `InvShiftRows`, `AddRoundKey` uninterpreted |
+
+Each of the nine takes under a second. They rest on these leaves, each
+proved first and then passed as an override to its callers:
+
+| Ada | Cryptol | overrides | tactic |
+|---|---|---|---|
+| `AES.Spec.Types.Nk`, `.Nr` | `Types.cry`: `Nk k = k / 32`, `Nr k = Nk k + 6`, for `k` in 128, 192, 256 | | z3 (rme does not finish on the 32-bit division) |
+| `AES.Spec.Types.Split`, `.Join` | Cryptol's `split : Block -> [4]AESWord`, `join` | | rme |
+| `X_Times` | `GF28.cry`: `xTimes` | | rme |
+| `Sub_Byte`, `Inv_Sub_Byte` | `SBox.cry`: `\b -> SBox @ b`, `\b -> InvSBox @ b` | | rme |
+| `Sub_Bytes`, `Inv_Sub_Bytes` | `Cipher.cry`: `SubBytes`, `InvSubBytes` | `Sub_Byte`, `Inv_Sub_Byte` | rme |
+| `Shift_Rows`, `Inv_Shift_Rows` | `Cipher.cry`: `ShiftRows`, `InvShiftRows` | | rme |
+| `Add_Round_Key` | `Cipher.cry`: `AddRoundKey` | | rme |
+| `Mix_Column` | `Cipher.cry`: `MixColumnsStep` | `X_Times` | rme |
+| `Inv_Mix_Byte` (body-local) | `Cipher.cry`: `\a b c d -> InvMixColumnsStep [a, b, c, d] @ 0` | `X_Times` | rme |
+| `Inv_Mix_Column` | `Cipher.cry`: `InvMixColumnsStep` | `Inv_Mix_Byte` | rme |
+| `Mix_Columns`, `Inv_Mix_Columns` | `Cipher.cry`: `MixColumns`, `InvMixColumns` | the column step, `Split`, `Join` | rme |
+| `Round` | `Cipher.cry`: `Round` | `Sub_Bytes`, `Shift_Rows`, `Mix_Columns`, `Add_Round_Key` | rme |
+| `Inv_Round` | `Cipher.cry`: `InvRound` | `Inv_Shift_Rows`, `Inv_Sub_Bytes`, `Add_Round_Key`, `Inv_Mix_Columns` | rme |
+
+There is **no `llvm_unsafe_assume_spec`**: every override is a proof in
+the same module, and `check-saw.sh` refuses to run if a script under
+`saw/` contains one. Not proved by SAW: `Dot` (no cipher calls it), and
+`Decrypt_Block_Prime` with `Inv_Round_Prime` (``InvCipher'``, which the
+issue does not ask for). `Sub_Word`, `Rot_Word`, `Xor_Word` and `Rcon` are
+expression functions that llvm-gcc inlines into `Expand_Key` even at
+`-O0`, so they are proved as part of it.
 
 ```console
-$ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install scripts/check-saw.sh
+$ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install LLVM_LINK_DIR=.../llvm-21.1.8 scripts/check-saw.sh
 $ scripts/check-saw.sh --print      # run, print the record, write nothing
 ```
 
@@ -792,38 +821,74 @@ does not have and nobody without GNAT Pro can install. It is used for
 nothing else: the crate's toolchain, its gates and CI stay FSF GNAT 16.1.
 `check-saw.sh` fails at once, saying so, when `GNAT_LLVM_DIR` is unset. On
 the x86_64 instance the bootstrap's `gnat-llvm` phase checks
-`GNAT_LLVM_DIR` and writes it to `env.sh` when it is set; it downloads
-nothing.
+`GNAT_LLVM_DIR` and writes it to `env.sh` when it is set; nothing of GNAT
+Pro is downloaded.
+
+**`llvm-link`, pinned.** SAW verifies one LLVM module at a time and takes
+an override only from that module, and `AES.Impl` calls `AES.Spec.Types`
+(see "The bitcode ABI"). GNAT Pro ships no `llvm-link`, so `check-saw.sh`
+links the two units' bitcode with **LLVM's own 21.1.8 release**, the LLVM
+of GNAT Pro 27's llvm-gcc: `LLVM_LINK_VERSION`, `_TAG`, `_TARBALL` and
+`_SHA256` in `scripts/toolchain-pins.env` (the sha256 is the digest
+GitHub lists for `LLVM-21.1.8-Linux-X64.tar.xz`). `LLVM_LINK_DIR` must
+name a directory with that `bin/llvm-link`; the script fails, saying
+which, when it is unset, missing, of another version, or when GNAT-LLVM's
+LLVM (`llvm-nm --version`) is not the same version. The bootstrap's
+`gnat-llvm` phase installs it when `GNAT_LLVM_DIR` is set: it fetches
+the 2 GB tarball, checks its sha256, extracts `bin/llvm-link` alone (it
+is statically linked against LLVM) to `~/foundation-tools/llvm-21.1.8`,
+and writes `LLVM_LINK_DIR` to `env.sh`.
 
 **The record.** Since no one else can rerun it, every run that passes
 writes `saw/results.txt`: the commit (the tree must be clean), the date,
-the host, the versions of llvm-gcc, LLVM, SAW, Cryptol and z3, the
-compiler switches, the sha256 of the bitcode, of every crate source the
-compiler read for it (the ALI's dependencies) and of every NSA Cryptol
-file imported, each result, each negative control's counterexample, and
-the wall-clock. Commit it with the change it checks. CI's gates do not
-read `saw/`: the trust and docs gates scan `src/`, and the bitcode
-(`saw/obj/`) is not tracked.
+the host, the versions of llvm-gcc, LLVM, llvm-link (with the tarball's
+sha256), SAW, Cryptol and z3, the compiler switches, the sha256 of each
+unit's bitcode and of the linked module, of every crate source the
+compiler read for them (the ALIs' dependencies) and of every NSA Cryptol
+file imported, each result with its tactic and SAW's time for it, each
+negative control's counterexample, and the wall-clock. Commit it with the
+change it checks. CI's gates do not read `saw/`: the trust and docs gates
+scan `src/`, and the bitcode (`saw/obj/`) is not tracked.
 
 **What it runs.**
 
 1. `llvm-gcc -c -gnat2022 -gnatp -gnatVn -O0 -emit-llvm` on
-   `src/aes/foundation_spark-aes-impl.adb`, every directory of `src/` on
-   the search path, into `saw/obj/`. No run-time or validity checks
-   (gnatprove proves them absent). No `-gnata`, so contracts, assertions
-   and ghost code are ignored and none reaches the bitcode; `llvm-nm`
-   checks that no symbol of a ghost unit (`AES.Spec.Cipher`, `GF28`,
-   `SBox`, `KeyExpansion`, `Lemmas`, ...) is defined or referenced. The
-   unit needs no SPARKlib.
-2. `saw aes_impl.saw` (from `saw/`, with `CRYPTOLPATH` the repository's
+   `src/aes/foundation_spark-aes-impl.adb` and
+   `src/aes/foundation_spark-aes-spec-types.ads`, every directory of
+   `src/` on the search path, into `saw/obj/`. No run-time or validity
+   checks (gnatprove proves them absent). No `-gnata`, so contracts,
+   assertions and ghost code are ignored and none reaches the bitcode.
+   The units need no SPARKlib.
+2. `llvm-link` of the two into `saw/obj/aes.bc`, the one module the
+   scripts load. `llvm-nm` checks each unit's bitcode and the linked
+   module: no symbol of a ghost unit (`AES.Spec.Cipher`, `GF28`, `SBox`,
+   `KeyExpansion`, `Lemmas`, ...) is defined or referenced.
+3. `saw aes_impl.saw` (from `saw/`, with `CRYPTOLPATH` the repository's
    root): every proof must pass.
-3. `saw negative/*.saw`: each negative control must **fail** with a
-   counterexample (`X_Times` against the shift without the reduction:
-   `b = 128`; `Sub_Bytes` against `InvSubBytes`).
+4. `saw negative/*.saw`: each negative control must **fail** with a
+   counterexample:
+   - `X_Times` against the shift without the reduction: `b = 128`;
+   - `Sub_Bytes` against `InvSubBytes`;
+   - `Expand_Key` at 128 against `KeyExpansion` of the key words reversed;
+   - `Encrypt_Block` at 256 against `Cipher` of the round keys reversed;
+   - `Decrypt_Block` at 128 against `InvCipher` of the round keys
+     reversed.
+
+   The last three run `aes_impl.saw` first and use its overrides and
+   tactics, so they show that neither the overrides nor the uninterpreted
+   functions make the top-level proofs vacuous. (`Encrypt_Block` against
+   ``InvCipher`{128}`` fails too, but z3 took 245 s to find the
+   counterexample, with `Round` uninterpreted on one side and `InvRound`
+   interpreted on the other; it is not among the controls.)
 
 The scripts follow `algorithms/AES/rust/Cipher/theorems/saw.py`: a
 contract per shape of subprogram, leaves first, each verified leaf passed
-as an override to its callers, `rme` for the leaves. They are SAWScript,
+as an override to its callers, `rme` for the leaves, and z3 with the
+overridden compositions uninterpreted for the ciphers (the template's
+`z3(["Round", "SubBytes", "ShiftRows"])`, plus `AddRoundKey`; the
+template uses ``InvCipher'`` and cvc5 for decryption, the crate's
+`Decrypt_Block` is ``InvCipher`` itself and z3 proves it). They are
+SAWScript,
 not the Python client: SAWScript runs with the `saw` of the release
 tarball alone, while the client needs `saw-remote-api` and an unpinned
 `saw-client` from PyPI; the NSA's own `algorithms/*/theorems/*.saw` are
@@ -839,8 +904,8 @@ SAWScript too.
   (scalars) verify at `-O2 -gnatn`; `Sub_Bytes` (an array) does not.
 - **One module per proof.** An override must come from the module being
   verified (`llvm_verify` says "different LLVM module" otherwise), and the
-  GNAT Pro install has no `llvm-link`. See "The bitcode ABI" for what that
-  means for calls into `AES.Spec.Types`.
+  GNAT Pro install has no `llvm-link`: hence the pinned `llvm-link` above,
+  and one linked module.
 - And `llvm-gcc` refuses `-o x.bc` ("incorrect object file extension"): the
   bitcode takes the source's name.
 
@@ -869,26 +934,39 @@ What `llvm-gcc -O0` makes of `AES.Impl`, which M4.2 (#23) builds on:
   `{ ptr, ptr }`: the data, and a bounds record `{ i32, i32 }` (`First`,
   `Last`), named `%foundation_spark__aes__spec__types__round_keys_BOUNDS`.
   `Encrypt_Block (K, W, State)` is
-  `[16 x i8] (i32 %k, { ptr, ptr } %w, [16 x i8] %state)`; a contract
-  allocates the `Nr + 1` blocks and the bounds `{0, Nr}` read-only and
-  passes `llvm_struct_value [data, bounds]` (an exploratory run proved
-  `Encrypt_Block` at K = 128 this way, below). `Expand_Key (K, Key, W :
-  out Round_Keys)` writes through `W`'s data pointer and returns `void`.
+  `[16 x i8] (i32 %k, { ptr, ptr } %w, [16 x i8] %state)`; its contract
+  (`cipher_contract`) allocates the `Nr + 1` blocks and the bounds
+  `{0, Nr}` read-only, which is `Is_Round_Keys (K, W)`, and passes
+  `llvm_struct_value [data, bounds]`. `Expand_Key (K, Key, W : out
+  Round_Keys)` is `void (i32 %k, { ptr, ptr } %key, { ptr, ptr } %w)`: it
+  writes through `W`'s data pointer, so its contract
+  (`expand_key_contract`) allocates `Key`'s `Nk` words read-only with
+  bounds `{0, Nk - 1}` and `W`'s `Nr + 1` blocks writable with bounds
+  `{0, Nr}` (the precondition), and states the result with
+  `llvm_points_to` on `W`'s data. After `llvm-link` the two units' fat
+  pointer and bounds types are merged into one (`..._key_words_FP`,
+  `..._round_keys_BOUNDS`).
+- **Layout against the Cryptol.** Element `i` of an Ada array is element
+  `i` of the Cryptol sequence, and a `Byte` is the `[8]` whose head is its
+  most significant bit, so no reordering is needed anywhere:
+  `Key (I) (J)` is `key @ i @ j` of KeyExpansion's `[Nk k]AESWord`;
+  `W (R) (I)` is `KeyExpansion key @ r @ i`, which is byte `i mod 4` of
+  word `4 r + i / 4` of the schedule (`split (split (join (join w)))`),
+  exactly how `Expand_Key` fills `W (R)` from its words; and a `Block`'s
+  byte `I` is `Block`'s element `i`, column `I / 4`, row `I mod 4`, as
+  `split`/`join` in `MixColumns` take it.
 - **Constant tables** (`S_Box`, `Inv_S_Box`) are constant globals; at
   `-O0` the body reads a private copy (`@foundation_spark-aes-impl.for.ref`).
   SAW initializes constant globals itself: no `llvm_alloc_global` needed.
 - **Calls into `AES.Spec.Types`** (`Nk`, `Nr`, `Split`, `Join`: non-ghost
   expression functions, from `Expand_Key`, `Encrypt_Block`, `Decrypt_*`,
-  `Mix_Columns`, `Inv_Mix_Columns`) are external declarations at `-O0`:
-  that unit compiles to a module of its own, and SAW proves `Nr`, `Split`
-  and `Join` there, but cannot use those proofs as overrides in the
-  `AES.Impl` module. `-O2 -gnatn` inlines them, but `-O2` is ruled out
-  above. M4.2 needs one of: an `llvm-link` matching LLVM 21 to link the
-  two modules; or, in the `AES.Impl` module, `llvm_unsafe_assume_spec` of
-  exactly the contracts proved in the `AES.Spec.Types` module (an
-  assumption discharged by a proof elsewhere, to be recorded as such).
-  With the second, an exploratory run (not committed) proved `Mix_Column`,
-  `Mix_Columns`, `Add_Round_Key`, `Round`, `Inv_Mix_Byte` and then
-  `Encrypt_Block` at K = 128 against ``Cipher`{128}``, each called leaf an
-  override, `Encrypt_Block` itself in under a second (`w4_unint_z3` over
-  `Round`, `SubBytes`, `ShiftRows`, `AddRoundKey`).
+  `Mix_Columns`, `Inv_Mix_Columns`) are external declarations in
+  `AES.Impl`'s bitcode at `-O0`: that unit compiles to a module of its
+  own. `-O2 -gnatn` would inline them, but `-O2` is ruled out above.
+  M4.1 left the choice between linking and `llvm_unsafe_assume_spec`;
+  M4.2 links (`llvm-link`, above), so `Nk`, `Nr`, `Split` and `Join` are
+  proved in the linked module and are overrides like any other.
+- **Expression functions of `AES.Impl` itself** (`Sub_Word`, `Rot_Word`,
+  `Xor_Word`, `Rcon`) are inlined into their callers by llvm-gcc even at
+  `-O0` (the inlined blocks are named `..._xor_word.exit` and so on).
+  `Expand_Key` calls none of them: it calls `Sub_Byte`, `Nk` and `Nr`.
