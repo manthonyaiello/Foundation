@@ -47,10 +47,11 @@ jobs:
               -u foundation_spark-hmac-sha256_impl.adb \
               --report=statistics > "diag-$mode.log" 2>&1 || true
             echo "== $mode: $(( $(date +%s) - t0 ))s wall-clock"
-            grep -E 'medium:|high:|low:' "diag-$mode.log" || echo "(no unproved checks)"
-            echo "-- the three checks, and every check over 2 s:"
-            grep -E 'properties\.ads:66:|sha256_impl\.adb:137:|sha256_impl\.adb:431:|[0-9]\.[0-9]+ seconds' obj/*/gnatprove/gnatprove.out \
-              | grep -E 'properties\.ads:66:|sha256_impl\.adb:137:|sha256_impl\.adb:431:|max ([2-9]|[1-9][0-9])\.' || true
-            grep -E 'properties\.ads:66:|sha256_impl\.adb:137:|sha256_impl\.adb:431:' "diag-$mode.log" || true
-            grep -E '^Total|^Summary' -A1 obj/*/gnatprove/gnatprove.out | head -n 5 || true
+            grep -B1 -A1 -E 'medium:|high:|low:' "diag-$mode.log" || echo "(no unproved checks)"
+            grep -E '^Total' obj/*/gnatprove/gnatprove.out || true
+            echo "-- the checks of interest, then the 15 slowest:"
+            python3 "$GITHUB_WORKSPACE/.github/workflows/spark-x86-diag-top.py" "diag-$mode.log" 15 \
+              properties.ads:66:14 sha256_impl.adb:137:14 sha256_impl.adb:431: \
+              properties.adb:3 properties.adb:4 sha256_impl.adb:18 sha256_impl.adb:19 \
+              sha256_impl.adb:20 sha256_impl.adb:51 || true
           done
