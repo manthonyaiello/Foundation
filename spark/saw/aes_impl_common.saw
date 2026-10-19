@@ -23,9 +23,11 @@ import "../../algorithms/AES/Cipher.cry";
 
 /*
  * Foundation_Spark.AES.Impl as bitcode, compiled with -O0 and without -g
- * (spark/README.md, "SAW", says why both).
+ * (spark/README.md, "SAW", says why both), linked by llvm-link with
+ * AES.Spec.Types, whose Nk, Nr, Split and Join it calls: SAW takes an
+ * override only from the module it verifies.
  */
-aes_impl <- llvm_load_module "obj/foundation_spark-aes-impl.bc";
+aes_impl <- llvm_load_module "obj/aes.bc";
 
 /*
  * The Ada names as LLVM symbols: GNAT's external names, the expanded name
