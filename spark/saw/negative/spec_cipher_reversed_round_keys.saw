@@ -1,0 +1,20 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's Cipher at K = 256 against Cipher.cry's Cipher`{256} of
+ * the round keys in reverse order, with every override and the tactic of
+ * aes_spec.saw's proof (z3 with Round, SubBytes, ShiftRows and
+ * AddRoundKey uninterpreted), as negative/encrypt_block_reversed_round_
+ * keys.saw does for the implementation. It runs aes_spec_gf.saw and
+ * aes_spec_cipher.saw first, for the overrides. The proof must fail with
+ * a counterexample.
+ */
+
+include "../aes_spec_common.saw";
+include "../aes_spec_gf.saw";
+include "../aes_spec_cipher.saw";
+
+verify_spec "cipher__cipher" (concat c_foldl_round [types_nr, c_subbytes, c_shiftrows, c_addroundkey])
+  (spec_cipher_contract 256 14 {{ \w s -> Cipher`{256} (reverse w) s }})
+  (w4_unint_z3 ["Round", "SubBytes", "ShiftRows", "AddRoundKey"])
+  "w4_unint_z3 Round SubBytes ShiftRows AddRoundKey" "Cipher::Cipher`{256} of the reversed round keys";

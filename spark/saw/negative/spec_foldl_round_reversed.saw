@@ -1,0 +1,20 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * One of aes_spec.saw's per-length lemmas of Foldl_Round with the wrong
+ * Cryptol: Foldl_Round at M = 9 (the length Cipher at k = 128 folds)
+ * against foldl Round z (reverse xs), with the overrides of the lemma at
+ * M = 9 (Round's and the lemma at M = 8) and its tactic (z3 with Round
+ * uninterpreted). It runs aes_spec_gf.saw and aes_spec_cipher.saw first,
+ * for the lemmas. The proof must fail with a counterexample, which shows
+ * that the fold lemmas' overrides and Round uninterpreted do not make
+ * them vacuous: the order of the round keys is checked.
+ */
+
+include "../aes_spec_common.saw";
+include "../aes_spec_gf.saw";
+include "../aes_spec_cipher.saw";
+
+verify_spec "cipher__foldl_round" (concat c_foldl_round [c_round])
+  (foldl_contract 9 {{ \z (xs : [9][16][8]) -> foldl Round z (reverse xs) }})
+  (w4_unint_z3 ["Round"]) "w4_unint_z3 Round" "M = 9: foldl Cipher::Round z (reverse xs)";

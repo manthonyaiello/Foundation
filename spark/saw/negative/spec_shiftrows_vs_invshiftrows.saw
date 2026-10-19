@@ -1,0 +1,14 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's ShiftRows (ghost, from obj/spec/aes_spec.bc) against
+ * Cipher.cry's InvShiftRows instead of ShiftRows, by rme as aes_spec.saw
+ * proves the leaves. The proof must fail with a counterexample block,
+ * which shows that the spec build's bitcode is what is checked: a leaf of
+ * the spec layer, compiled with ghost code on, is told from the wrong
+ * Cryptol.
+ */
+
+include "../aes_spec_common.saw";
+
+verify_spec "cipher__shiftrows" [] (block_contract {{ InvShiftRows }}) rme "rme" "Cipher::InvShiftRows";
