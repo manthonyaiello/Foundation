@@ -437,10 +437,10 @@ if [ -n "${GNAT_LLVM_DIR:-}" ]; then
     mv "$LLVM_LINK_DIR.new" "$LLVM_LINK_DIR"
   fi
   ensure_libs "$LLVM_LINK_DIR"
-  llvm_link_version="$("$LLVM_LINK_DIR/bin/llvm-link" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
-  [ "$llvm_link_version" = "$LLVM_LINK_VERSION" ] \
-    || die "$LLVM_LINK_DIR/bin/llvm-link is LLVM ${llvm_link_version:-?}, not $LLVM_LINK_VERSION"
-  echo ">> LLVM_LINK_DIR=$LLVM_LINK_DIR: llvm-link $llvm_link_version"
+  link_version_found="$("$LLVM_LINK_DIR/bin/llvm-link" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
+  [ "$link_version_found" = "$LLVM_LINK_VERSION" ] \
+    || die "$LLVM_LINK_DIR/bin/llvm-link is LLVM ${link_version_found:-?}, not $LLVM_LINK_VERSION"
+  echo ">> LLVM_LINK_DIR=$LLVM_LINK_DIR: llvm-link $link_version_found"
 
   GNAT_LLVM_ENV="export GNAT_LLVM_DIR=\"$GNAT_LLVM_DIR\"
 export LLVM_LINK_DIR=\"$LLVM_LINK_DIR\""
