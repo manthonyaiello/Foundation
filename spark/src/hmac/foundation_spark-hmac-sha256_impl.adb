@@ -141,6 +141,19 @@ is
    --  @param X One message.
    --  @param Y The other, "=" to X.
 
+   procedure Lemma_Join_Ext (A, B : SHA2.SHA256.Hash_Value) with
+     Ghost,
+     Pre  => A = B,
+     Post =>
+       SHA2.SHA256.Join (A) (0 .. 255) = SHA2.SHA256.Join (B) (0 .. 255);
+   --  The digests that SHA256.Hash takes from "=" hash values are "=".
+   --  Stated apart from Lemma_Hash_Ext so that the provers see Join with
+   --  nothing else in context.
+   --  @param A One hash value.
+   --  @param B The other, "=" to A.
+
+   procedure Lemma_Join_Ext (A, B : SHA2.SHA256.Hash_Value) is null;
+
    procedure Lemma_Hash_Ext (X, Y : Bits) is
       N  : constant Bit_Index := SHA2.SHA256.N (X'Length);
       PX : constant Bits := SHA2.SHA256.Pad (X);
@@ -161,6 +174,23 @@ is
          SHA2.SHA256.Parse (PX, N),
          SHA2.SHA256.Parse (PY, N),
          N);
+      Lemma_Join_Ext
+        (SHA2.SHA256.Foldl_Step
+           (SHA2.Preprocessing.H0_256, SHA2.SHA256.Parse (PX, N), N),
+         SHA2.SHA256.Foldl_Step
+           (SHA2.Preprocessing.H0_256, SHA2.SHA256.Parse (PY, N), N));
+      pragma Assert
+        (SHA2.SHA256.Hash (X)
+         = SHA2.SHA256.Join
+             (SHA2.SHA256.Foldl_Step
+                (SHA2.Preprocessing.H0_256, SHA2.SHA256.Parse (PX, N), N))
+             (0 .. 255));
+      pragma Assert
+        (SHA2.SHA256.Hash (Y)
+         = SHA2.SHA256.Join
+             (SHA2.SHA256.Foldl_Step
+                (SHA2.Preprocessing.H0_256, SHA2.SHA256.Parse (PY, N), N))
+             (0 .. 255));
    end Lemma_Hash_Ext;
 
    procedure Lemma_Byte_Bit_Xor (A, B : Byte) with
@@ -202,6 +232,39 @@ is
                     xor SHA2.SHA256_Bytes.Byte_Bit (X, T))));
       end loop;
    end Lemma_Bits_Xor;
+
+   procedure Lemma_Pad_Xor_Bits (P, K0 : Key_Block; X : Byte; K, Pad : Bits)
+   with
+     Ghost,
+     Pre  =>
+       (for all J in Key_Block'Range => P (J) = (K0 (J) xor X))
+       and then K'First = 0
+       and then K'Length = 512
+       and then SHA2.SHA256_Bytes.Bits_Of (K0) = K
+       and then Pad'First = 0
+       and then Pad'Length = 512
+       and then
+         (for all I in 0 .. Bit_Index (511) =>
+            Pad (I) = SHA2.SHA256_Bytes.Byte_Bit (X, Natural (I mod 8))),
+     Post =>
+       (for all I in 0 .. Bit_Index (511) =>
+          SHA2.SHA256_Bytes.Bits_Of (P) (I) = Bits'(K xor Pad) (I));
+   --  The bits of K0 xor a pad, K0 xor ipad or K0 xor opad, are the
+   --  spec's `K0 ^ ipad` or `K0 ^ opad`, when K0's bits are K and the
+   --  pad's bits are Pad. Stated apart from Lemma_HMAC, whose context is
+   --  large, so that the provers see this step alone: within Lemma_HMAC
+   --  it ran out of time on x86_64 (PR #46).
+   --  @param P K0 xor X, byte by byte.
+   --  @param K0 The key block.
+   --  @param X The pad's byte, 0x36 or 0x5C.
+   --  @param K K0's bits, the spec's K0.
+   --  @param Pad The pad's bits, the spec's ipad or opad.
+
+   procedure Lemma_Pad_Xor_Bits (P, K0 : Key_Block; X : Byte; K, Pad : Bits)
+   is
+   begin
+      Lemma_Bits_Xor (P, K0, X);
+   end Lemma_Pad_Xor_Bits;
 
    procedure Lemma_Bits_Of_Append
      (M : Byte_Array; P : Key_Block; T : Byte_Array)
@@ -421,8 +484,10 @@ is
    begin
       Lemma_Pad_Bits (16#36#);
       Lemma_Pad_Bits (16#5C#);
-      Lemma_Bits_Xor (I_Pad, K0, 16#36#);
-      Lemma_Bits_Xor (O_Pad, K0, 16#5C#);
+      Lemma_Pad_Xor_Bits
+        (I_Pad, K0, 16#36#, HMAC.SHA256.HMAC_init (KB), HMAC.SHA256.Ipad);
+      Lemma_Pad_Xor_Bits
+        (O_Pad, K0, 16#5C#, HMAC.SHA256.HMAC_init (KB), HMAC.SHA256.Opad);
 
       --  The inner hash.
       Lemma_Bits_Of_Append (M_In, I_Pad, Text);
