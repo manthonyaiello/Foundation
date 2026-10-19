@@ -10,10 +10,43 @@ is
    -- GF28MultiplicationCorrect --
    -------------------------------
 
-   procedure GF28MultiplicationCorrect (B, C : Byte) is
+   --  GF28MultiplicationCorrect's two conjuncts are proved apart, each in a
+   --  lemma of its own, so that the provers never unfold Dot, Pmult_Fold,
+   --  Pmod_Fold and Foldl_Mult for both at once: together, the one
+   --  postcondition ran out of time on x86_64 (PR #46).
+
+   procedure Lemma_xTimes_Dot (B : Byte)
+   with Post => GF28.xTimes (B) = GF28.Dot (B, 2);
+   --  GF28MultiplicationCorrect's first conjunct: xTimes b == b • 2. The
+   --  fold over the bits of 2 is 0 for six steps, then B, then xTimes B.
+   --  @param B The Cryptol's b.
+
+   procedure Lemma_Dot_Foldl (B, C : Byte)
+   with Post => GF28.Dot (B, C) = Foldl_Mult (B, C, 8);
+   --  GF28MultiplicationCorrect's second conjunct: b • c is the fold over
+   --  the bits of b.
+   --  @param B The Cryptol's b.
+   --  @param C The Cryptol's c.
+
+   procedure Lemma_xTimes_Dot (B : Byte) is
+   begin
+      Lemma_Pmod_Pmult_Fold (2, B, 8);
+      pragma Assert (GF28.Dot (B, 2) = Foldl_Mult (2, B, 8));
+      pragma Assert (Foldl_Mult (2, B, 6) = 0);
+      pragma Assert (Foldl_Mult (2, B, 7) = B);
+   end Lemma_xTimes_Dot;
+
+   procedure Lemma_Dot_Foldl (B, C : Byte) is
    begin
       Lemma_Pmult_Commutes (B, C);
       Lemma_Pmod_Pmult_Fold (B, C, 8);
+      pragma Assert (GF28.Dot (B, C) = Pmod (GF28.Pmult_Fold (C, B, 8)));
+   end Lemma_Dot_Foldl;
+
+   procedure GF28MultiplicationCorrect (B, C : Byte) is
+   begin
+      Lemma_xTimes_Dot (B);
+      Lemma_Dot_Foldl (B, C);
    end GF28MultiplicationCorrect;
 
    -----------------
