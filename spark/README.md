@@ -986,7 +986,8 @@ do not read `saw/`: the trust and docs gates scan `src/`, and the bitcode
    - `Encrypt_Block` at 256 against `Cipher` of the round keys reversed;
    - `Decrypt_Block` at 128 against `InvCipher` of the round keys
      reversed;
-   - `Compress` against `step` of the block's words reversed;
+   - `Compress` against `step` with the feed-forward adding `H`'s words
+     reversed (`step h m - h + reverse h`);
    - `Hash` at 56 bytes against `hash` of the message's bytes reversed;
    - `HMAC_SHA256` at a 100-byte key and a 3-byte text against `HMAC` of
      the key reversed.
@@ -997,7 +998,14 @@ do not read `saw/`: the trust and docs gates scan `src/`, and the bitcode
    the top-level proofs vacuous. (`Encrypt_Block` against
    ``InvCipher`{128}`` fails too, but z3 took 245 s to find the
    counterexample, with `Round` uninterpreted on one side and `InvRound`
-   interpreted on the other; it is not among the controls.)
+   interpreted on the other; it is not among the controls. Nor are three
+   stronger controls of `Compress` that no solver refuted in time: `step`
+   of the block reversed (z3 stopped after 11 min at 2.8 GB; yices and
+   bitwuzla, 400 s), of the block with word 15 flipped (z3, 400 s), and
+   with its result words rotated (z3, 150 s). Telling two different
+   64-round terms apart means bit-blasting both, with the uninterpreted
+   sigmas' applications Ackermannized; the correct spec is the same term
+   as the implementation's and is proved in 3 s.)
 
 The scripts follow `algorithms/AES/rust/Cipher/theorems/saw.py`: a
 contract per shape of subprogram, leaves first, each verified leaf passed

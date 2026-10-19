@@ -1,0 +1,30 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * Compress against SHA256Main's step with the feed-forward (Step 4,
+ * `H + H'`) adding the incoming hash value's words in reverse order:
+ * `step h m - h + reverse h`. Every override and the tactic are those of
+ * sha256_impl.saw's proof (z3 with the SIGMA and sigma functions
+ * uninterpreted); it runs sha256_impl.saw first, for the overrides. The
+ * proof must fail with a counterexample, which shows that the overrides
+ * and the uninterpreted functions do not make the Compress proof vacuous:
+ * the result depends on H, word by word, as step's does.
+ *
+ * Stronger controls were tried and measured, and left out because no
+ * solver refuted them in time: step of the block's words reversed (z3,
+ * stopped after 11 min at 2.8 GB; yices and bitwuzla, 400 s), of the
+ * block with word 15 flipped (z3, 400 s), and step's result words rotated
+ * (z3, 150 s). Each asks the solver to tell two different 64-round terms
+ * apart, which it can only do by bit-blasting both with the uninterpreted
+ * sigmas Ackermannized, where the correct spec is the same term as the
+ * implementation's and is proved in 3 s. The Hash and HMAC controls
+ * permute message and key bytes, which `step` uninterpreted makes cheap.
+ */
+
+include "../sha256_impl.saw";
+
+verify_symbol (stream_symbol "compress") "sha256_stream.compress (against a reversed feed-forward)"
+  [sigma_0, sigma_1, small_sigma_0, small_sigma_1, ch, maj, hash_value_add]
+  (compress_contract {{ \h m -> step h m - h + reverse h }})
+  (w4_unint_z3 compress_unint) "w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1"
+  "\\h m -> SHA256Main::step h m - h + reverse h";
