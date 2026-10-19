@@ -27,7 +27,9 @@
 #   cryptol    Cryptol's release build with solvers, sha256 checked.
 #   saw        SAW's release build with solvers, sha256 checked (and its .sig,
 #              when SAW_SIGNING_KEY_FILE names the signing key).
-#   gnat-llvm  a hook only: M4.1 (#22) adds GNAT-LLVM there.
+#   gnat-llvm  no download: checks GNAT Pro's LLVM back end when GNAT_LLVM_DIR
+#              names it (and writes it to env.sh, for scripts/check-saw.sh);
+#              skipped, with a note, when GNAT_LLVM_DIR is unset.
 #   build      `alr -n build` in spark/.
 #   proof      scripts/check-proof.sh (the slow units of proof-slow.txt are
 #              skipped, and their recorded proofs checked current, as in CI),
@@ -59,6 +61,8 @@
 #   SAW_SIGNING_KEY_FILE
 #                      an armored public key; when set, SAW's .sig is verified
 #                      with it (and the key must be SAW_SIGNING_KEY's).
+#   GNAT_LLVM_DIR      a GNAT Pro LLVM install (holding bin/llvm-gcc), for
+#                      the gnat-llvm phase; optional.
 #
 # Exit status: 0 when every phase passed; 1 when one failed (the proof and FFI
 # phases both run even if the other fails, so one run reports both); 2 on a
@@ -385,18 +389,31 @@ end
 # --- gnat-llvm ------------------------------------------------------------------------
 
 begin gnat-llvm
-# >>> M4.1 (#22) HOOK: install GNAT-LLVM here. <<<
-# Not part of M0.5: there is no GNAT-LLVM build to pin yet. M4.1 adds its
-# pins to toolchain-pins.env, installs it under "$TOOLS", puts its bin/ on
-# TOOL_PATH (above) and checks its version, as the cryptol phase does.
-echo ">> not installed: M4.1 (#22) adds GNAT-LLVM here"
-end "hook only (M4.1)"
+# Nothing is downloaded: the GNAT-LLVM that E4's SAW checks use is GNAT Pro's
+# (M4.1, #22), which is not public. When GNAT_LLVM_DIR names its install,
+# check it and record it in env.sh for scripts/check-saw.sh; when it is
+# unset, skip: everything but check-saw.sh works without it. It is not put
+# on PATH: the crate's toolchain stays FSF GNAT (README "SAW").
+GNAT_LLVM_ENV=""
+if [ -n "${GNAT_LLVM_DIR:-}" ]; then
+  [ -x "$GNAT_LLVM_DIR/bin/llvm-gcc" ] || die "GNAT_LLVM_DIR=$GNAT_LLVM_DIR has no bin/llvm-gcc"
+  # Captured, not piped into head: SIGPIPE under pipefail.
+  llvm_gcc_version="$("$GNAT_LLVM_DIR/bin/llvm-gcc" --version)"
+  echo ">> GNAT_LLVM_DIR=$GNAT_LLVM_DIR: ${llvm_gcc_version%%$'\n'*}"
+  GNAT_LLVM_ENV="export GNAT_LLVM_DIR=\"$GNAT_LLVM_DIR\""
+  end
+else
+  echo ">> skipped: GNAT_LLVM_DIR is unset. Only scripts/check-saw.sh (local, E4) needs it:"
+  echo "   set it to a GNAT Pro LLVM install (the directory holding bin/llvm-gcc) and rerun."
+  end "skipped (no GNAT_LLVM_DIR)"
+fi
 
 # Write the environment for later shells, before the checks, so a failed
 # check still leaves the tools usable.
 cat > "$TOOLS/env.sh" <<EOF
 # Written by spark/scripts/bootstrap-x86_64.sh. Source it: . $TOOLS/env.sh
 export PATH="$TOOL_PATH:\$PATH"
+$GNAT_LLVM_ENV
 EOF
 
 # --- build, proof, ffi ------------------------------------------------------------------
