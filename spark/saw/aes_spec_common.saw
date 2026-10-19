@@ -1,0 +1,149 @@
+/*
+ * What the AES spec layer's SAW script shares: the bitcode of the ghost
+ * spec units, NSA's Cryptol, and the contracts, one per shape of Ada
+ * subprogram.
+ *
+ * Run from spark/saw/ by spark/scripts/check-saw.sh, which first compiles
+ * the spec units (AES.Spec.Types, .GF28, .GF2, .SBox, .Cipher,
+ * .KeyExpansion) with GNAT Pro's LLVM back end, ghost code enabled
+ * (saw/spec.adc) and inlining off, into obj/spec/, and links them into
+ * obj/spec/aes_spec.bc. Not run by CI: see spark/README.md, "SAW".
+ */
+
+enable_experimental;
+
+/*
+ * NSA's Cryptol, imported unmodified. CRYPTOLPATH is the repository's
+ * root (check-saw.sh sets it). GF2.cry is imported for the names SBox.cry
+ * uses and does not re-export. Its operators (^*) = pmult, (^/) = pdiv
+ * and (^%) = pmod are Cryptol's primitives renamed, and SAWScript's
+ * import list takes no operator, so the contracts name the primitives.
+ */
+import "../../algorithms/AES/GF28.cry";
+import "../../algorithms/AES/SBox.cry";
+import "../../algorithms/AES/Cipher.cry";
+import "../../algorithms/AES/KeyExpansion.cry";
+import "../../shared/algebra/Polynomial/GF2.cry" (pdeg, pgcd, inverse);
+
+/*
+ * The spec units as bitcode, compiled with -O0, without -g and with
+ * -fno-inline (spark/README.md, "SAW", says why), linked by llvm-link.
+ */
+aes_spec <- llvm_load_module "obj/spec/aes_spec.bc";
+
+/*
+ * The Ada names as LLVM symbols: GNAT's external names, unchanged for
+ * ghost entities too (GNAT-LLVM 27 adds no ___ghost_ prefix; README "The
+ * bitcode ABI").
+ */
+let spec_symbol name = str_concat "foundation_spark__aes__spec__" name;
+
+/*
+ * The LLVM types of the Ada ones: Byte is i8, a Boolean i8 (0 or 1),
+ * Natural and Integer i32, GF28.Poly and GF2.Poly i16, GF2.Product i32,
+ * AESWord [4 x i8], Block [16 x i8], Columns [4 x [4 x i8]],
+ * GF2.Poly_State [6 x i16], GF2.Pgcd_Result [5 x i16].
+ */
+let byte_t = llvm_int 8;
+let poly_t = llvm_int 16;
+let word_t = llvm_array 4 byte_t;
+let block_t = llvm_array 16 byte_t;
+
+/*
+ * The bounds record { i32, i32 } (First, Last) of Key_Words' and
+ * Round_Keys' fat pointers. After llvm-link the two types are one, named
+ * after the first the linker met.
+ */
+let bounds_t = llvm_alias "foundation_spark__aes__spec__types__key_words_BOUNDS";
+let bounds (first : Term) (last : Term) = do {
+  p <- llvm_alloc_readonly bounds_t;
+  llvm_points_to p (llvm_struct_value [llvm_term first, llvm_term last]);
+  return p;
+};
+
+/*
+ * llvm_verify of one spec subprogram (its LLVM symbol) against a Cryptol
+ * term, with the overrides given and the proof tactic named, timed, and a
+ * line check-saw.sh records: "RESULT proved <name> = <cryptol> [<tactic>]".
+ */
+let verify_spec name overrides contract tactic tactic_name cryptol = do {
+  result <- time (llvm_verify aes_spec (spec_symbol name) overrides false contract tactic);
+  print (str_concat (str_concat (str_concat (str_concat (str_concat "RESULT proved " name) " = ") cryptol) " [") (str_concat tactic_name "]"));
+  return result;
+};
+
+/*
+ * The same, without the RESULT line: for the members of a group of proofs
+ * that one RESULTS line reports (an exhaustive proof, value by value).
+ */
+let verify_quiet name overrides contract tactic =
+  llvm_verify aes_spec (spec_symbol name) overrides false contract tactic;
+
+/*
+ * "RESULTS <n> proved <name> = <cryptol> [<tactic>]": n proofs, recorded
+ * as one line. check-saw.sh counts n against SAW's "Proof succeeded!".
+ */
+let print_results (n : Int) name cryptol tactic_name =
+  print (str_concat (str_concat (str_concat (str_concat (str_concat (str_concat
+    (str_concat "RESULTS " (show n)) " proved ") name) " = ") cryptol) " [") (str_concat tactic_name "]"));
+
+/* --- contracts ------------------------------------------------------------ */
+
+/*
+ * function F (B : Byte) return Byte, and the same returning a Boolean
+ * (i8 0 or 1).
+ */
+let byte_to_byte_contract (f : Term) = do {
+  b <- llvm_fresh_var "b" byte_t;
+  llvm_execute_func [llvm_term b];
+  llvm_return (llvm_term {{ f b }});
+};
+
+/*
+ * function F (B, C : Byte) return R.
+ */
+let byte_byte_contract (f : Term) = do {
+  b <- llvm_fresh_var "b" byte_t;
+  c <- llvm_fresh_var "c" byte_t;
+  llvm_execute_func [llvm_term b, llvm_term c];
+  llvm_return (llvm_term {{ f b c }});
+};
+
+/*
+ * function F (Bs : Block) return Block, F (S : AESWord) return AESWord,
+ * F (A, B : AESWord) return AESWord, F (Bs, W : Block) return Block:
+ * constrained arrays by value.
+ */
+let block_contract (f : Term) = do {
+  bs <- llvm_fresh_var "bs" block_t;
+  llvm_execute_func [llvm_term bs];
+  llvm_return (llvm_term {{ f bs }});
+};
+let word_contract (f : Term) = do {
+  s <- llvm_fresh_var "s" word_t;
+  llvm_execute_func [llvm_term s];
+  llvm_return (llvm_term {{ f s }});
+};
+let word_word_contract (f : Term) = do {
+  a <- llvm_fresh_var "a" word_t;
+  b <- llvm_fresh_var "b" word_t;
+  llvm_execute_func [llvm_term a, llvm_term b];
+  llvm_return (llvm_term {{ f a b }});
+};
+let block_block_contract (f : Term) = do {
+  bs <- llvm_fresh_var "bs" block_t;
+  w <- llvm_fresh_var "w" block_t;
+  llvm_execute_func [llvm_term bs, llvm_term w];
+  llvm_return (llvm_term {{ f bs w }});
+};
+
+/*
+ * function F (K : Natural) return Positive, with Pre => Key (K):
+ * AES.Spec.Types' Nk and Nr, as aes_impl_common.saw states them.
+ */
+let key_size_contract (f : Term) = do {
+  k <- llvm_fresh_var "k" (llvm_int 32);
+  llvm_precond {{ k == 128 \/ k == 192 \/ k == 256 }};
+  llvm_execute_func [llvm_term k];
+  llvm_return (llvm_term {{ f k }});
+};

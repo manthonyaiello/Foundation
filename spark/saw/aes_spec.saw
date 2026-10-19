@@ -1,0 +1,272 @@
+/*
+ * llvm_verify of the SPARK AES spec layer (spark/src/aes/foundation_spark-
+ * aes-spec-*.ads, ghost) against NSA's Cryptol: M4.4 (#59). Where M4.1 and
+ * M4.2 prove the implementation equal to the Cryptol, this proves the spec
+ * layer equal to it, so that spec = Cryptol is a proof at these sizes and
+ * not only the FFI check's tests.
+ *
+ * The spec layer's recursions are never unfolded. A recursive ghost
+ * function whose variant is a size (the folds Pmult_Fold, Pmod_Fold,
+ * Pdiv_Fold, Foldl_Round and the rest; KeyExpansion's W) is proved one
+ * index at a time, each lemma with the lemmas at the smaller indices it
+ * calls as overrides, as algorithms/AES/rust/Cipher/theorems/saw.py
+ * composes its leaf lemmas. GF2's Inner, whose variant is a value (the
+ * degree of r'), has no such index: Pgcd and Inverse, which call it, are
+ * proved exhaustively, for each of the 256 bytes, on concrete values.
+ */
+
+include "aes_spec_common.saw";
+
+/* --- AES.Spec.Types -------------------------------------------------------- */
+
+/*
+ * Nk and Nr (Types.cry: type Nk k = k / 32, type Nr k = Nk k + 6), Split
+ * and Join (Cryptol's split : Block -> [4]AESWord and join), as
+ * aes_impl.saw proves them for the implementation's module.
+ */
+types_nk <- verify_spec "types__nk" [] (key_size_contract {{ \k -> k / 32 }})
+              z3 "z3" "\\k -> k / 32 (Types::Nk)";
+types_nr <- verify_spec "types__nr" [] (key_size_contract {{ \k -> k / 32 + 6 }})
+              z3 "z3" "\\k -> k / 32 + 6 (Types::Nr)";
+types_split <- verify_spec "types__split" []
+                 (do {
+                    bs <- llvm_fresh_var "bs" block_t;
+                    llvm_execute_func [llvm_term bs];
+                    llvm_return (llvm_term {{ split bs : [4][4][8] }});
+                  }) rme "rme" "split : Block -> [4]AESWord";
+types_join <- verify_spec "types__join" []
+                (do {
+                   ws <- llvm_fresh_var "ws" (llvm_array 4 word_t);
+                   llvm_execute_func [llvm_term ws];
+                   llvm_return (llvm_term {{ join ws : [16][8] }});
+                 }) rme "rme" "join : [4]AESWord -> Block";
+
+/* --- AES.Spec.GF28 (GF28.cry) ---------------------------------------------- */
+
+/*
+ * xTimes = GF28.cry's xTimes [FIPS-PUB-197 Section 4.2]:
+ *   xTimes b = b << 1 ^ (if head b then 0x1b else 0x00)
+ */
+gf28_xtimes <- verify_spec "gf28__xtimes" [] (byte_to_byte_contract {{ xTimes }})
+                 rme "rme" "GF28::xTimes";
+
+/*
+ * Head = Cryptol's head on a [8]; Bit (B, I) = b @ i, for every I in
+ * 0 .. 7; Product_Bit (X, I) = x @ i on the [15] held in the low 15 bits
+ * of a Poly, for every I in 0 .. 14. Booleans are i8, 0 or 1.
+ */
+gf28_head <- verify_spec "gf28__head" []
+               (byte_to_byte_contract {{ \b -> if head b then 1 else 0 : [8] }})
+               rme "rme" "\\b -> head b";
+gf28_bit <- verify_spec "gf28__bit" []
+              (do {
+                 b <- llvm_fresh_var "b" byte_t;
+                 i <- llvm_fresh_var "i" (llvm_int 32);
+                 llvm_precond {{ i < 8 }};
+                 llvm_execute_func [llvm_term b, llvm_term i];
+                 llvm_return (llvm_term {{ if b @ i then 1 else 0 : [8] }});
+               }) z3 "z3" "\\b i -> b @ i, i < 8";
+gf28_product_bit <- verify_spec "gf28__product_bit" []
+                      (do {
+                         x <- llvm_fresh_var "x" poly_t;
+                         i <- llvm_fresh_var "i" (llvm_int 32);
+                         llvm_precond {{ i < 15 }};
+                         llvm_execute_func [llvm_term x, llvm_term i];
+                         llvm_return (llvm_term {{ if (drop`{1} x : [15]) @ i then 1 else 0 : [8] }});
+                       }) z3 "z3" "\\x i -> (drop`{1} x : [15]) @ i, i < 15";
+
+/*
+ * Pmult_Fold (B, C, N): the first N steps of pmult b c, the product of B
+ * with the leading N bits of C, one lemma per N in 0 .. 8, each with the
+ * lemma at N - 1 as the override for its recursive call:
+ *   Pmult_Fold (B, C, 0) = 0
+ *   Pmult_Fold (B, C, N) = zext (pmult b (take`{N} c))
+ */
+let pmult_fold_contract (n : Int) (rhs : Term) = do {
+  b <- llvm_fresh_var "b" byte_t;
+  c <- llvm_fresh_var "c" byte_t;
+  llvm_execute_func [llvm_term b, llvm_term c, llvm_term {{ `n : [32] }}];
+  llvm_return (llvm_term {{ rhs b c }});
+};
+pmult_fold_0 <- verify_spec "gf28__pmult_fold" [] (pmult_fold_contract 0 {{ \(b : [8]) (c : [8]) -> 0 : [16] }})
+                  rme "rme" "N = 0: \\b c -> 0";
+rec pmult_folds (n : Int) (prev : LLVMSpec) : TopLevel LLVMSpec = do {
+  lemma <- verify_spec "gf28__pmult_fold" [prev]
+             (pmult_fold_contract n {{ \(b : [8]) (c : [8]) -> zext (pmult b (take`{n} c)) : [16] }})
+             rme "rme" (str_concat (str_concat "N = " (show n)) ": \\b c -> zext (pmult b (take`{N} c))");
+  if eval_bool {{ `n == (8 : Integer) }} then return lemma
+  else pmult_folds (eval_int {{ `n + 1 : [32] }}) lemma;
+};
+pmult_fold_8 <- pmult_folds 1 pmult_fold_0;
+
+/*
+ * Pmult = Cryptol's pmult at [8] -> [8] -> [15], held in a Poly.
+ */
+gf28_pmult <- verify_spec "gf28__pmult" [pmult_fold_8]
+                (byte_byte_contract {{ \b c -> zext (pmult b c) : [16] }})
+                rme "rme" "\\b c -> zext (pmult b c)";
+
+/*
+ * Reduce (R, Y), one step of the remainder, = pmod of the [9] R by the
+ * [9] Y, under its precondition: R of degree at most 8, Y of degree 8.
+ */
+gf28_reduce <- verify_spec "gf28__reduce" []
+                 (do {
+                    r <- llvm_fresh_var "r" poly_t;
+                    y <- llvm_fresh_var "y" poly_t;
+                    llvm_precond {{ r < 512 /\ y >= 256 /\ y < 512 }};
+                    llvm_execute_func [llvm_term r, llvm_term y];
+                    llvm_return (llvm_term {{ pmod (drop`{7} r : [9]) (drop`{7} y : [9]) }});
+                  }) rme "rme" "\\r y -> pmod (drop`{7} r : [9]) (drop`{7} y : [9]), r < 512, 256 <= y < 512";
+
+/*
+ * Pmod_Fold (X, Y, N): the first N steps of pmod x y, the remainder
+ * modulo the [9] Y of the leading N bits of the [15] X, one lemma per N
+ * in 0 .. 15, each with the lemma at N - 1 and Reduce's as overrides:
+ *   Pmod_Fold (X, Y, N) = pmod (take`{N} x) y
+ * under the precondition 256 <= Y < 512.
+ */
+let pmod_fold_contract (n : Int) (rhs : Term) = do {
+  x <- llvm_fresh_var "x" poly_t;
+  y <- llvm_fresh_var "y" poly_t;
+  llvm_precond {{ y >= 256 /\ y < 512 }};
+  llvm_execute_func [llvm_term x, llvm_term y, llvm_term {{ `n : [32] }}];
+  llvm_return (llvm_term {{ rhs x y }});
+};
+rec pmod_folds (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- verify_spec "gf28__pmod_fold" (concat prev [gf28_reduce, gf28_product_bit])
+             (pmod_fold_contract n {{ \(x : [16]) (y : [16]) -> pmod (take`{n} (drop`{1} x : [15])) (drop`{7} y : [9]) }})
+             rme "rme" (str_concat (str_concat "N = " (show n)) ": \\x y -> pmod (take`{N} (drop`{1} x : [15])) (drop`{7} y : [9]), 256 <= y < 512");
+  if eval_bool {{ `n == (15 : Integer) }} then return lemma
+  else pmod_folds (eval_int {{ `n + 1 : [32] }}) [lemma];
+};
+pmod_fold_15 <- pmod_folds 0 [];
+
+/*
+ * Pmod = Cryptol's pmod at [15] -> [9] -> [8].
+ */
+gf28_pmod <- verify_spec "gf28__pmod" [pmod_fold_15]
+               (do {
+                  x <- llvm_fresh_var "x" poly_t;
+                  y <- llvm_fresh_var "y" poly_t;
+                  llvm_precond {{ y >= 256 /\ y < 512 }};
+                  llvm_execute_func [llvm_term x, llvm_term y];
+                  llvm_return (llvm_term {{ pmod (drop`{1} x : [15]) (drop`{7} y : [9]) }});
+                }) rme "rme" "\\x y -> pmod (drop`{1} x : [15]) (drop`{7} y : [9]), 256 <= y < 512";
+
+/*
+ * Dot = GF28.cry's (•) [FIPS-PUB-197 Section 4.2]:
+ *   (•) b c = pmod (pmult b c) m
+ */
+gf28_dot <- verify_spec "gf28__dot" [gf28_pmult, gf28_pmod]
+              (byte_byte_contract {{ \b c -> b • c }}) rme "rme" "GF28::(•)";
+
+/* --- AES.Spec.GF2 (shared/algebra/Polynomial/GF2.cry, at [9]) -------------- */
+
+/*
+ * Pmult = GF2.cry's (^*) = pmult at [9] -> [9] -> [17], held in a
+ * Product, for X and Y of degree below 9 (its precondition).
+ */
+gf2_pmult <- verify_spec "gf2__pmult" []
+               (do {
+                  x <- llvm_fresh_var "x" poly_t;
+                  y <- llvm_fresh_var "y" poly_t;
+                  llvm_precond {{ x < 512 /\ y < 512 }};
+                  llvm_execute_func [llvm_term x, llvm_term y];
+                  llvm_return (llvm_term {{ zext (pmult (drop`{7} x : [9]) (drop`{7} y : [9])) : [32] }});
+                }) rme "rme" "\\x y -> zext (pmult (drop`{7} x : [9]) (drop`{7} y : [9])) (GF2::(^*)), x, y < 512";
+
+/*
+ * Pdeg = GF2.cry's pdeg at [9]: pdeg p = toInteger (lg2 ((0b0 # p) + 1))
+ * - 1, an Integer, here the Integer's i32 (-1 for 0).
+ */
+gf2_pdeg <- verify_spec "gf2__pdeg" []
+              (do {
+                 p <- llvm_fresh_var "p" poly_t;
+                 llvm_precond {{ p < 512 }};
+                 llvm_execute_func [llvm_term p];
+                 llvm_return (llvm_term {{ fromInteger (pdeg (drop`{7} p : [9])) : [32] }});
+               }) z3 "z3" "\\p -> fromInteger (pdeg (drop`{7} p : [9])) (GF2::pdeg), p < 512";
+
+/*
+ * Pmod_Fold (X, Y, N) and Pdiv_Fold (X, Y, N): the remainder and the
+ * quotient by the nonzero [9] Y of the leading N bits of the [9] X, by
+ * long division, one lemma per N in 0 .. 9, each with the lemmas at
+ * N - 1 as the overrides for its calls:
+ *   Pmod_Fold (X, Y, N) = zext (pmod (take`{N} x) y)
+ *   Pdiv_Fold (X, Y, N) = zext (pdiv (take`{N} x) y)
+ * pmod and pdiv are Cryptol's primitives, GF2.cry's (^%) and (^/). The
+ * calls they make to Lead, Pdeg, Bit and Reduce (not recursive) are
+ * executed, not overridden: Pdeg's lemma states an Integer, which rme
+ * cannot take.
+ */
+let gf2_fold_contract (n : Int) (rhs : Term) = do {
+  x <- llvm_fresh_var "x" poly_t;
+  y <- llvm_fresh_var "y" poly_t;
+  llvm_precond {{ x < 512 /\ y < 512 /\ y != 0 }};
+  llvm_execute_func [llvm_term x, llvm_term y, llvm_term {{ `n : [32] }}];
+  llvm_return (llvm_term {{ rhs x y }});
+};
+rec gf2_folds (n : Int) (prev_mod : [LLVMSpec]) (prev_div : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  pmod_n <- verify_spec "gf2__pmod_fold" prev_mod
+              (gf2_fold_contract n {{ \(x : [16]) (y : [16]) -> zext (pmod (take`{n} (drop`{7} x : [9])) (drop`{7} y : [9])) : [16] }})
+              rme "rme" (str_concat (str_concat "N = " (show n)) ": \\x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0");
+  pdiv_n <- verify_spec "gf2__pdiv_fold" (concat prev_mod prev_div)
+              (gf2_fold_contract n {{ \(x : [16]) (y : [16]) -> zext (pdiv (take`{n} (drop`{7} x : [9])) (drop`{7} y : [9])) : [16] }})
+              rme "rme" (str_concat (str_concat "N = " (show n)) ": \\x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0");
+  if eval_bool {{ `n == (9 : Integer) }} then return pdiv_n
+  else gf2_folds (eval_int {{ `n + 1 : [32] }}) [pmod_n] [pdiv_n];
+};
+gf2_pdiv_fold_9 <- gf2_folds 0 [] [];
+
+/*
+ * Pdiv = GF2.cry's (^/) = pdiv at [9] -> [9] -> [9].
+ */
+gf2_pdiv <- verify_spec "gf2__pdiv" [gf2_pdiv_fold_9]
+              (do {
+                 x <- llvm_fresh_var "x" poly_t;
+                 y <- llvm_fresh_var "y" poly_t;
+                 llvm_precond {{ x < 512 /\ y < 512 /\ y != 0 }};
+                 llvm_execute_func [llvm_term x, llvm_term y];
+                 llvm_return (llvm_term {{ zext (pdiv (drop`{7} x : [9]) (drop`{7} y : [9])) : [16] }});
+               }) rme "rme" "\\x y -> zext (pdiv (drop`{7} x : [9]) (drop`{7} y : [9])) (GF2::(^/)), x, y < 512, y /= 0";
+
+/* --- GF2.cry's pgcd and inverse, and SBox.cry's affine: exhaustive --------- */
+
+/*
+ * Pgcd (A, SBoxPolynomial) = GF2.cry's pgcd a SBoxPolynomial at a : [8]
+ * (wa = 7, wb = 8), Inverse (A, SBoxPolynomial) = GF2.cry's inverse a
+ * SBoxPolynomial, and Affine (B) = SBox.cry's affine b
+ * [FIPS-PUB-197 Sections 4.4 and 5.1.1], for each of the 256 bytes.
+ *
+ * pgcd's inner, and the spec's Inner that mirrors it, recurse on the
+ * value of r' (Inner's variant is the polynomial S (3)), not on a size,
+ * so there is no index to prove them at one at a time; and with a
+ * symbolic byte the Cryptol's inner does not terminate under SAW's
+ * symbolic evaluation. So the three are proved on each concrete byte:
+ * 3 x 256 llvm_verify, which together are the proof for every byte. Each
+ * value's Inverse is proved with that value's Pgcd as the override, and
+ * its Affine with its Inverse. The modulus is SBoxPolynomial, the only
+ * one SBox.cry (and the spec's Affine) passes.
+ */
+let pgcd_contract (a : Term) = do {
+  llvm_execute_func [llvm_term a, llvm_term {{ zext SBoxPolynomial : [16] }}];
+  llvm_return (llvm_term {{ [ zext p | p <- pgcd`{7, 8} a SBoxPolynomial ] : [5][16] }});
+};
+let inverse_contract (a : Term) = do {
+  llvm_execute_func [llvm_term a, llvm_term {{ zext SBoxPolynomial : [16] }}];
+  llvm_return (llvm_term {{ inverse a SBoxPolynomial }});
+};
+let affine_contract (b : Term) = do {
+  llvm_execute_func [llvm_term b];
+  llvm_return (llvm_term {{ affine b }});
+};
+t_exhaustive <- time (for (eval_list {{ [0 .. 255] : [256][8] }}) (\a -> do {
+  pgcd_a <- verify_quiet "gf2__pgcd" [gf2_pdiv] (pgcd_contract a) rme;
+  inverse_a <- verify_quiet "gf2__inverse" [pgcd_a] (inverse_contract a) rme;
+  affine_a <- verify_quiet "sbox__affine" [inverse_a, gf28_bit] (affine_contract a) rme;
+  return inverse_a;
+}));
+print_results 256 "gf2__pgcd" "\\a -> [zext p | p <- GF2::pgcd`{7, 8} a SBox::SBoxPolynomial], every a : [8]" "rme";
+print_results 256 "gf2__inverse" "\\a -> GF2::inverse a SBox::SBoxPolynomial, every a : [8]" "rme";
+print_results 256 "sbox__affine" "SBox::affine, every b : [8]" "rme";
