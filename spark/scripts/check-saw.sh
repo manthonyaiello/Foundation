@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-# check-saw.sh -- SAW's llvm_verify of the SPARK AES implementation against
-# NSA's Cryptol, on GNAT-LLVM bitcode of the crate's own sources (E4, #21;
-# M4.1, #22). README "SAW".
+# check-saw.sh -- SAW's llvm_verify of the SPARK AES, SHA-256 and
+# HMAC-SHA-256 implementations against NSA's Cryptol, on GNAT-LLVM bitcode
+# of the crate's own sources (E4, #21; M4.1 #22, M4.2 #23, M4.3 #24).
+# README "SAW".
 #
 # LOCAL ONLY: never wired into a CI workflow. It needs GNAT Pro's LLVM back
 # end (llvm-gcc), which CI does not have and which nobody without GNAT Pro
@@ -13,20 +14,28 @@
 # of each source compiled into it and of each Cryptol file imported, every
 # result, the negative controls' counterexamples, and the wall-clock.
 #
-# What it does:
-#   1. compiles each unit of UNITS below with $GNAT_LLVM_DIR/bin/llvm-gcc
+# What it does, for each module of MODULES below (aes, sha256):
+#   1. compiles each of the module's units with $GNAT_LLVM_DIR/bin/llvm-gcc
 #      to saw/obj/<unit>.bc (SWITCHES below), and links them with
-#      $LLVM_LINK_DIR/bin/llvm-link into one module, saw/obj/aes.bc (M4.2,
-#      #23): SAW takes an override only from the module being verified, and
-#      AES.Impl calls AES.Spec.Types;
+#      $LLVM_LINK_DIR/bin/llvm-link into one module, saw/obj/<module>.bc
+#      (M4.2, #23): SAW takes an override only from the module being
+#      verified;
 #   2. checks the bitcode, each unit's and the linked module: no symbol of a
-#      ghost unit (the spec layer and the lemmas) is defined or referenced;
+#      ghost entity (the spec layer, the lemmas, ghost functions of the
+#      implementation units) is defined or referenced;
 #   3. refuses any llvm_unsafe_assume_spec in saw/ (every override must be
-#      a proof), then runs saw/aes_impl.saw, every llvm_verify of which
-#      must succeed;
+#      a proof), then runs saw/<module>_impl.saw, every llvm_verify of
+#      which must succeed;
+# and then:
 #   4. runs each saw/negative/*.saw, every one of which must FAIL with a
 #      counterexample (the negative controls);
 #   5. writes saw/results.txt (unless --print).
+#
+# Every saw run is in its own systemd scope capped at SAW_MEMORY_MAX (10G,
+# no swap) when systemd-run --user works, so that a proof that blows up is
+# killed alone instead of taking the machine down (#24: one did, at
+# 15.7 GB). A run killed by the cap is a failure, reported as such. Without
+# systemd-run the runs are not capped, and the script says so.
 #
 # Usage:
 #   scripts/check-saw.sh           run, and record saw/results.txt
@@ -43,6 +52,7 @@
 #                  which must also be the LLVM of GNAT_LLVM_DIR's llvm-gcc.
 #                  GNAT Pro ships no llvm-link; the bootstrap's gnat-llvm
 #                  phase installs LLVM's own release (README "SAW").
+#   SAW_MEMORY_MAX optional: the memory cap of each saw run (default 10G).
 #   saw, cryptol and z3 must be on PATH (the x86_64 bootstrap's env.sh).
 #
 # Exit status: 0 when every proof passed and every negative control failed;
@@ -75,10 +85,10 @@ LLVM_GCC="$GNAT_LLVM_DIR/bin/llvm-gcc"
 LLVM_NM="$GNAT_LLVM_DIR/bin/llvm-nm"
 [ -x "$LLVM_GCC" ] || die "GNAT_LLVM_DIR=$GNAT_LLVM_DIR has no bin/llvm-gcc"
 [ -x "$LLVM_NM" ] || die "GNAT_LLVM_DIR=$GNAT_LLVM_DIR has no bin/llvm-nm"
-[ -n "${LLVM_LINK_DIR:-}" ] || die "LLVM_LINK_DIR is unset. This check links two units' bitcode with
-   llvm-link, which GNAT Pro does not ship: set LLVM_LINK_DIR to the directory
-   holding bin/llvm-link of LLVM's own release (the x86_64 bootstrap's
-   gnat-llvm phase installs it, README \"SAW\")."
+[ -n "${LLVM_LINK_DIR:-}" ] || die "LLVM_LINK_DIR is unset. This check links each module's units'
+   bitcode with llvm-link, which GNAT Pro does not ship: set LLVM_LINK_DIR to
+   the directory holding bin/llvm-link of LLVM's own release (the x86_64
+   bootstrap's gnat-llvm phase installs it, README \"SAW\")."
 LLVM_LINK="$LLVM_LINK_DIR/bin/llvm-link"
 [ -x "$LLVM_LINK" ] || die "LLVM_LINK_DIR=$LLVM_LINK_DIR has no bin/llvm-link"
 for t in saw cryptol z3; do
@@ -102,15 +112,41 @@ V_SAW="$(first_line saw --version)"
 V_CRYPTOL="$(cryptol --version 2>&1 | tr '\n' ' ' | sed 's/  */ /g; s/ $//')"
 V_Z3="$(first_line z3 --version)"
 
+# The memory cap of each saw run: its own systemd scope when the user
+# manager answers (an OOM then kills that scope alone), else no cap.
+SAW_MEMORY_MAX="${SAW_MEMORY_MAX:-10G}"
+CAP=()
+if command -v systemd-run >/dev/null 2>&1 \
+   && systemd-run --user --scope -q -p MemoryMax=1G true >/dev/null 2>&1; then
+  CAP=(systemd-run --user --scope -q -p "MemoryMax=$SAW_MEMORY_MAX" -p MemorySwapMax=0)
+  CAP_NOTE="each saw run in its own systemd scope, MemoryMax=$SAW_MEMORY_MAX, MemorySwapMax=0"
+else
+  CAP_NOTE="none: systemd-run --user is not available, saw runs uncapped"
+  echo ">> NOTE: systemd-run --user is not available: the saw runs are NOT memory-capped" >&2
+fi
+
 # --- what is compiled, and how ----------------------------------------------------
 
-# The units compiled to bitcode, as files under spark/src: AES.Impl, and
-# the non-ghost AES.Spec.Types whose expression functions (Nk, Nr, Split,
-# Join) AES.Impl calls, and which -O0 leaves as calls to external symbols.
-UNITS=(aes/foundation_spark-aes-impl.adb aes/foundation_spark-aes-spec-types.ads)
+# The modules SAW loads, each the units listed (files under spark/src)
+# linked by llvm-link into saw/obj/<module>.bc, and the script of proofs
+# run on it, saw/<module>_impl.saw.
+MODULES=(aes sha256)
 
-# The one module SAW loads: UNITS linked by llvm-link.
-LINKED="aes.bc"
+# aes: AES.Impl, and the non-ghost AES.Spec.Types whose expression
+# functions (Nk, Nr, Split, Join) AES.Impl calls, and which -O0 leaves as
+# calls to external symbols.
+UNITS_aes=(aes/foundation_spark-aes-impl.adb aes/foundation_spark-aes-spec-types.ads)
+
+# sha256: SHA2.SHA256_Stream (Compress, Hash), the SHA-256 instance of the
+# generic SHA2.Main (Ch, Maj, "+"), SHA2.Functions (the SIGMA and sigma
+# functions, and the Notation instances' ROTR and SHR), which
+# SHA256_Stream calls; and HMAC.SHA256_Impl, which calls SHA256_Stream.
+UNITS_sha256=(
+  sha2/foundation_spark-sha2-sha256_stream.adb
+  sha2/foundation_spark-sha2-sha256.ads
+  sha2/foundation_spark-sha2-functions.ads
+  hmac/foundation_spark-hmac-sha256_impl.adb
+)
 
 # -gnatp: no run-time checks in the bitcode (gnatprove proves them absent).
 # -gnatVn: no validity checks. No -gnata: assertions, contracts and ghost
@@ -124,8 +160,23 @@ LINKED="aes.bc"
 #   with a .bc name ("incorrect object file extension").
 SWITCHES=(-c -gnat2022 -gnatp -gnatVn -O0 -emit-llvm)
 
-# The ghost units: none of their symbols may appear in the bitcode.
-GHOST_RE='foundation_spark__aes__(spec__(cipher|gf2|gf28|keyexpansion|main|properties|sbox)|lemmas|main_lemmas)(__|_E$|$)'
+# The ghost entities: none of their symbols may appear in the bitcode.
+#  - AES: the spec layer's units and the lemmas (all ghost);
+#  - SHA-256 and HMAC: the ghost units SHA2.SHA256_Blocks, HMAC.Main and
+#    its instance HMAC.SHA256; the ghost functions of the units that also
+#    hold executable code (the SHA2 root, the SHA-256 instance of Main,
+#    SHA256_Bytes, SHA256_Stream, the HMAC root, HMAC.SHA256_Impl); and
+#    every lemma (`__lemma_`), wherever it is declared.
+GHOST_RE_AES='foundation_spark__aes__(spec__(cipher|gf2|gf28|keyexpansion|main|properties|sbox)|lemmas|main_lemmas)(__|_E$|$)'
+GHOST_RE_SHA='foundation_spark__(sha2__sha256_blocks|hmac__main|hmac__sha256)(__|_E$|$)'
+GHOST_RE_SHA+='|foundation_spark__sha2__(ceil_div|ceil_mod|to_bits)$'
+GHOST_RE_SHA+='|foundation_spark__sha2__sha256__(w|t1|t2|step3|foldl_step3|step|small_k|n|zero|pad|word_of|parse_block|parse|foldl_step|bit|join|hash)$'
+GHOST_RE_SHA+='|foundation_spark__sha2__sha256_bytes__(byte_bit|bits_of|blocks|length_byte|padded_byte|pad_bytes|word_at|block_at|parse_bytes|word_byte|digest_bytes|hash_bytes)$'
+GHOST_RE_SHA+='|foundation_spark__sha2__sha256_stream__(models|absorbed|finished|joined|tail_blocks|tail_pad|empty)$'
+GHOST_RE_SHA+='|foundation_spark__hmac__(byte_bit|join|repeat|zero)$'
+GHOST_RE_SHA+='|foundation_spark__hmac__sha256_impl__(to_bytes|models|absorbed|finished|inner_prefix|inner_message|outer_message)$'
+GHOST_RE_SHA+='|__lemma_'
+GHOST_RE="$GHOST_RE_AES|$GHOST_RE_SHA"
 
 # The NSA Cryptol that the scripts import, directly or through its imports.
 CRYPTOL_FILES=(
@@ -136,7 +187,14 @@ CRYPTOL_FILES=(
   algorithms/AES/KeyExpansion.cry
   shared/algebra/Polynomial/GF2.cry
   shared/common/utils/Prime.cry
+  algorithms/SHA2/Main.cry
+  algorithms/SHA2/Notation.cry
+  algorithms/SHA2/Functions.cry
+  algorithms/SHA2/Preprocessing.cry
+  algorithms/HMAC/Main.cry
 )
+# Our own Cryptol in saw/: instantiations of NSA's, recorded by sha256.
+OUR_CRYPTOL=(spark/saw/SHA256Main.cry)
 
 T0="$(date +%s)"
 COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
@@ -155,41 +213,42 @@ for f in "${CRYPTOL_FILES[@]}"; do
   git -C "$ROOT_DIR" diff --quiet HEAD -- "$f" || die "$f differs from HEAD: NSA's Cryptol is never modified"
 done
 
-# --- 1. compile ----------------------------------------------------------------------
+# --- 1. compile, and 2. no ghost code in the bitcode -----------------------------------
 
 INCLUDES=()
 while IFS= read -r d; do INCLUDES+=("-I$d"); done < <(find "$SPARK_DIR/src" -type d | sort)
 
-rm -rf "$OBJ_DIR"
-mkdir -p "$OBJ_DIR"
-for u in "${UNITS[@]}"; do
-  echo ">> llvm-gcc ${SWITCHES[*]} src/$u"
-  (cd "$OBJ_DIR" && "$LLVM_GCC" "${SWITCHES[@]}" "${INCLUDES[@]}" "$SPARK_DIR/src/$u")
-done
-
-# --- 2. no ghost code in the bitcode ---------------------------------------------------
-
-no_ghost() {  # no_ghost BC: die if BC defines or references a ghost unit's symbol
+no_ghost() {  # no_ghost BC: die if BC defines or references a ghost entity's symbol
   local bc="$1" syms ghost
   syms="$("$LLVM_NM" "$bc")"
   ghost="$(printf '%s\n' "$syms" | awk '{print $NF}' | grep -E "$GHOST_RE" || true)"
   [ -z "$ghost" ] || die "ghost symbols in $(basename "$bc"):
 $ghost"
-  echo ">> $(basename "$bc"): $(printf '%s\n' "$syms" | grep -c ' [TtDdRrBb] ') symbols defined, none of a ghost unit; undefined: $(printf '%s\n' "$syms" | awk '$1 == "U" {print $2}' | tr '\n' ' ')"
+  echo ">> $(basename "$bc"): $(printf '%s\n' "$syms" | grep -c ' [TtDdRrBb] ') symbols defined, none of a ghost entity; undefined: $(printf '%s\n' "$syms" | awk '$1 == "U" {print $2}' | tr '\n' ' ')"
 }
 
+rm -rf "$OBJ_DIR"
+mkdir -p "$OBJ_DIR"
 BITCODE=()
-for u in "${UNITS[@]}"; do
-  bc="$OBJ_DIR/$(basename "${u%.*}").bc"
-  [ -f "$bc" ] || die "llvm-gcc wrote no $bc"
-  BITCODE+=("$bc")
-  no_ghost "$bc"
+ALL_UNITS=()
+for mod in "${MODULES[@]}"; do
+  declare -n units="UNITS_$mod"
+  mod_bc=()
+  for u in "${units[@]}"; do
+    echo ">> llvm-gcc ${SWITCHES[*]} src/$u"
+    (cd "$OBJ_DIR" && "$LLVM_GCC" "${SWITCHES[@]}" "${INCLUDES[@]}" "$SPARK_DIR/src/$u")
+    bc="$OBJ_DIR/$(basename "${u%.*}").bc"
+    [ -f "$bc" ] || die "llvm-gcc wrote no $bc"
+    no_ghost "$bc"
+    mod_bc+=("$bc")
+    ALL_UNITS+=("$u")
+  done
+  unset -n units
+  echo ">> llvm-link ${mod_bc[*]##*/} -o $mod.bc"
+  "$LLVM_LINK" "${mod_bc[@]}" -o "$OBJ_DIR/$mod.bc"
+  no_ghost "$OBJ_DIR/$mod.bc"
+  BITCODE+=("${mod_bc[@]}" "$OBJ_DIR/$mod.bc")
 done
-
-echo ">> llvm-link ${BITCODE[*]##*/} -o $LINKED"
-"$LLVM_LINK" "${BITCODE[@]}" -o "$OBJ_DIR/$LINKED"
-no_ghost "$OBJ_DIR/$LINKED"
-BITCODE+=("$OBJ_DIR/$LINKED")
 
 # --- 3. the proofs ---------------------------------------------------------------------
 
@@ -202,31 +261,46 @@ export CRYPTOLPATH="$ROOT_DIR"
 LOG_DIR="$OBJ_DIR/logs"
 mkdir -p "$LOG_DIR"
 
-run_saw() {  # run_saw FILE LOG: saw FILE from saw/, its output in LOG; returns saw's status
+KILLED_BY_CAP=137  # 128 + SIGKILL: what a scope killed by its MemoryMax returns
+
+run_saw() {  # run_saw FILE LOG: saw FILE from saw/, capped, its output in LOG; returns saw's status
   local status=0
-  (cd "$SAW_DIR" && saw "$1") > "$2" 2>&1 || status=$?
+  (cd "$SAW_DIR" && "${CAP[@]}" saw "$1") > "$2" 2>&1 || status=$?
+  if [ "$status" -eq "$KILLED_BY_CAP" ] && [ "${#CAP[@]}" -gt 0 ]; then
+    echo "!! KILLED (SIGKILL): saw $1 reached the memory cap ($SAW_MEMORY_MAX)" >> "$2"
+  fi
   return "$status"
 }
 
 PROVED=()
-echo ">> saw aes_impl.saw"
-t="$(date +%s)"
-if ! run_saw aes_impl.saw "$LOG_DIR/aes_impl.log"; then
-  grep -v 'override\|^Matching\|^Branching' "$LOG_DIR/aes_impl.log" | tail -40 >&2
-  die "saw aes_impl.saw FAILED (log: $LOG_DIR/aes_impl.log)"
-fi
-T_PROOFS=$(( $(date +%s) - t ))
-# Each RESULT line, with the time SAW's `time` printed just before it for
-# that llvm_verify (aes_impl_common.saw's verify_symbol).
-while IFS= read -r line; do PROVED+=("$line"); done < <(awk '
-  /^Time: / { t = $2; sub(/s$/, "", t) }
-  /^RESULT proved / { sub(/^RESULT proved /, ""); printf "%s, %.2f s\n", $0, t; t = "" }
-' "$LOG_DIR/aes_impl.log")
-[ "${#PROVED[@]}" -gt 0 ] || die "saw aes_impl.saw proved nothing (log: $LOG_DIR/aes_impl.log)"
-n_succeeded="$(grep -c '^Proof succeeded!' "$LOG_DIR/aes_impl.log" || true)"
-[ "$n_succeeded" -eq "${#PROVED[@]}" ] \
-  || die "aes_impl.saw: $n_succeeded proofs succeeded but ${#PROVED[@]} RESULT lines"
-for p in "${PROVED[@]}"; do echo "   proved $p"; done
+T_PROOFS=()
+for mod in "${MODULES[@]}"; do
+  script="${mod}_impl.saw"
+  log="$LOG_DIR/${mod}_impl.log"
+  echo ">> saw $script"
+  t="$(date +%s)"
+  status=0
+  run_saw "$script" "$log" || status=$?
+  if [ "$status" -ne 0 ]; then
+    grep -v 'override\|^Matching\|^Branching\|^  variant' "$log" | tail -40 >&2
+    [ "$status" -ne "$KILLED_BY_CAP" ] || die "saw $script was KILLED by the memory cap ($SAW_MEMORY_MAX): a failure (log: $log)"
+    die "saw $script FAILED (log: $log)"
+  fi
+  T_PROOFS+=("$(( $(date +%s) - t )) s for $script")
+  # Each RESULT line, with the time SAW's `time` printed just before it for
+  # that llvm_verify (the common files' verify_symbol).
+  mod_proved=()
+  while IFS= read -r line; do mod_proved+=("$line"); done < <(awk '
+    /^Time: / { t = $2; sub(/s$/, "", t) }
+    /^RESULT proved / { sub(/^RESULT proved /, ""); printf "%s, %.2f s\n", $0, t; t = "" }
+  ' "$log")
+  [ "${#mod_proved[@]}" -gt 0 ] || die "saw $script proved nothing (log: $log)"
+  n_succeeded="$(grep -c '^Proof succeeded!' "$log" || true)"
+  [ "$n_succeeded" -eq "${#mod_proved[@]}" ] \
+    || die "$script: $n_succeeded proofs succeeded but ${#mod_proved[@]} RESULT lines"
+  for p in "${mod_proved[@]}"; do echo "   proved $p"; done
+  PROVED+=("${mod_proved[@]}")
+done
 
 # --- 4. the negative controls ---------------------------------------------------------------
 
@@ -235,14 +309,17 @@ for f in "$SAW_DIR"/negative/*.saw; do
   name="negative/$(basename "$f")"
   log="$LOG_DIR/$(basename "$f" .saw).log"
   echo ">> saw $name (must fail)"
-  if run_saw "$name" "$log"; then
-    die "NEGATIVE CONTROL PROVED: $name must fail (log: $log)"
-  fi
+  status=0
+  run_saw "$name" "$log" || status=$?
+  [ "$status" -ne 0 ] || die "NEGATIVE CONTROL PROVED: $name must fail (log: $log)"
+  [ "$status" -ne "$KILLED_BY_CAP" ] \
+    || die "$name was KILLED by the memory cap ($SAW_MEMORY_MAX), not refuted (log: $log)"
   grep -q '^Proof failed\.' "$log" && grep -q -- '-Counterexample-' "$log" \
     || { tail -20 "$log" >&2; die "$name failed without a counterexample (log: $log)"; }
   target="$(sed -n 's/^Verifying \(.*\)\.\.\.$/\1/p' "$log" | tail -1)"
   cex="$(sed -n '/-Counterexample-/,/^---*$/p' "$log" | sed '1d;$d' | sed 's/^ *//' | tr '\n' ' ' | sed 's/ $//')"
-  NEGATIVE+=("$name: $target fails, counterexample $cex")
+  t_neg="$(awk '/^Time: / { t = $2 } END { sub(/s$/, "", t); if (t != "") printf "%.2f s", t }' "$log")"
+  NEGATIVE+=("$name: $target fails${t_neg:+ in $t_neg}, counterexample $cex")
   echo "   failed as it must: $target, counterexample $cex"
 done
 [ "${#NEGATIVE[@]}" -gt 0 ] || die "no negative control in saw/negative/"
@@ -256,9 +333,10 @@ sha() { sha256sum "$1" | cut -d' ' -f1; }
 record() {
   echo "# saw/results.txt -- written by scripts/check-saw.sh; do not edit."
   echo "#"
-  echo "# SAW llvm_verify of the SPARK AES implementation's bitcode against NSA's"
-  echo "# Cryptol. Local only (GNAT Pro LLVM), never run by CI: this record is the"
-  echo "# provenance of the result. README \"SAW\"."
+  echo "# SAW llvm_verify of the SPARK AES, SHA-256 and HMAC-SHA-256"
+  echo "# implementations' bitcode against NSA's Cryptol. Local only (GNAT Pro"
+  echo "# LLVM), never run by CI: this record is the provenance of the result."
+  echo "# README \"SAW\"."
   echo
   echo "commit      $COMMIT$DIRTY"
   echo "date        $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -269,6 +347,7 @@ record() {
   echo "saw         $V_SAW"
   echo "cryptol     $V_CRYPTOL"
   echo "solvers     rme (SAW's built-in); z3 on PATH: $V_Z3 (each proof's below)"
+  echo "memory cap  $CAP_NOTE"
   echo "switches    ${SWITCHES[*]}"
   for bc in "${BITCODE[@]}"; do
     echo "bitcode     $(sha "$bc") $(basename "$bc")"
@@ -276,7 +355,7 @@ record() {
   # The sources the front end read for the units (their ALIs' D lines),
   # each once: ours by sha256; the GNAT Pro runtime's by name and the ALI's
   # checksum.
-  for u in "${UNITS[@]}"; do
+  for u in "${ALL_UNITS[@]}"; do
     grep '^D ' "$OBJ_DIR/$(basename "${u%.*}").ali"
   done | awk '!seen[$2]++' | while read -r _ file _ cksum _; do
     src="$(find "$SPARK_DIR/src" -name "$file" -print -quit)"
@@ -289,13 +368,17 @@ record() {
   for f in "${CRYPTOL_FILES[@]}"; do
     echo "cryptol     $(sha "$ROOT_DIR/$f") $f"
   done
+  for f in "${OUR_CRYPTOL[@]}"; do
+    echo "cryptol     $(sha "$ROOT_DIR/$f") $f (ours: an instantiation)"
+  done
   for p in "${PROVED[@]}"; do
     echo "proved      $p"
   done
   for n in "${NEGATIVE[@]}"; do
     echo "negative    $n"
   done
-  echo "wall-clock  ${T_PROOFS} s for aes_impl.saw; ${T_TOTAL} s in all"
+  local IFS=';'
+  echo "wall-clock  ${T_PROOFS[*]}; ${T_TOTAL} s in all" | sed 's/;/; /g'
 }
 
 if [ "$PRINT" -eq 1 ]; then
