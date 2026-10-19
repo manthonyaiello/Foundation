@@ -216,7 +216,7 @@ let key_size_contract (f : Term) = do {
  * unchanged after the call: InvCipher's is on the secondary stack (the
  * reversed keys), writable, which a read-only allocation does not match.
  */
-let foldl_contract (m : Int) (f : Term) = do {
+let foldl_contract_rhs (m : Int) (rhs : Term) = do {
   z <- llvm_fresh_var "z" block_t;
   xs <- llvm_fresh_var "xs" (llvm_array m block_t);
   xsp <- llvm_alloc (llvm_array m block_t);
@@ -227,8 +227,10 @@ let foldl_contract (m : Int) (f : Term) = do {
   llvm_execute_func [llvm_term z, llvm_struct_value [xsp, xsb]];
   llvm_points_to xsp (llvm_term xs);
   llvm_points_to xsb (llvm_struct_value [llvm_term first, llvm_term {{ first + `m - 1 }}]);
-  llvm_return (llvm_term {{ foldl f z xs }});
+  llvm_return (llvm_term {{ rhs z xs }});
 };
+let foldl_contract (m : Int) (f : Term) =
+  foldl_contract_rhs m {{ \(z : [16][8]) (xs : [m][16][8]) -> foldl f z xs }};
 
 /*
  * The fold lemmas, one per length M in m .. 13 (Cipher at k = 256 folds
@@ -248,8 +250,9 @@ rec foldls (name : String) (round : LLVMSpec) (f : Term) (cry : String) (m : Int
  * function Cipher (K : Natural; W : Round_Keys; Input : Block) return
  * Block, at one key size k with Nr = nr: W is a fat pointer to the nr + 1
  * round keys with bounds {0, nr}, which is Is_Round_Keys (K, W), as
- * aes_impl_common.saw's cipher_contract, but writable and stated
- * unchanged (the fold lemmas take a writable slice). With ss, the
+ * aes_impl_common.saw's cipher_contract, but both writable and stated
+ * unchanged: the fold lemmas take a writable slice, and Main's Encrypt
+ * passes the round keys KeyExpansion leaves on the secondary stack. With ss, the
  * secondary stack is set up first (InvCipher and InvCipher' use it). f is
  * the Cryptol at that size.
  */
@@ -258,10 +261,11 @@ let spec_cipher_contract_ss (ss : Bool) (k : Int) (nr : Int) (f : Term) = do {
   w <- llvm_fresh_var "w" (llvm_array (eval_int {{ `nr + 1 : [32] }}) block_t);
   wp <- llvm_alloc (llvm_array (eval_int {{ `nr + 1 : [32] }}) block_t);
   llvm_points_to wp (llvm_term w);
-  wb <- bounds {{ 0 : [32] }} {{ `nr : [32] }};
+  wb <- slice_bounds {{ 0 : [32] }} {{ `nr : [32] }};
   input <- llvm_fresh_var "input" block_t;
   llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [wp, wb], llvm_term input];
   llvm_points_to wp (llvm_term w);
+  llvm_points_to wb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
   llvm_return (llvm_term {{ f w input }});
 };
 let spec_cipher_contract = spec_cipher_contract_ss false;
@@ -291,10 +295,12 @@ let reverse_keys_contract (m : Int) = do {
 let keyexpansion_contract (k : Int) (nk : Int) (nr : Int) = do {
   stack <- secondary_stack;
   key <- llvm_fresh_var "key" (llvm_array nk word_t);
-  keyp <- llvm_alloc_readonly (llvm_array nk word_t);
+  keyp <- llvm_alloc (llvm_array nk word_t);
   llvm_points_to keyp (llvm_term key);
-  keyb <- bounds {{ 0 : [32] }} {{ `nk - 1 : [32] }};
+  keyb <- slice_bounds {{ 0 : [32] }} {{ `nk - 1 : [32] }};
   llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [keyp, keyb]];
+  llvm_points_to keyp (llvm_term key);
+  llvm_points_to keyb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
   llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
   llvm_points_to_untyped (ss_at stack 8) (llvm_term {{ KeyExpansion`{k} key }});
   llvm_return (llvm_struct_value [ss_at stack 8, ss_at stack 0]);
@@ -303,7 +309,9 @@ let keyexpansion_contract (k : Int) (nk : Int) (nr : Int) = do {
 /*
  * function W (K : Natural; Key : Key_Words; I : Natural) return AESWord
  * at key size k (nk key words) and index i: Key is a fat pointer to the
- * nk words (read-only) with bounds {0, nk - 1} (Is_Key_Words (K, Key)).
+ * nk words with bounds {0, nk - 1} (Is_Key_Words (K, Key)), both writable
+ * and stated unchanged (Main's Encrypt passes the key words Split_Key
+ * leaves on the secondary stack).
  * W's recursive calls pass the same fat pointer, so each lemma's Key is
  * its caller's.
  *
@@ -315,10 +323,12 @@ let keyexpansion_contract (k : Int) (nk : Int) (nr : Int) = do {
  */
 let w_contract (k : Int) (nk : Int) (i : Int) (key_of : Term) = do {
   key <- llvm_fresh_var "key" (llvm_array nk word_t);
-  keyp <- llvm_alloc_readonly (llvm_array nk word_t);
+  keyp <- llvm_alloc (llvm_array nk word_t);
   llvm_points_to keyp (llvm_term key);
-  keyb <- bounds {{ 0 : [32] }} {{ `nk - 1 : [32] }};
+  keyb <- slice_bounds {{ 0 : [32] }} {{ `nk - 1 : [32] }};
   llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [keyp, keyb], llvm_term {{ `i : [32] }}];
+  llvm_points_to keyp (llvm_term key);
+  llvm_points_to keyb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
   llvm_return (llvm_term {{ (groupBy`{4} (join (KeyExpansion`{k} (key_of key)))) @ (`i : [32]) }});
 };
 

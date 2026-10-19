@@ -14,16 +14,19 @@
  * degree of r'), has no such index: Pgcd and Inverse, which call it, are
  * proved exhaustively, for each of the 256 bytes, on concrete values.
  *
- * The lemmas are in three files, so that a negative control can include
+ * The lemmas are in four files, so that a negative control can include
  * what it needs: aes_spec_gf.saw (Types, GF28, GF2), aes_spec_cipher.saw
- * (the rounds, the folds, Cipher) and aes_spec_keyexpansion.saw (W);
- * aes_spec_common.saw has the contracts. The exhaustive proofs are here.
+ * (the rounds, the folds, the ciphers), aes_spec_keyexpansion.saw (W,
+ * KeyExpansion) and aes_spec_main.saw (Main.cry's bit-vector Encrypt and
+ * Decrypt); aes_spec_common.saw has the contracts. The exhaustive proofs
+ * are here.
  */
 
 include "aes_spec_common.saw";
 include "aes_spec_gf.saw";
 include "aes_spec_cipher.saw";
 include "aes_spec_keyexpansion.saw";
+include "aes_spec_main.saw";
 
 /* --- GF2.cry's pgcd and inverse, and SBox.cry's affine: exhaustive --------- */
 

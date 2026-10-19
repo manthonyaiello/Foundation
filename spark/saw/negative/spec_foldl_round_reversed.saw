@@ -16,5 +16,5 @@ include "../aes_spec_gf.saw";
 include "../aes_spec_cipher.saw";
 
 verify_spec "cipher__foldl_round" (concat c_foldl_round [c_round])
-  (foldl_contract 9 {{ \z (xs : [9][16][8]) -> foldl Round z (reverse xs) }})
+  (foldl_contract_rhs 9 {{ \z (xs : [9][16][8]) -> foldl Round z (reverse xs) }})
   (w4_unint_z3 ["Round"]) "w4_unint_z3 Round" "M = 9: foldl Cipher::Round z (reverse xs)";

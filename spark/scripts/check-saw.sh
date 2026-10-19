@@ -174,9 +174,7 @@ SWITCHES=(-c -gnat2022 -gnatp -gnatVn -O0 -emit-llvm)
 SPEC_MODULES=(aes_spec)
 
 # aes_spec: the AES spec layer's units whose functions the script proves
-# (all ghost but AES.Spec.Types). AES.Spec.Main is not among them: its
-# functions return their bit sequences on the secondary stack (README
-# "SAW").
+# (all ghost but AES.Spec.Types).
 UNITS_aes_spec=(
   aes/foundation_spark-aes-spec-types.ads
   aes/foundation_spark-aes-spec-gf28.ads
@@ -184,6 +182,7 @@ UNITS_aes_spec=(
   aes/foundation_spark-aes-spec-sbox.ads
   aes/foundation_spark-aes-spec-cipher.ads
   aes/foundation_spark-aes-spec-keyexpansion.ads
+  aes/foundation_spark-aes-spec-main.ads
 )
 
 # The spec layer's switches: the implementation's, plus

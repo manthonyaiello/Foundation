@@ -1,0 +1,18 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's xTimes (ghost, from obj/spec/aes_spec.bc) against the
+ * shift without the reduction, \b -> b << 1, by rme as aes_spec.saw proves
+ * the leaves (negative/x_times_without_reduction.saw does the same for the
+ * implementation's X_Times). The proof must fail with a counterexample
+ * (b = 128), which shows that the spec build's bitcode is what is checked:
+ * a leaf of the spec layer, compiled with ghost code on, is told from the
+ * wrong Cryptol.
+ *
+ * (ShiftRows against InvShiftRows, by rme, was tried first: rme's normal
+ * form of the false 128-bit equality took the 10 GB memory cap.)
+ */
+
+include "../aes_spec_common.saw";
+
+verify_spec "gf28__xtimes" [] (byte_to_byte_contract {{ \b -> b << 1 }}) rme "rme" "\\b -> b << 1";
