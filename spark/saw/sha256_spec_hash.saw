@@ -84,28 +84,40 @@ rec foldl_step_lemmas (nt : Int) (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSp
  * overrides are Pad's lemma at l, Word_Of's at Count = 32 for the padded
  * length, Foldl_Step's at N blocks, and z3 leaves step uninterpreted.
  */
-let hash_contract (l : Int) = do {
+let hash_used (l : Int) = do {
   let k = small_k l;
   let len = eval_int {{ `l + 1 + `k + 64 : [64] }};
   let nb = eval_int {{ `len / 512 : [64] }};
   let uz = ss_size 32 k;
   let t64 = to_bits_used 64;
   let sp = ss_size 32 len;
-  let pad_after = eval_int {{ `uz + `t64 + `sp : [64] }};
+  let sparse = ss_size 32 (eval_int {{ 64 * `nb : [64] }});
+  return (eval_int {{ `uz + `t64 + `sp + `sparse + 288 + 288 : [64] }});
+};
+/*
+ * hash_contract_at base mode moff l: on the stack at `base` bytes, with
+ * the message where `mode` says (sha256_spec_pad.saw's msg_frame);
+ * hash_contract l is base 0, mode 0.
+ */
+let hash_contract_at (base : Int) (mode : Int) (moff : Int) (l : Int) = do {
+  let k = small_k l;
+  let len = eval_int {{ `l + 1 + `k + 64 : [64] }};
+  let nb = eval_int {{ `len / 512 : [64] }};
+  let uz = ss_size 32 k;
+  let t64 = to_bits_used 64;
+  let sp = ss_size 32 len;
+  let pad_after = eval_int {{ `base + `uz + `t64 + `sp : [64] }};
   let sparse = ss_size 32 (eval_int {{ 64 * `nb : [64] }});
   let at = eval_int {{ `pad_after + `sparse + 288 : [64] }};
   let data = eval_int {{ `at + 32 : [64] }};
   let after = eval_int {{ `at + 288 : [64] }};
-  stack <- secondary_stack;
-  msg <- llvm_fresh_var "msg" (llvm_array l (llvm_int 8));
-  llvm_precond {{ all (\b -> b <= 1) msg }};
-  mp <- llvm_alloc_readonly (llvm_array l (llvm_int 8));
-  llvm_points_to mp (llvm_term msg);
-  mb <- llvm_alloc_readonly bits_bounds_t;
-  llvm_points_to mb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `l - 1 : [128] }}]);
-  llvm_execute_func [llvm_struct_value [mp, mb]];
+  stack <- secondary_stack_used base;
+  (msg, m, dp, bp) <- msg_frame stack mode moff l;
+  llvm_execute_func [m];
   ss_post stack after;
+  msg_frame_post mode l msg dp bp;
   llvm_points_to_untyped (ss_at stack at) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 255 : [128] }}]);
   llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (hash`{l} (bits_of msg)) }});
   llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
 };
+let hash_contract (l : Int) = hash_contract_at 0 0 0 l;

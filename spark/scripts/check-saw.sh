@@ -62,6 +62,10 @@
 #                  GNAT Pro ships no llvm-link; the bootstrap's gnat-llvm
 #                  phase installs LLVM's own release (README "SAW").
 #   SAW_MEMORY_MAX optional: the memory cap of each saw run (default 10G).
+#   SAW_LONG       optional: 1 adds the long proofs to sha256_spec.saw (the
+#                  spec layer's Hash at 120, 128 and 200 bytes, 3 and 4
+#                  padded blocks); 0 (the default) leaves them out. The
+#                  record says which ran (line "options").
 #   saw, cryptol and z3 must be on PATH (the x86_64 bootstrap's env.sh).
 #
 # Exit status: 0 when every proof passed and every negative control failed;
@@ -76,6 +80,12 @@ OBJ_DIR="$SAW_DIR/obj"
 RESULTS="$SAW_DIR/results.txt"
 
 die() { printf '!! %s\n' "$*" >&2; exit 1; }
+
+SAW_LONG="${SAW_LONG:-0}"
+case "$SAW_LONG" in
+  0|1) ;;
+  *) echo "check-saw.sh: SAW_LONG must be 0 or 1, not $SAW_LONG" >&2; exit 2 ;;
+esac
 
 PRINT=0
 case "${1:-}" in
@@ -189,12 +199,16 @@ UNITS_aes_spec=(
 # sha256_spec: the SHA-256 instance of the generic SHA2.Main (its ghost
 # functions are the spec layer), with the SHA2 root (To_Bits, Ceil_Div,
 # Ceil_Mod), SHA2.Functions and SHA2.Preprocessing (H0_256), which it
-# calls or reads.
+# calls or reads; and the HMAC-SHA-256 spec layer, the instance
+# HMAC.SHA256 of the generic HMAC.Main, with the HMAC root (Join, Repeat,
+# Zero), whose hashes are SHA2.SHA256.Hash.
 UNITS_sha256_spec=(
   sha2/foundation_spark-sha2.ads
   sha2/foundation_spark-sha2-functions.ads
   sha2/foundation_spark-sha2-preprocessing.ads
   sha2/foundation_spark-sha2-sha256.ads
+  hmac/foundation_spark-hmac.ads
+  hmac/foundation_spark-hmac-sha256.ads
 )
 
 # The spec layer's switches: the implementation's, plus
@@ -255,8 +269,9 @@ CRYPTOL_FILES=(
   algorithms/HMAC/Main.cry
 )
 # Our own Cryptol in saw/, recorded by sha256: an instantiation of NSA's,
-# and a copy of the local definitions of its step (sha256_spec.saw).
-OUR_CRYPTOL=(spark/saw/SHA256Main.cry spark/saw/SHA256Step.cry)
+# a copy of the local definitions of its step (sha256_spec.saw), and a
+# copy of HMAC/Main.cry's private HMAC_init (sha256_spec_hmac.saw).
+OUR_CRYPTOL=(spark/saw/SHA256Main.cry spark/saw/SHA256Step.cry spark/saw/HMACInit.cry)
 
 T0="$(date +%s)"
 COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
@@ -370,6 +385,15 @@ export CRYPTOLPATH="$ROOT_DIR"
 LOG_DIR="$OBJ_DIR/logs"
 mkdir -p "$LOG_DIR"
 
+# The options the scripts read (sha256_spec.saw includes obj/options.saw).
+if [ "$SAW_LONG" -eq 1 ]; then
+  OPTIONS_NOTE="SAW_LONG=1: the long proofs included (sha256_spec.saw: Hash at 120, 128, 200 bytes)"
+  echo "let saw_long = true;" > "$OBJ_DIR/options.saw"
+else
+  OPTIONS_NOTE="SAW_LONG=0 (default): the long proofs left out (sha256_spec.saw: Hash at 120, 128, 200 bytes)"
+  echo "let saw_long = false;" > "$OBJ_DIR/options.saw"
+fi
+
 KILLED_BY_CAP=137  # 128 + SIGKILL: what a scope killed by its MemoryMax returns
 
 run_saw() {  # run_saw FILE LOG: saw FILE from saw/, capped, its output in LOG; returns saw's status
@@ -479,6 +503,7 @@ record() {
   echo "cryptol     $V_CRYPTOL"
   echo "solvers     rme (SAW's built-in); z3 on PATH: $V_Z3 (each proof's below)"
   echo "memory cap  $CAP_NOTE"
+  echo "options     $OPTIONS_NOTE"
   echo "switches    ${SWITCHES[*]}"
   echo "spec layer  ${SPEC_SWITCHES[*]/#-gnatec=$SAW_DIR\//-gnatec=saw/}"
   echo "spec.adc    $(sha "$SPEC_ADC") saw/spec.adc: $(grep '^pragma' "$SPEC_ADC" | tr '\n' ' ' | sed 's/ $//')"

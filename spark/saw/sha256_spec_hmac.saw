@@ -1,0 +1,178 @@
+/*
+ * The HMAC-SHA-256 spec layer: HMAC.SHA256 (spark/src/hmac/foundation_
+ * spark-hmac-sha256.ads), the instance of the generic HMAC.Main at
+ * SHA-256 with Hk = Hn = HL = SHA2.SHA256.Hash, against
+ * algorithms/HMAC/Main.cry's HMAC at B = 64, L = 32 with the three hashes
+ * SHA256Main's hash, as packaging/Hash.cry's HMAC instantiates it
+ * (Hash.cry:71; Hash.cry cannot be loaded, sha256_spec_common.saw), at
+ * M4.3's (key, text) lengths in bytes: (0, 0), (32, 3), (32, 32),
+ * (64, 3), (64, 32), (65, 3) and (100, 32), which cover HMAC_init's three
+ * cases (k < B, k = B, k > B), and λ = 256. Included by sha256_spec.saw
+ * after sha256_spec_hash.saw, in the module's load with lax arithmetic
+ * (Hash's lemmas are of that load; Join of an empty key computes a null
+ * range's length, as To_Bits does).
+ *
+ * HMAC_init is private in Main.cry: the spec's HMAC_init is proved
+ * against saw/HMACInit.cry, a copy of it, and HMAC against Main.cry's
+ * HMAC with HMAC_init's lemmas as the overrides of its two calls, which
+ * ties the copy to Main.cry.
+ *
+ * The secondary stack. HMAC (K, Text, Lambda) = HL ((HMAC_init (K) xor
+ * Opad) & Hn ((HMAC_init (K) xor Ipad) & Text)) (0 .. Lambda - 1) calls,
+ * in this order: HMAC_init, Opad (Repeat, then Join), HMAC_init, Ipad,
+ * then Hn and HL; each leaves its result on the secondary stack (the
+ * xors and concatenations are on the primary stack), and HMAC allocates
+ * its result last. HMAC_init (K) calls Join (K), then, for a key longer
+ * than B, Hk on Join's result (which is on the secondary stack: Hash's
+ * message mode 2) and Zero (256), or, for a shorter key, Zero; then it
+ * allocates its result (except for k = B, where it returns Join's). So
+ * each hash is called with the stack at a base of its own, and its lemma,
+ * with the lemmas it rests on (Pad, Zero, To_Bits' chain; Word_Of and
+ * Foldl_Step take no stack), is proved at that base. Hn and HL get
+ * HMAC's concatenations, temporaries on the primary stack (mode 1).
+ *
+ * What a lemma keeps below its base is what its caller reads after the
+ * call: the second HMAC_init's caller reads the first one's result and
+ * Opad's after it. Nothing else below a hash's base is read after the
+ * hash returns (HMAC copies HMAC_init's results into its xors before it
+ * calls Hn; HMAC_init reads Hk's result and Zero's).
+ */
+
+import "../../algorithms/HMAC/Main.cry" (HMAC);
+import "HMACInit.cry" (HMAC_init);
+
+let bytes_bounds_t = llvm_alias "foundation_spark__hmac__bytes_BOUNDS";
+
+let hmac_symbol name = str_concat "foundation_spark__hmac__sha256__" name;
+let verify_hmac_spec name overrides contract tactic tactic_name cryptol = do {
+  result <- time (llvm_verify sha256_spec_lax (hmac_symbol name) overrides false contract tactic);
+  print (str_concat (str_concat (str_concat (str_concat (str_concat (str_concat "RESULT proved hmac__sha256__" name) " (lax arithmetic module) = ") cryptol) " [") tactic_name) "]");
+  return result;
+};
+
+/*
+ * A key, Bytes (Byte_Index range <>) of Unsigned_8: a fat pointer to k
+ * bytes, read-only, with bounds {0, k - 1} (two i64).
+ */
+let key_arg (k : Int) = do {
+  key <- llvm_fresh_var "key" (llvm_array k (llvm_int 8));
+  kp <- llvm_alloc_readonly (llvm_array k (llvm_int 8));
+  llvm_points_to kp (llvm_term key);
+  kb <- llvm_alloc_readonly bytes_bounds_t;
+  llvm_points_to kb (llvm_struct_value [llvm_term {{ 0 : [64] }}, llvm_term {{ `k - 1 : [64] }}]);
+  return (key, llvm_struct_value [kp, kb]);
+};
+
+/*
+ * Hash's lemma at length l on the stack at `base`, with the message
+ * where `mode` says, with Pad's and its chain proved for that stack.
+ */
+let mode_name (mode : Int) (moff : Int) =
+  if eval_bool {{ `mode == (0 : Integer) }} then ""
+  else if eval_bool {{ `mode == (1 : Integer) }} then ", M a writable temporary"
+  else str_concat (str_concat ", M on the secondary stack at " (show moff)) " bytes";
+let verify_hash_at (base : Int) (mode : Int) (moff : Int) (l : Int) = do {
+  pad_l <- verify_pad_at base mode moff l;
+  let nb = eval_int {{ (`l + 65 + 511) / 512 : [64] }};
+  let one = eval_bool {{ `nb == (1 : Integer) }};
+  verify_spec "sha256__hash"
+    [pad_l, if one then i_word_of_1 else i_word_of_2, if one then i_foldl_step_1 else i_foldl_step_2]
+    (hash_contract_at base mode moff l)
+    (w4_unint_z3 ["step"]) "w4_unint_z3 step"
+    (str_concat (at_base base (str_concat (str_concat "l = " (show l)) ": SHA256Main::hash`{l} (Main.cry's hash at SHA-256)"))
+                (mode_name mode moff));
+};
+
+/* The bytes HMAC_init (K) takes on the secondary stack for a k-byte key. */
+let init_used (k : Int) = do {
+  let j = ss_size 32 (eval_int {{ 8 * `k : [64] }});
+  let z = if eval_bool {{ `k < (64 : Integer) }} then ss_size 32 (eval_int {{ 512 - 8 * `k : [64] }}) else 0;
+  if eval_bool {{ `k == (64 : Integer) }} then return 544
+  else if eval_bool {{ `k < (64 : Integer) }} then
+    return (eval_int {{ `j + `z + 544 : [64] }})
+  else do {
+    h <- hash_used (eval_int {{ 8 * `k : [64] }});
+    return (eval_int {{ `j + `h + 288 + 544 : [64] }});
+  };
+};
+
+/*
+ * HMAC_init (K) = HMACInit's HMAC_init`{B = 64, k, L = 32} hash K at a
+ * k-byte key, on the stack at `base` bytes, keeping the kn bytes at ko.
+ * Its result, 512 bits, is the last thing it allocates. For k > 64 the
+ * override is Hash's lemma at 8 * k bits, on the stack after Join (K),
+ * with its message Join's result.
+ */
+let verify_init_at (k : Int) (base : Int) (ko : Int) (kn : Int) = do {
+  u <- init_used k;
+  let res = eval_int {{ `base + `u - 544 : [64] }};
+  let res_data = eval_int {{ `res + 32 : [64] }};
+  let after = eval_int {{ `base + `u : [64] }};
+  let long = eval_bool {{ `k > (64 : Integer) }};
+  let lk = eval_int {{ 8 * `k : [64] }};
+  let j = ss_size 32 lk;
+  hk <- if long then do {
+          h <- verify_hash_at (eval_int {{ `base + `j : [64] }}) 2 base lk;
+          return [h];
+        } else return [];
+  verify_hmac_spec "hmac_init" hk
+    (do {
+       stack <- secondary_stack_used base;
+       kept <- keep_at stack ko kn;
+       (key, ka) <- key_arg k;
+       llvm_execute_func [ka];
+       ss_post stack after;
+       keep_at_post stack ko kn kept;
+       llvm_points_to_untyped (ss_at stack res) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 511 : [128] }}]);
+       llvm_points_to_untyped (ss_at stack res_data) (llvm_term {{ bytes_of (HMAC_init`{64, k, 32} hash key) }});
+       llvm_return (llvm_struct_value [ss_at stack res_data, ss_at stack res]);
+     })
+    (if long then w4_unint_z3 ["step"] else z3) (if long then "w4_unint_z3 step" else "z3")
+    (at_base base (str_concat (str_concat "k = " (show k)) " bytes: HMACInit::HMAC_init`{64, k, 32} SHA256Main::hash (Main.cry's HMAC_init)"));
+};
+
+/*
+ * HMAC (K, Text, 256) = Main.cry's HMAC`{256, 64, k, n, 32} hash hash
+ * hash K text (Main.cry:40, [FIPS-PUB-198-1 Section 4]), at a k-byte key
+ * and an n-bit text, on an empty stack. Text is a read-only fat pointer
+ * to n bits; the MAC, 256 bits, is HMAC's last allocation.
+ */
+let verify_hmac (k : Int) (t : Int) = do {
+  let n = eval_int {{ 8 * `t : [64] }};
+  u <- init_used k;
+  let b2 = eval_int {{ `u + 624 : [64] }};
+  let hn_base = eval_int {{ 2 * `u + 1248 : [64] }};
+  let ln = eval_int {{ 512 + `n : [64] }};
+  hn_used <- hash_used ln;
+  let hl_base = eval_int {{ `hn_base + `hn_used : [64] }};
+  hl_used <- hash_used 768;
+  let res = eval_int {{ `hl_base + `hl_used : [64] }};
+  let res_data = eval_int {{ `res + 32 : [64] }};
+  let after = eval_int {{ `res + 288 : [64] }};
+  init1 <- verify_init_at k 0 0 0;
+  init2 <- verify_init_at k b2 (eval_int {{ `u - 544 : [64] }}) 1168;
+  hn <- verify_hash_at hn_base 1 0 ln;
+  hl <- verify_hash_at hl_base 1 0 768;
+  let none = eval_bool {{ `k == (0 : Integer) /\ `t == (0 : Integer) }};
+  verify_hmac_spec "hmac" [init1, init2, hn, hl]
+    (do {
+       stack <- secondary_stack;
+       (key, ka) <- key_arg k;
+       text <- llvm_fresh_var "text" (llvm_array n (llvm_int 8));
+       llvm_precond {{ all (\b -> b <= 1) text }};
+       tp <- llvm_alloc_readonly (llvm_array n (llvm_int 8));
+       llvm_points_to tp (llvm_term text);
+       tb <- llvm_alloc_readonly bits_bounds_t;
+       llvm_points_to tb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `n - 1 : [128] }}]);
+       llvm_execute_func [ka, llvm_struct_value [tp, tb], llvm_term {{ 256 : [128] }}];
+       ss_post stack after;
+       llvm_points_to_untyped (ss_at stack res) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 255 : [128] }}]);
+       llvm_points_to_untyped (ss_at stack res_data)
+         (llvm_term {{ bytes_of (HMAC`{256, 64, k, n, 32} hash hash hash key (bits_of text)) }});
+       llvm_return (llvm_struct_value [ss_at stack res_data, ss_at stack res]);
+     })
+    (if none then z3 else w4_unint_z3 ["step"])
+    (if none then "z3, nothing uninterpreted (no symbolic input)" else "w4_unint_z3 step")
+    (str_concat (str_concat (str_concat "key " (show k)) (str_concat " bytes, text " (show t)))
+                " bytes, λ = 256: HMAC::HMAC`{256, 64, k, 8 * t, 32} SHA256Main::hash (x3) key text (Main.cry's HMAC, Hash.cry's at SHA-256)");
+};
