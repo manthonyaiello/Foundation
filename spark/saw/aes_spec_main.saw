@@ -1,9 +1,10 @@
 /*
  * The AES spec layer's bit-vector interface, Foundation_Spark.AES.Spec.Main
  * (spark/src/aes/foundation_spark-aes-spec-main.ads): the splits of
- * algorithms/AES/Main.cry's Encrypt and Decrypt, at k = 128, 192 and 256.
- * Encrypt and Decrypt themselves are not proved (below). Included by
- * aes_spec.saw after aes_spec_common.saw and aes_spec_gf.saw.
+ * algorithms/AES/Main.cry's Encrypt and Decrypt, their join, and Encrypt
+ * and Decrypt themselves, with the AES128, AES192 and AES256 packages, at
+ * k = 128, 192 and 256. Included by aes_spec.saw after the other
+ * aes_spec_*.saw files, whose lemmas it uses.
  *
  * Main.cry's bit sequences [n] are the spec's ghost Boolean arrays Bits,
  * indexed by a 128-bit integer (README "The bitcode ABI"): an Ada Boolean
@@ -88,7 +89,8 @@ m_split_block <- verify_spec "main__split_block" [m_byte_at_128]
 
 /*
  * Split_Key (K, Key) = Main.cry's split (split key) : [Nk k]AESWord, at
- * k = 128, 192, 256; the result is on the secondary stack.
+ * k = 128, 192, 256; the result is on the secondary stack, and the
+ * stack's Top after it (Encrypt and Decrypt call KeyExpansion next).
  */
 let verify_split_key (k : Int) (nk : Int) (byte_at : LLVMSpec) =
   verify_spec "main__split_key" [types_nk, byte_at]
@@ -96,6 +98,7 @@ let verify_split_key (k : Int) (nk : Int) (byte_at : LLVMSpec) =
        stack <- secondary_stack;
        (key, fp) <- fresh_bits_fp "key" k;
        llvm_execute_func [llvm_term {{ `k : [32] }}, fp];
+       ss_post stack (ss_size 8 (eval_int {{ 4 * `nk : [64] }}));
        llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
        llvm_points_to_untyped (ss_at stack 8) (llvm_term {{ split (split (bits_of key)) : [nk][4][8] }});
        llvm_return (llvm_struct_value [ss_at stack 8, ss_at stack 0]);
@@ -105,11 +108,155 @@ m_split_key_192 <- verify_split_key 192 6 m_byte_at_192;
 m_split_key_256 <- verify_split_key 256 8 m_byte_at_256;
 
 /*
- * Not proved: Join_Block, and so Encrypt, Decrypt and the AES128, AES192
- * and AES256 packages' functions, which call it. Join_Block's aggregate
- * indexes its Block_Bits result, a constrained array, by the 128-bit
- * Bit_Index directly (getelementptr [128 x i8], ptr, i64 0, i128 %n),
- * and SAW 1.6's simulator rejects a getelementptr index wider than 64
- * bits ("Invalid index value in GEP") when it translates the function, so
- * Join_Block can be neither executed nor proved (README "SAW").
+ * Join_Block = Main.cry's join : Block -> [128] (Encrypt's and Decrypt's
+ * join). Block_Bits, constrained, is returned through a pointer to the
+ * caller's [128 x i8] (sret). Join_Block's aggregate over
+ * Block_Bits'Range indexes its temporary by the 128-bit Bit_Index
+ * (getelementptr [128 x i8], ptr, i64 0, i128 %n), which SAW 1.6 rejects
+ * ("Invalid index value in GEP"); check-saw.sh rewrites that one index to
+ * its truncation to i64 (gep64, README "SAW"), which LangRef says the GEP
+ * does anyway, and checks that nothing else changed.
  */
+m_join_block <- verify_spec "main__join_block" [m_bit_of]
+                  (do {
+                     b <- llvm_fresh_var "b" block_t;
+                     ret <- llvm_alloc (bits_t 128);
+                     llvm_execute_func [ret, llvm_term b];
+                     llvm_points_to ret (llvm_term {{ [ if x then 1 else 0 | x <- join b ] : [128][8] }});
+                   }) z3 "z3" "join : Block -> [128]";
+
+/*
+ * The secondary stack in Encrypt and Decrypt: each marks it, then
+ * Split_Key leaves the key words on it (sk bytes, its bounds then the
+ * words), KeyExpansion the round keys after them (ke bytes), and
+ * InvCipher (Decrypt) marks it again, puts the reversed keys after them
+ * (rv bytes), and releases its mark; then Encrypt and Decrypt release
+ * theirs. So KeyExpansion and InvCipher are called on a stack in use,
+ * with their argument on it, and their lemmas here state that.
+ */
+let sk_size (nk : Int) = ss_size 8 (eval_int {{ 4 * `nk : [64] }});
+let ke_size (nr : Int) = ss_size 8 (eval_int {{ 16 * (`nr + 1) : [64] }});
+let rv_size (nr : Int) = ss_size 8 (eval_int {{ 16 * (`nr - 1) : [64] }});
+let add_int (a : Int) (b : Int) = eval_int {{ `a + `b : [64] }};
+let enc_hwm (nk : Int) (nr : Int) = add_int (sk_size nk) (ke_size nr);
+let dec_hwm (nk : Int) (nr : Int) = add_int (enc_hwm nk nr) (rv_size nr);
+
+/*
+ * KeyExpansion (K, Key) at key size k, Key the key words Split_Key left
+ * at the bottom of the secondary stack (bounds {0, nk - 1} at 0, the
+ * words at 8): the round keys after them, stated as aes_spec_common.saw's
+ * keyexpansion_contract states them; the key words unchanged.
+ */
+let keyexpansion_ss_contract (k : Int) (nk : Int) (nr : Int) = do {
+  let sk = sk_size nk;
+  let ke = ke_size nr;
+  stack <- secondary_stack_used sk;
+  key <- llvm_fresh_var "key" (llvm_array nk word_t);
+  llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
+  llvm_points_to_untyped (ss_at stack 8) (llvm_term key);
+  llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [ss_at stack 8, ss_at stack 0]];
+  ss_post stack (eval_int {{ `sk + `ke : [64] }});
+  llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
+  llvm_points_to_untyped (ss_at stack 8) (llvm_term key);
+  llvm_points_to_untyped (ss_at stack sk) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
+  llvm_points_to_untyped (ss_at stack (eval_int {{ `sk + 8 : [64] }})) (llvm_term {{ KeyExpansion`{k} key }});
+  llvm_return (llvm_struct_value [ss_at stack (eval_int {{ `sk + 8 : [64] }}), ss_at stack sk]);
+};
+let verify_keyexpansion_ss (k : Int) (nk : Int) (nr : Int) (ws : [LLVMSpec]) =
+  verify_spec "keyexpansion__keyexpansion" (concat ws [types_nr, types_join])
+    (keyexpansion_ss_contract k nk nr) (w4_unint_z3 ["SubWord"]) "w4_unint_z3 SubWord"
+    (str_concat (str_concat (str_concat "KeyExpansion::KeyExpansion`{" (show k))
+       "}, the key words on the secondary stack at 0, the round keys after them at ") (show (sk_size nk)));
+m_keyexpansion_128 <- verify_keyexpansion_ss 128 4 10 ke_w_128;
+m_keyexpansion_192 <- verify_keyexpansion_ss 192 6 12 ke_w_192;
+m_keyexpansion_256 <- verify_keyexpansion_ss 256 8 14 ke_w_256;
+
+/*
+ * InvCipher (K, W, Input) at key size k, W the round keys KeyExpansion
+ * left on the secondary stack after the key words (at sk): it marks the
+ * stack, reverses W (1 .. Nr - 1) onto it, and releases the mark, so Top
+ * is back at sk + ke and High_Water_Mark is sk + ke + rv.
+ */
+let invcipher_ss_contract (k : Int) (nk : Int) (nr : Int) = do {
+  let sk = sk_size nk;
+  let ke = ke_size nr;
+  let used = eval_int {{ `sk + `ke : [64] }};
+  let hwm = add_int used (rv_size nr);
+  stack <- secondary_stack_used used;
+  w <- llvm_fresh_var "w" (llvm_array (eval_int {{ `nr + 1 : [32] }}) block_t);
+  llvm_points_to_untyped (ss_at stack sk) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
+  llvm_points_to_untyped (ss_at stack (eval_int {{ `sk + 8 : [64] }})) (llvm_term w);
+  input <- llvm_fresh_var "input" block_t;
+  llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [ss_at stack (eval_int {{ `sk + 8 : [64] }}), ss_at stack sk], llvm_term input];
+  ss_post_hwm stack used hwm;
+  llvm_points_to_untyped (ss_at stack sk) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
+  llvm_points_to_untyped (ss_at stack (eval_int {{ `sk + 8 : [64] }})) (llvm_term w);
+  llvm_return (llvm_term {{ InvCipher`{k} w input }});
+};
+let verify_invcipher_ss (k : Int) (nk : Int) (nr : Int) =
+  verify_spec "cipher__invcipher" (concat c_foldl_invround [types_nr, c_invsubbytes, c_invshiftrows, c_addroundkey])
+    (invcipher_ss_contract k nk nr) (w4_unint_z3 inv_unint) (str_concat "w4_unint_z3" (names inv_unint))
+    (str_concat (str_concat (str_concat "Cipher::InvCipher`{" (show k))
+       "}, the round keys on the secondary stack at ") (show (sk_size nk)));
+m_invcipher_128 <- verify_invcipher_ss 128 4 10;
+m_invcipher_192 <- verify_invcipher_ss 192 6 12;
+m_invcipher_256 <- verify_invcipher_ss 256 8 14;
+
+/*
+ * Encrypt (K, Key, Input) and Decrypt (K, Key, Input) = Main.cry's
+ * AES`{k}.Encrypt key in and AES`{k}.Decrypt key in [FIPS-PUB-197
+ * Section 5] (Main.cry:21-24): join (Cipher`{k} (KeyExpansion`{k}
+ * (split (split key))) (split in)), and InvCipher for Decrypt. Key is a
+ * fat pointer to k bits, Input a pointer to 128, the result written
+ * through the caller's pointer. On an empty secondary stack, left empty
+ * (the mark released), its High_Water_Mark the most it held. The
+ * overrides are the lemmas of each call at k; z3 leaves Cipher,
+ * InvCipher and KeyExpansion uninterpreted.
+ */
+let main_unint = ["Cipher", "InvCipher", "KeyExpansion"];
+let main_unint_name = "w4_unint_z3 Cipher InvCipher KeyExpansion";
+let main_contract (k : Int) (hwm : Int) (wrap : Bool) (f : Term) = do {
+  stack <- secondary_stack;
+  (key, kp) <- fresh_bits "key" k;
+  kb <- llvm_alloc_readonly bits_bounds_t;
+  if wrap then return ()
+  else llvm_points_to kb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `k - 1 : [128] }}]);
+  (input, ip) <- fresh_bits "input" 128;
+  ret <- llvm_alloc (bits_t 128);
+  if wrap then llvm_execute_func [ret, kp, ip]
+  else llvm_execute_func [ret, llvm_term {{ `k : [32] }}, llvm_struct_value [kp, kb], ip];
+  ss_post_hwm stack 0 hwm;
+  llvm_points_to ret (llvm_term {{ [ if x then 1 else 0 | x <- f (bits_of key) (bits_of input) ] : [128][8] }});
+};
+let verify_encrypt (k : Int) (nk : Int) (nr : Int) (split_key : LLVMSpec) (ke : LLVMSpec) (cipher : LLVMSpec) =
+  verify_spec "main__encrypt" [split_key, ke, m_split_block, cipher, m_join_block]
+    (main_contract k (enc_hwm nk nr) false {{ (AES`{k}).Encrypt }})
+    (w4_unint_z3 main_unint) main_unint_name
+    (str_concat (str_concat "Main::AES`{" (show k)) "}.Encrypt");
+let verify_decrypt (k : Int) (nk : Int) (nr : Int) (split_key : LLVMSpec) (ke : LLVMSpec) (invcipher : LLVMSpec) =
+  verify_spec "main__decrypt" [split_key, ke, m_split_block, invcipher, m_join_block]
+    (main_contract k (dec_hwm nk nr) false {{ (AES`{k}).Decrypt }})
+    (w4_unint_z3 main_unint) main_unint_name
+    (str_concat (str_concat "Main::AES`{" (show k)) "}.Decrypt");
+m_encrypt_128 <- verify_encrypt 128 4 10 m_split_key_128 m_keyexpansion_128 c_cipher_128;
+m_encrypt_192 <- verify_encrypt 192 6 12 m_split_key_192 m_keyexpansion_192 c_cipher_192;
+m_encrypt_256 <- verify_encrypt 256 8 14 m_split_key_256 m_keyexpansion_256 c_cipher_256;
+m_decrypt_128 <- verify_decrypt 128 4 10 m_split_key_128 m_keyexpansion_128 m_invcipher_128;
+m_decrypt_192 <- verify_decrypt 192 6 12 m_split_key_192 m_keyexpansion_192 m_invcipher_192;
+m_decrypt_256 <- verify_decrypt 256 8 14 m_split_key_256 m_keyexpansion_256 m_invcipher_256;
+
+/*
+ * The AES128, AES192 and AES256 packages: Main.cry's AES128 = AES`{128}
+ * and the others (Main.cry:43-55), their Encrypt and Decrypt calling
+ * Main's at k with the key as a constrained Key_Bits (a pointer to k
+ * bits). Encrypt's or Decrypt's lemma at k is the override.
+ */
+let verify_wrapped (pkg : String) (op : String) (k : Int) (hwm : Int) (lemma : LLVMSpec) (f : Term) (cry : String) =
+  verify_spec (str_concat (str_concat (str_concat "main__" pkg) "__") op) [lemma]
+    (main_contract k hwm true f) (w4_unint_z3 main_unint) main_unint_name cry;
+verify_wrapped "aes128" "encrypt" 128 (enc_hwm 4 10) m_encrypt_128 {{ AES128.Encrypt }} "Main::AES128.Encrypt";
+verify_wrapped "aes128" "decrypt" 128 (dec_hwm 4 10) m_decrypt_128 {{ AES128.Decrypt }} "Main::AES128.Decrypt";
+verify_wrapped "aes192" "encrypt" 192 (enc_hwm 6 12) m_encrypt_192 {{ AES192.Encrypt }} "Main::AES192.Encrypt";
+verify_wrapped "aes192" "decrypt" 192 (dec_hwm 6 12) m_decrypt_192 {{ AES192.Decrypt }} "Main::AES192.Decrypt";
+verify_wrapped "aes256" "encrypt" 256 (enc_hwm 8 14) m_encrypt_256 {{ AES256.Encrypt }} "Main::AES256.Encrypt";
+verify_wrapped "aes256" "decrypt" 256 (dec_hwm 8 14) m_decrypt_256 {{ AES256.Decrypt }} "Main::AES256.Decrypt";

@@ -963,14 +963,19 @@ AES (`aes_spec.saw`, with `aes_spec_gf.saw`, `aes_spec_cipher.saw`,
 | `KeyExpansion.W` | `w @ i` = `(groupBy`{4} (join (KeyExpansion`{k} key))) @ i` | each I at each k: 44, 52, 60 | the lemmas below I (SAW applies those at I - 1 and I - Nk), the leaves | z3, `SubWord` uninterpreted |
 | `KeyExpansion.KeyExpansion` | ``KeyExpansion`{k}`` | 128, 192, 256 | the W lemmas, `Nr`, `Join` | z3, `SubWord` uninterpreted |
 | `Main.Bit_Of`, `.Byte_At`, `.Split_Block`, `.Split_Key` | `Main.cry`'s `split`s: `b @ j`, ``take`{8} (bs << from)``, `split in`, `split (split key)` | `Byte_At` at 128, 192, 256 bits; `Split_Key` at each k | `Byte_At` | z3 |
+| `Main.Join_Block` | `Main.cry`'s `join : Block -> [128]` | | `Bit_Of` | z3 (its one `i128` GEP index rewritten, "The bitcode ABI") |
+| `KeyExpansion.KeyExpansion`, `Cipher.InvCipher` (as `Main` calls them) | as above | 128, 192, 256, their argument on the secondary stack (Split_Key's key words; KeyExpansion's round keys) | as above | as above |
+| **`Main.Encrypt`, `.Decrypt`** | **`Main.cry`: ``AES`{k}.Encrypt``, ``.Decrypt``** | 128, 192, 256 | `Split_Key`, `KeyExpansion`, `Split_Block`, `Cipher` or `InvCipher`, `Join_Block` | z3, `Cipher`, `InvCipher`, `KeyExpansion` uninterpreted |
+| `Main.AES128.Encrypt`, `.Decrypt`, and `AES192`'s, `AES256`'s | `Main.cry`: `AES128.Encrypt` and the others | | `Encrypt` or `Decrypt` at k | as above |
 
 `Rcon` is read by the W lemmas, and the `SBox` and `InvSBox` tables by
 `SubBytes` and `InvSubBytes` (every entry, for a symbolic block).
 
-SHA-256 (`sha256_spec.saw`, with `sha256_spec_step.saw`,
-`sha256_spec_pad.saw`, `sha256_spec_hash.saw`; shared parts in
-`sha256_spec_common.saw`). Message lengths are M4.3's: 0, 1, 55, 56, 63,
-64, 65, 100, 119, 120, 128 and 200 bytes.
+SHA-256 and HMAC-SHA-256 (`sha256_spec.saw`, with `sha256_spec_step.saw`,
+`sha256_spec_pad.saw`, `sha256_spec_hash.saw`, `sha256_spec_hmac.saw`;
+shared parts in `sha256_spec_common.saw`; the HMAC units are linked into
+`sha256_spec.bc`). Message lengths are M4.3's: 0, 1, 55, 56, 63, 64, 65,
+100, 119, 120, 128 and 200 bytes; HMAC's (key, text) lengths M4.3's too.
 
 | Ada (`SHA2.SHA256.` unless named) | Cryptol | sizes, lemmas | overrides | tactic |
 |---|---|---|---|---|
@@ -985,7 +990,10 @@ SHA-256 (`sha256_spec.saw`, with `sha256_spec_step.saw`,
 | **`Pad`** | `Preprocessing.cry`: ``pad`{512, 32, l, k}`` | all twelve lengths | `Small_K`, `Zero`, `To_Bits` at 64 | z3 |
 | `Word_Of` | ``zext (take`{Count} (p << first))`` (a word of `parse`) | Count = 0 .. 32, P of 512 and 1024 bits | Count - 1 | yices |
 | `Foldl_Step` | ``foldl step h (take`{N} ms)`` | N = 0 .. 1 of 1 block, 0 .. 2 of 2 | N - 1, `Step` | z3, `step` uninterpreted |
-| **`Hash`** | `Main.cry`: ``hash`{l}`` | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes | `Pad`, `Word_Of` at 32, `Foldl_Step` (`Parse`, `Parse_Block`, `Join`, `Bit` executed) | z3, `step` uninterpreted |
+| **`Hash`** | `Main.cry`: ``hash`{l}`` | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes; with `SAW_LONG=1` also 120, 128, 200 | `Pad`, `Word_Of` at 32, `Foldl_Step` (`Parse`, `Parse_Block`, `Join`, `Bit` executed) | z3, `step` uninterpreted |
+| `Hash` (for HMAC), with its `Pad`, `Zero`, `To_Bits` chain | as above | at each base of the secondary stack where HMAC calls it (below) | as above | as above |
+| `HMAC.SHA256.HMAC_init` | `saw/HMACInit.cry` (ours: a copy of `HMAC/Main.cry`'s private `HMAC_init`): ``HMAC_init`{64, k, 32} hash`` | each key length HMAC is proved at, at the two stack bases HMAC calls it at | for k > 64, `Hash` at 8k bits, its message on the secondary stack | z3 (k > 64: `step` uninterpreted) |
+| **`HMAC.SHA256.HMAC`** | **`HMAC/Main.cry`: ``HMAC`{256, 64, k, n, 32} hash hash hash``** (Hash.cry's `HMAC` at SHA-256) | (key, text) = (32, 3), (64, 32), (65, 3) bytes (one per case of `HMAC_init`); with `SAW_LONG=1` also (0, 0), (32, 32), (64, 3), (100, 32); λ = 256 | `HMAC_init` twice, `Hash` (Hn at 512 + n bits, HL at 768) | z3, `step` uninterpreted (at (0, 0): none; with `step` uninterpreted z3 reports a spurious counterexample there, as for `Hash` at 0) |
 
 `Pad` (`pad` has no executable counterpart: `Final` writes only the last
 blocks) and `Hash` are proved in a load of the module with lax arithmetic
@@ -993,35 +1001,59 @@ blocks) and `Hash` are proved in a load of the module with lax arithmetic
 `To_Bits (V / 2, 0)`, and `Pad` on an empty message makes one), with
 `Small_K`, `Zero`, `To_Bits`, `Word_Of`, `Foldl_Step` and the compression
 function's lemmas proved again in that load; `results.txt` marks each of
-those results "lax arithmetic module".
+those results "lax arithmetic module". HMAC is proved in the same load
+(its hashes' lemmas are there, and `Join` of an empty key computes a
+null range's length).
 
-**Measured** (`results.txt`, the run at `2ae2b2a` on the x86_64 IOD):
-2162 proofs of the spec layer, 1064 of AES (768 of them the exhaustive
-`Pgcd`, `Inverse` and `Affine`, recorded as three `RESULTS 256` lines) and
-1098 of SHA-256 (266 in the module as loaded, 832 in its lax-arithmetic
-load: the compression function again, 7 `To_Bits` chains, 12 `Pad`, 66
-`Word_Of`, 5 `Foldl_Step`, 9 `Hash`, and their leaves), with 9 negative
-controls of the spec layer failing as they must. `aes_spec.saw` takes
-522 s, `sha256_spec.saw` 1363 s (most of it `Word_Of`), the whole
-`check-saw.sh` 2732 s; peak memory 2.5 GB.
+**HMAC and the secondary stack.** `HMAC (K, Text, Lambda)` calls, in
+order, `HMAC_init`, `Opad` (`Repeat`, `Join`), `HMAC_init`, `Ipad`, `Hn`
+and `HL`, each leaving its result on the secondary stack (the `xor`s and
+`&`s are on the primary stack), and allocates its result last; a long key's
+`HMAC_init` calls `Join (K)`, `Hk` on that result, and `Zero`. An override
+applies only where the stack's `Top` is the one its contract states, so
+each hash's lemma, with `Pad`, `Zero` and the `To_Bits` chain under it
+(`Word_Of` and `Foldl_Step` take no stack), is proved at the base where
+that call happens (`results.txt`: "the secondary stack at N bytes"), and
+`HMAC_init`'s at its two. A lemma's message is in one of three places
+(`msg_frame` in `sha256_spec_pad.saw`): a read-only argument (the `Hash`
+proofs above), a writable temporary (`Hn`'s and `HL`'s concatenations), or
+on the secondary stack below the base (`Hk`'s, `Join (K)`'s result),
+stated unchanged. A lemma keeps (states unchanged) what its caller reads
+after the call: `Zero`'s result across `To_Bits`, the message on the stack
+across both, and the first `HMAC_init`'s result and `Opad`'s across the
+second `HMAC_init`. Nothing else below a hash's base is read after it
+returns. `HMAC_init` is private in `Main.cry`; `saw/HMACInit.cry` copies
+it text for text, the spec's `HMAC_init` is proved against the copy, and
+`HMAC` against `Main.cry`'s own `HMAC` with `HMAC_init`'s lemmas as the
+overrides, which ties the copy to `Main.cry` (as `Step` ties
+`SHA256Step.cry`).
+
+**Measured** (`results.txt`, the default run at `d874133` on the x86_64
+IOD): 2742 proofs of the spec layer, 1083 of AES (768 of them the
+exhaustive `Pgcd`, `Inverse` and `Affine`, recorded as three `RESULTS 256`
+lines) and 1659 of SHA-256 and HMAC (1393 of them in the lax-arithmetic
+load), with 11 negative controls of the spec layer failing as they must.
+`aes_spec.saw` takes 567 s, `sha256_spec.saw` 2362 s (most of it the
+`To_Bits` chains, 15 of them, and `Word_Of`), the whole `check-saw.sh`
+3785 s; peak memory 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at
+`c31472e`): 3522 proofs of the spec layer, `sha256_spec.saw` 6363 s, the
+whole 7784 s, peak 7.2 GB (below, "Running it").
 
 **Not proved by SAW**, and why:
 
-- `AES.Spec.Main.Join_Block`, and so `Encrypt`, `Decrypt` and the
-  `AES128`, `AES192` and `AES256` packages' functions, which call it:
-  `Join_Block`'s aggregate indexes its `Block_Bits` result, a constrained
-  array, by the 128-bit `Bit_Index` directly (`getelementptr [128 x i8],
-  ptr, i64 0, i128 %n`), and SAW 1.6's simulator rejects a getelementptr
-  index wider than 64 bits ("Invalid index value in GEP") when it
-  translates the function. This is SAW's limit, not the crate's, and needs
-  no change to the SPARK.
-- `SHA2.SHA256.Hash` at 120, 128 and 200 bytes (3 and 4 padded blocks):
-  each `Word_Of` lemma, `First` symbolic, takes about 5 s per 512 bits of
-  padded message (yices; z3 half again as long), so the 33 lemmas for
-  1536 and 2048 bits would add about 30 minutes to every run. `Pad` is
-  proved at those lengths.
-- `SHA2.SHA256_Bytes`' and HMAC's spec layer (`HMAC.Main`, `HMAC.SHA256`:
-  `HMAC`, `HMAC_init`): not attempted in M4.4.
+- `SHA2.SHA256.Hash` at 120, 128 and 200 bytes (3 and 4 padded blocks)
+  only with `SAW_LONG=1`: each `Word_Of` lemma, `First` symbolic, takes
+  longer the longer the padded message (yices; z3 half again as long), and
+  the 66 lemmas for 1536 and 2048 bits would make every run that much
+  longer. `Pad` is proved at those lengths in every run.
+- `SHA2.SHA256_Bytes` (`Hash_Bytes` and its helpers): not the spec layer,
+  but a ghost representation change (bytes for bits) proved equal to it by
+  gnatprove (`Lemma_Hash_Bytes`); not attempted.
+- HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and (100, 32) bytes
+  only with `SAW_LONG=1`: each call of a hash is at a secondary-stack base
+  of its own, and each base costs `Pad`'s `To_Bits` chain again (65
+  lemmas, about 70 s); the default run proves one length per case of
+  `HMAC_init`. HMAC at other lengths, or λ < 256: not attempted.
 - On their own: `Parse`, `Parse_Block`, `Join` and `Bit` (executed within
   `Hash`), `Ceil_Div` and `Ceil_Mod` (within `Small_K`), GF2's `Inner`,
   `Inner_Step`, `Inner_Next`, `Sub_Mult`, `Term`, `Lead`, `Reduce` and
@@ -1079,9 +1111,11 @@ at the spec layer, for every input at the sizes stated: `prop_SubBytes`,
 and block, at the property's key size); `prop_pad` (at the twelve
 lengths) and `prop_hash`, `prop_hash_bits` (at nine). `SBox.affine` and
 `GF2::inverse`, which have no FFI property and no executable counterpart,
-are proved for every byte. Not backed: `prop_parse` (executed within
-`Hash` only), `Main`'s `prop_Encrypt*`/`prop_Decrypt*`, `prop_Hash_Bytes`
-and the HMAC properties.
+are proved for every byte. Since #59's second PR, `Main`'s
+`prop_Encrypt*`/`prop_Decrypt*` too (every key and block at each key
+size), and HMAC's spec properties (`prop_HMAC_*`, `prop_HMAC_init`) at
+the (key, text) lengths proved, which overlap theirs only in part. Not
+backed: `prop_parse` (executed within `Hash` only) and `prop_Hash_Bytes`.
 
 ### Running it
 
@@ -1092,7 +1126,18 @@ the same module, and `check-saw.sh` refuses to run if a script under
 ```console
 $ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install LLVM_LINK_DIR=.../llvm-21.1.8 scripts/check-saw.sh
 $ scripts/check-saw.sh --print      # run, print the record, write nothing
+$ SAW_LONG=1 scripts/check-saw.sh   # also the long proofs; writes saw/results-long.txt
 ```
+
+**What the default run proves, and `SAW_LONG`.** The default run (about
+an hour on the x86_64 IOD) proves everything above but `Hash` at 120, 128
+and 200 bytes and HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and
+(100, 32) bytes; `SAW_LONG=1` adds those (`Word_Of`'s lemmas for 1536 and
+2048 bits, `Foldl_Step` at 3 and 4 blocks, and four more HMAC lengths
+with their hashes' lemmas at their stack bases) and records the run in
+`saw/results-long.txt`. Each record's `options` line says which it was.
+`LLVM_LINK_DIR` must hold `bin/opt` and `bin/llvm-extract` of the same
+release too (the spec layer's one GEP rewrite, "The bitcode ABI").
 
 **Local only, never CI** (Tony, 2026-10-19). The bitcode comes from
 **GNAT Pro 27's LLVM back end** (`$GNAT_LLVM_DIR/bin/llvm-gcc`), which CI
@@ -1397,8 +1442,22 @@ adds:
   returned through a hidden first pointer. **SAW 1.6 cannot translate a
   `getelementptr` with an `i128` index**, which GNAT-LLVM emits where a
   constrained array of a 128-bit index type is indexed directly
-  (`Join_Block`'s aggregate over `Block_Bits'Range`); indexing through a
-  fat pointer goes through an `i64` offset and is fine.
+  (`Join_Block`'s aggregate over `Block_Bits'Range`; it is the only one in
+  the spec modules); indexing through a fat pointer goes through an `i64`
+  offset and is fine. `check-saw.sh` rewrites that one index (`gep64`):
+  `llvm-extract` takes `Join_Block` out of its unit's bitcode, LLVM's
+  `opt -passes=separate-const-offset-from-gep` (21.1.8, the pinned
+  release, as `llvm-link`) inserts `%idxprom = trunc i128 %n to i64` and
+  uses it as the index, and `llvm-link --override` puts the result in the
+  module. LangRef has a GEP index truncated to the pointer's index width
+  (64 bits) anyway, so the meaning is the same; the script checks that the
+  rewritten function, with each such `trunc` undone, is the function as
+  compiled, and that no `i128` index is left in the module. No GNAT
+  switch avoids the index (`-foptimize-ir` and every `-gnatd` debug flag
+  leave it), `instcombine` would also add `insertvalue ... poison` (which
+  SAW 1.6 rejects), and no SAW release accepts it (crucible-llvm's
+  `calcGEP_array`, at 2026-10-16, takes an index of exactly the pointer's
+  width or narrower).
 - **Unconstrained results** are on the secondary stack: `SS_Allocate`'s
   block holds the bounds record, then the data (`KeyExpansion`'s
   `Round_Keys`: `{ i32, i32 }` at 0, the blocks at 8; a `Bits`:

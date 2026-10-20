@@ -66,6 +66,24 @@ let ss_post stack (used : Int) = do {
 };
 
 /*
+ * ss_post after a mark and its release (SS_Mark, SS_Release, which a
+ * function that frees its temporaries calls around them): Top is back at
+ * `used` bytes, and High_Water_Mark records the most bytes in use in
+ * between, `hwm`.
+ */
+let ss_post_hwm stack (used : Int) (hwm : Int) = do {
+  llvm_points_to_untyped (llvm_elem stack 0)
+    (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_term {{ 0 : [8] }},
+                               llvm_term {{ 0 : [8] }}, llvm_term {{ 0 : [16] }}, llvm_term {{ 0 : [32] }},
+                               llvm_term {{ `hwm : [64] }},
+                               llvm_packed_struct_value [llvm_term {{ `used + 1 : [64] }}, llvm_elem stack 48]]);
+  llvm_points_to_untyped (llvm_elem stack 48)
+    (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_null, llvm_term {{ 0 : [64] }}]);
+  llvm_points_to (llvm_global "system__soft_links__get_sec_stack") (llvm_global "saw_soft_links__get_sec_stack");
+  llvm_points_to (llvm_elem (llvm_global "system__soft_links__nt_tsd") 2) stack;
+};
+
+/*
  * The first n bytes of the stack's memory, as found and left: what a
  * caller allocated before the call, which the call must not change. In a
  * precondition it binds them (keep_pre), in the postcondition it states

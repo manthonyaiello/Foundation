@@ -38,7 +38,8 @@
 # and then:
 #   4. runs each saw/negative/*.saw, every one of which must FAIL with a
 #      counterexample (the negative controls);
-#   5. writes saw/results.txt (unless --print).
+#   5. writes saw/results.txt (unless --print), or saw/results-long.txt
+#      with SAW_LONG=1.
 #
 # Every saw run is in its own systemd scope capped at SAW_MEMORY_MAX (10G,
 # no swap) when systemd-run --user works, so that a proof that blows up is
@@ -62,6 +63,13 @@
 #                  GNAT Pro ships no llvm-link; the bootstrap's gnat-llvm
 #                  phase installs LLVM's own release (README "SAW").
 #   SAW_MEMORY_MAX optional: the memory cap of each saw run (default 10G).
+#   SAW_LONG       optional: 1 adds the long proofs to sha256_spec.saw (the
+#                  spec layer's Hash at 120, 128 and 200 bytes, 3 and 4
+#                  padded blocks, and HMAC at (key, text) = (0, 0),
+#                  (32, 32), (64, 3) and (100, 32) bytes); 0 (the default)
+#                  leaves them out. The
+#                  record says which ran (line "options"); a SAW_LONG=1
+#                  run writes saw/results-long.txt, not saw/results.txt.
 #   saw, cryptol and z3 must be on PATH (the x86_64 bootstrap's env.sh).
 #
 # Exit status: 0 when every proof passed and every negative control failed;
@@ -74,8 +82,15 @@ ROOT_DIR="$(cd "$SPARK_DIR/.." && pwd)"
 SAW_DIR="$SPARK_DIR/saw"
 OBJ_DIR="$SAW_DIR/obj"
 RESULTS="$SAW_DIR/results.txt"
+[ "${SAW_LONG:-0}" != 1 ] || RESULTS="$SAW_DIR/results-long.txt"
 
 die() { printf '!! %s\n' "$*" >&2; exit 1; }
+
+SAW_LONG="${SAW_LONG:-0}"
+case "$SAW_LONG" in
+  0|1) ;;
+  *) echo "check-saw.sh: SAW_LONG must be 0 or 1, not $SAW_LONG" >&2; exit 2 ;;
+esac
 
 PRINT=0
 case "${1:-}" in
@@ -100,6 +115,12 @@ LLVM_NM="$GNAT_LLVM_DIR/bin/llvm-nm"
    bootstrap's gnat-llvm phase installs it, README \"SAW\")."
 LLVM_LINK="$LLVM_LINK_DIR/bin/llvm-link"
 [ -x "$LLVM_LINK" ] || die "LLVM_LINK_DIR=$LLVM_LINK_DIR has no bin/llvm-link"
+# opt and llvm-extract, of the same release, for the spec layer's one GEP
+# rewrite (gep64 below); the bootstrap extracts them with llvm-link.
+LLVM_OPT="$LLVM_LINK_DIR/bin/opt"
+LLVM_EXTRACT="$LLVM_LINK_DIR/bin/llvm-extract"
+[ -x "$LLVM_OPT" ] && [ -x "$LLVM_EXTRACT" ] || die "LLVM_LINK_DIR=$LLVM_LINK_DIR has no bin/opt or bin/llvm-extract:
+   extract them from the same pinned release tarball (the bootstrap's gnat-llvm phase does)"
 for t in saw cryptol z3; do
   command -v "$t" >/dev/null 2>&1 || die "$t is not on PATH (source the bootstrap's env.sh)"
 done
@@ -109,6 +130,10 @@ first_line() { local out; out="$("$@" 2>&1)" || true; printf '%s\n' "${out%%$'\n
 V_LLVM_GCC="$(first_line "$LLVM_GCC" --version)"
 V_LLVM="$("$LLVM_NM" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
 V_LLVM_LINK="$("$LLVM_LINK" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
+V_LLVM_OPT="$("$LLVM_OPT" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
+V_LLVM_EXTRACT="$("$LLVM_EXTRACT" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
+[ "$V_LLVM_OPT" = "$V_LLVM_LINK" ] && [ "$V_LLVM_EXTRACT" = "$V_LLVM_LINK" ] \
+  || die "opt (${V_LLVM_OPT:-?}) and llvm-extract (${V_LLVM_EXTRACT:-?}) must be llvm-link's LLVM ($V_LLVM_LINK)"
 # The pinned release: llvm-link must be it, and it must be GNAT-LLVM's own
 # LLVM, so that the linker reads and writes the bitcode llvm-gcc makes.
 # shellcheck source=toolchain-pins.env
@@ -189,13 +214,24 @@ UNITS_aes_spec=(
 # sha256_spec: the SHA-256 instance of the generic SHA2.Main (its ghost
 # functions are the spec layer), with the SHA2 root (To_Bits, Ceil_Div,
 # Ceil_Mod), SHA2.Functions and SHA2.Preprocessing (H0_256), which it
-# calls or reads.
+# calls or reads; and the HMAC-SHA-256 spec layer, the instance
+# HMAC.SHA256 of the generic HMAC.Main, with the HMAC root (Join, Repeat,
+# Zero), whose hashes are SHA2.SHA256.Hash.
 UNITS_sha256_spec=(
   sha2/foundation_spark-sha2.ads
   sha2/foundation_spark-sha2-functions.ads
   sha2/foundation_spark-sha2-preprocessing.ads
   sha2/foundation_spark-sha2-sha256.ads
+  hmac/foundation_spark-hmac.ads
+  hmac/foundation_spark-hmac-sha256.ads
 )
+
+# The functions of a spec module whose getelementptr indices are i128
+# (unit:function), rewritten to i64 before linking (gep64, below):
+# AES.Spec.Main.Join_Block's aggregate over Block_Bits'Range indexes its
+# [128 x i8] temporary by the 128-bit Bit_Index (#59).
+GEP64_aes_spec=(foundation_spark-aes-spec-main:foundation_spark__aes__spec__main__join_block)
+GEP64_sha256_spec=()
 
 # The spec layer's switches: the implementation's, plus
 # -fno-inline: GNAT-LLVM marks every expression function alwaysinline, and
@@ -246,6 +282,7 @@ CRYPTOL_FILES=(
   algorithms/AES/SBox.cry
   algorithms/AES/Cipher.cry
   algorithms/AES/KeyExpansion.cry
+  algorithms/AES/Main.cry
   shared/algebra/Polynomial/GF2.cry
   shared/common/utils/Prime.cry
   algorithms/SHA2/Main.cry
@@ -255,17 +292,18 @@ CRYPTOL_FILES=(
   algorithms/HMAC/Main.cry
 )
 # Our own Cryptol in saw/, recorded by sha256: an instantiation of NSA's,
-# and a copy of the local definitions of its step (sha256_spec.saw).
-OUR_CRYPTOL=(spark/saw/SHA256Main.cry spark/saw/SHA256Step.cry)
+# a copy of the local definitions of its step (sha256_spec.saw), and a
+# copy of HMAC/Main.cry's private HMAC_init (sha256_spec_hmac.saw).
+OUR_CRYPTOL=(spark/saw/SHA256Main.cry spark/saw/SHA256Step.cry spark/saw/HMACInit.cry)
 
 T0="$(date +%s)"
 COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 if [ "$PRINT" -eq 0 ] \
-   && [ -n "$(git -C "$ROOT_DIR" status --porcelain -- spark algorithms shared ':!spark/saw/results.txt' ':!spark/saw/obj' ':!spark/obj' ':!spark/lib' ':!spark/alire' ':!spark/config' ':!spark/docs')" ]; then
+   && [ -n "$(git -C "$ROOT_DIR" status --porcelain -- spark algorithms shared ':!spark/saw/results.txt' ':!spark/saw/results-long.txt' ':!spark/saw/obj' ':!spark/obj' ':!spark/lib' ':!spark/alire' ':!spark/config' ':!spark/docs')" ]; then
   die "the tree has changes: commit them, or use --print (the record names HEAD as the commit checked)"
 fi
 DIRTY=""
-[ -z "$(git -C "$ROOT_DIR" status --porcelain -- spark/src spark/saw algorithms shared ':!spark/saw/results.txt' ':!spark/saw/obj')" ] \
+[ -z "$(git -C "$ROOT_DIR" status --porcelain -- spark/src spark/saw algorithms shared ':!spark/saw/results.txt' ':!spark/saw/results-long.txt' ':!spark/saw/obj')" ] \
   || DIRTY=" (with uncommitted changes: not a record)"
 
 # NSA's Cryptol is never modified here: it must be the commit's, even with
@@ -340,6 +378,37 @@ for u in "${HARNESS_UNITS[@]}"; do
 done
 BITCODE+=("${SS_BC[@]}")
 
+# gep64 UNIT_BC FUNCTION OUT_BC: FUNCTION, extracted from UNIT_BC, with
+# its getelementptr indices wider than 64 bits truncated to i64 by LLVM's
+# separate-const-offset-from-gep pass, into OUT_BC, for llvm-link
+# --override. Dies unless the only change is that: each `trunc i128 %x to
+# i64` the pass inserts, used in place of %x as a GEP index (LangRef:
+# a GEP index is truncated to the pointer's index width, 64 bits, so the
+# meaning is the same; SAW 1.6 rejects the wider index, README "SAW").
+gep64() {
+  local unit_bc="$1" fn="$2" out="$3" before after
+  echo ">> llvm-extract --func=$fn ${unit_bc##*/}; opt -passes=separate-const-offset-from-gep"
+  "$LLVM_EXTRACT" "--func=$fn" "$unit_bc" -o "$out.orig.bc"
+  "$LLVM_OPT" -passes=separate-const-offset-from-gep "$out.orig.bc" -o "$out"
+  before="$("$LLVM_OPT" -S "$out.orig.bc" -o -)"
+  after="$("$LLVM_OPT" -S "$out" -o -)"
+  [ "$(printf '%s\n' "$before" | grep -c 'getelementptr.*, i128 ' || true)" -gt 0 ] \
+    || die "$fn in ${unit_bc##*/} has no i128 getelementptr index: the rewrite is not needed"
+  [ "$(printf '%s\n' "$after" | grep -c 'getelementptr.*, i128 ' || true)" -eq 0 ] \
+    || die "$fn: an i128 getelementptr index is left after the rewrite"
+  # Undo the rewrite textually (drop each trunc, use its operand again):
+  # the result must be the function as compiled.
+  printf '%s\n' "$after" | awk '
+    /^; ModuleID = / { next }
+    $2 == "=" && $3 == "trunc" && $4 == "i128" && $6 == "to" && $7 == "i64" && NF == 7 { sub_of[$1] = $5; next }
+    { for (v in sub_of) { gsub("i64 " v ",", "i128 " sub_of[v] ","); gsub("i64 " v "$", "i128 " sub_of[v]) } print }
+  ' > "$out.undone.ll"
+  printf '%s\n' "$before" | grep -v '^; ModuleID = ' > "$out.orig.ll"
+  diff -q "$out.orig.ll" "$out.undone.ll" >/dev/null \
+    || { diff "$out.orig.ll" "$out.undone.ll" >&2; die "$fn: the rewrite changed more than the width of GEP indices"; }
+  echo ">> $fn: $(printf '%s\n' "$after" | grep -c '= trunc i128 .* to i64$') GEP index(es) truncated to i64, nothing else changed"
+}
+
 # The spec layer: ghost code compiled, so its symbols are expected.
 for mod in "${SPEC_MODULES[@]}"; do
   declare -n units="UNITS_$mod"
@@ -353,8 +422,20 @@ for mod in "${SPEC_MODULES[@]}"; do
     ALL_ALIS+=("${bc%.bc}.ali")
   done
   unset -n units
-  echo ">> llvm-link ${mod_bc[*]##*/} ${SS_BC[*]##*/} -o spec/$mod.bc"
-  "$LLVM_LINK" "${mod_bc[@]}" "${SS_BC[@]}" -o "$SPEC_OBJ_DIR/$mod.bc"
+  declare -n rewrites="GEP64_$mod"
+  overrides=()
+  for f in "${rewrites[@]}"; do
+    unit_bc="$SPEC_OBJ_DIR/${f%%:*}.bc"
+    fn="${f#*:}"
+    gep64 "$unit_bc" "$fn" "$SPEC_OBJ_DIR/$fn.gep64.bc"
+    overrides+=("--override=$SPEC_OBJ_DIR/$fn.gep64.bc")
+    BITCODE+=("$SPEC_OBJ_DIR/$fn.gep64.bc")
+  done
+  unset -n rewrites
+  echo ">> llvm-link ${mod_bc[*]##*/} ${SS_BC[*]##*/} ${overrides[*]##*/} -o spec/$mod.bc"
+  "$LLVM_LINK" "${mod_bc[@]}" "${SS_BC[@]}" "${overrides[@]}" -o "$SPEC_OBJ_DIR/$mod.bc"
+  wide="$("$LLVM_OPT" -S "$SPEC_OBJ_DIR/$mod.bc" -o - | grep -c 'getelementptr.*, i128 ' || true)"
+  [ "$wide" -eq 0 ] || die "spec/$mod.bc has $wide getelementptr with an i128 index, which SAW 1.6 rejects"
   has_ghost "$SPEC_OBJ_DIR/$mod.bc"
   BITCODE+=("${mod_bc[@]}" "$SPEC_OBJ_DIR/$mod.bc")
 done
@@ -369,6 +450,15 @@ $assumed"
 export CRYPTOLPATH="$ROOT_DIR"
 LOG_DIR="$OBJ_DIR/logs"
 mkdir -p "$LOG_DIR"
+
+# The options the scripts read (sha256_spec.saw includes obj/options.saw).
+if [ "$SAW_LONG" -eq 1 ]; then
+  OPTIONS_NOTE="SAW_LONG=1: the long proofs included (sha256_spec.saw: Hash at 120, 128, 200 bytes; HMAC at (0, 0), (32, 32), (64, 3), (100, 32))"
+  echo "let saw_long = true;" > "$OBJ_DIR/options.saw"
+else
+  OPTIONS_NOTE="SAW_LONG=0 (default): the long proofs left out (sha256_spec.saw: Hash at 120, 128, 200 bytes; HMAC at (0, 0), (32, 32), (64, 3), (100, 32))"
+  echo "let saw_long = false;" > "$OBJ_DIR/options.saw"
+fi
 
 KILLED_BY_CAP=137  # 128 + SIGKILL: what a scope killed by its MemoryMax returns
 
@@ -461,7 +551,7 @@ T_TOTAL=$(( $(date +%s) - T0 ))
 sha() { sha256sum "$1" | cut -d' ' -f1; }
 
 record() {
-  echo "# saw/results.txt -- written by scripts/check-saw.sh; do not edit."
+  echo "# saw/${RESULTS##*/} -- written by scripts/check-saw.sh; do not edit."
   echo "#"
   echo "# SAW llvm_verify of the SPARK AES, SHA-256 and HMAC-SHA-256"
   echo "# implementations' bitcode, and of the AES and SHA-256 spec layers'"
@@ -474,11 +564,13 @@ record() {
   echo "host        $(uname -m), $(nproc) CPUs"
   echo "llvm-gcc    $V_LLVM_GCC"
   echo "llvm        $V_LLVM"
-  echo "llvm-link   $V_LLVM_LINK ($LLVM_LINK_TARBALL, sha256 $LLVM_LINK_SHA256)"
+  echo "llvm-link   $V_LLVM_LINK ($LLVM_LINK_TARBALL, sha256 $LLVM_LINK_SHA256); opt and llvm-extract of the same"
+  echo "gep64       spec layer: ${GEP64_aes_spec[*]#*:} extracted, opt -passes=separate-const-offset-from-gep (i128 GEP index -> trunc to i64; checked: nothing else changed), linked with --override"
   echo "saw         $V_SAW"
   echo "cryptol     $V_CRYPTOL"
   echo "solvers     rme (SAW's built-in); z3 on PATH: $V_Z3 (each proof's below)"
   echo "memory cap  $CAP_NOTE"
+  echo "options     $OPTIONS_NOTE"
   echo "switches    ${SWITCHES[*]}"
   echo "spec layer  ${SPEC_SWITCHES[*]/#-gnatec=$SAW_DIR\//-gnatec=saw/}"
   echo "spec.adc    $(sha "$SPEC_ADC") saw/spec.adc: $(grep '^pragma' "$SPEC_ADC" | tr '\n' ' ' | sed 's/ $//')"

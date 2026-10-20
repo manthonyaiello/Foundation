@@ -54,20 +54,111 @@ let verify_small_k (l : Int) =
      }) z3 "z3" (str_concat (str_concat "L = " (show l)) ": `((L + 1 + 2 * 32) %^ 512) (Main.cry's hash's k)");
 
 /*
- * Zero (Count) = Cryptol's zero : [k], at k = Small_K (l) for each
- * length: Count bytes of 0 with bounds {0, Count - 1}, on an empty
- * secondary stack.
+ * The secondary stack's base. Hash and the lemmas under it are proved
+ * on an empty secondary stack (base 0) for sha256_spec_hash.saw's Hash
+ * proofs, and again with `base` bytes already allocated for the calls
+ * HMAC makes (sha256_spec_hmac.saw): an override applies only where the
+ * stack's Top is the one its contract states. The bytes below the base
+ * are not described (the callee neither reads nor writes them) except
+ * those kept (keep_at): what the caller reads after the call.
  */
-let verify_zero (k : Int) =
+let at_base (base : Int) (name : String) =
+  if eval_bool {{ `base == (0 : Integer) }} then name
+  else str_concat (str_concat (str_concat name ", the secondary stack at ") (show base)) " bytes";
+
+/*
+ * n bytes of the stack's memory from offset off, as found and left (as
+ * secondary_stack.saw's keep_pre and keep_post, at an offset): bound in
+ * the precondition, stated unchanged in the postcondition.
+ */
+let keep_at stack (off : Int) (n : Int) = do {
+  if eval_bool {{ `n == (0 : Integer) }} then return {{ [] : [0][8] }}
+  else do {
+    kept <- llvm_fresh_var "kept" (llvm_array n (llvm_int 8));
+    llvm_points_to_untyped (ss_at stack off) (llvm_term kept);
+    return kept;
+  };
+};
+let keep_at_post stack (off : Int) (n : Int) (kept : Term) =
+  if eval_bool {{ `n == (0 : Integer) }} then return ()
+  else llvm_points_to_untyped (ss_at stack off) (llvm_term kept);
+
+/*
+ * Where Pad's and Hash's message M (l bits) is, by mode:
+ *  0: a read-only allocation of its own, with read-only bounds (a caller's
+ *     argument: sha256_spec_hash.saw's Hash proofs);
+ *  1: a writable allocation of its own, with writable bounds, stated
+ *     unchanged (a temporary of the caller's: HMAC's Hn and HL get the
+ *     concatenations HMAC builds on the primary stack);
+ *  2: on the secondary stack at offset moff, bounds then bits (32 bytes
+ *     later), below the base, stated unchanged (a result the caller got
+ *     from SS_Allocate: HMAC_init's Hk gets Join (K)); with it, the bytes
+ *     from lo up to moff, which the caller reads after the call (the
+ *     second HMAC_init's caller's), also stated unchanged (lo = moff:
+ *     none).
+ * msg_frame binds M and returns it with the fat pointer to pass, the
+ * data and bounds pointers, and the bytes kept below M; msg_frame_post
+ * states them unchanged. When SAW applies an override, the bytes of the
+ * stack its postcondition does not state are lost to the caller.
+ */
+let msg_frame stack (mode : Int) (lo : Int) (moff : Int) (l : Int) = do {
+  below <- if eval_bool {{ `mode == (2 : Integer) }} then keep_at stack lo (eval_int {{ `moff - `lo : [64] }})
+           else return {{ [] : [0][8] }};
+  msg <- llvm_fresh_var "msg" (llvm_array l (llvm_int 8));
+  llvm_precond {{ all (\b -> b <= 1) msg }};
+  let bounds = llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `l - 1 : [128] }}];
+  if eval_bool {{ `mode == (2 : Integer) }} then do {
+    llvm_points_to_untyped (ss_at stack moff) bounds;
+    llvm_points_to_untyped (ss_at stack (eval_int {{ `moff + 32 : [64] }})) (llvm_term msg);
+    let dp = ss_at stack (eval_int {{ `moff + 32 : [64] }});
+    let bp = ss_at stack moff;
+    return (msg, llvm_struct_value [dp, bp], dp, bp, below);
+  } else do {
+    mp <- if eval_bool {{ `mode == (0 : Integer) }} then llvm_alloc_readonly (llvm_array l (llvm_int 8))
+          else llvm_alloc (llvm_array l (llvm_int 8));
+    llvm_points_to mp (llvm_term msg);
+    mb <- if eval_bool {{ `mode == (0 : Integer) }} then llvm_alloc_readonly bits_bounds_t
+          else llvm_alloc_aligned 1 bits_bounds_t;
+    llvm_points_to mb bounds;
+    return (msg, llvm_struct_value [mp, mb], mp, mb, below);
+  };
+};
+let msg_frame_post stack (mode : Int) (lo : Int) (moff : Int) (l : Int) (msg : Term) dp bp (below : Term) = do {
+  let bounds = llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `l - 1 : [128] }}];
+  if eval_bool {{ `mode == (0 : Integer) }} then return ()
+  else if eval_bool {{ `mode == (1 : Integer) }} then do {
+    llvm_points_to dp (llvm_term msg);
+    llvm_points_to bp bounds;
+  } else do {
+    keep_at_post stack lo (eval_int {{ `moff - `lo : [64] }}) below;
+    llvm_points_to_untyped dp (llvm_term msg);
+    llvm_points_to_untyped bp bounds;
+  };
+};
+/* The region to keep on the secondary stack (mode 2: from lo to the message's end), its size. */
+let msg_keep_size (mode : Int) (lo : Int) (moff : Int) (l : Int) =
+  if eval_bool {{ `mode == (2 : Integer) }} then eval_int {{ `moff - `lo + 32 + `l : [64] }} else 0;
+
+/*
+ * Zero (Count) = Cryptol's zero : [k], at k = Small_K (l) for each
+ * length: Count bytes of 0 with bounds {0, Count - 1}, on the secondary
+ * stack at `base` bytes, keeping the kn bytes at ko (Pad's message, when
+ * it is on the stack).
+ */
+let verify_zero_at (base : Int) (ko : Int) (kn : Int) (k : Int) =
   verify_spec "sha256__zero" []
     (do {
-       stack <- secondary_stack;
+       let sz = ss_size 32 k;
+       stack <- secondary_stack_used base;
+       kept <- keep_at stack ko kn;
        llvm_execute_func [llvm_term {{ `k : [128] }}];
-       ss_post stack (ss_size 32 k);
-       llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `k - 1 : [128] }}]);
-       llvm_points_to_untyped (ss_at stack 32) (llvm_term {{ bytes_of (zero : [k]) }});
-       llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
-     }) z3 "z3" (str_concat (str_concat "zero : [" (show k)) "] (Preprocessing.cry's pad's zero)");
+       ss_post stack (eval_int {{ `base + `sz : [64] }});
+       keep_at_post stack ko kn kept;
+       llvm_points_to_untyped (ss_at stack base) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `k - 1 : [128] }}]);
+       llvm_points_to_untyped (ss_at stack (eval_int {{ `base + 32 : [64] }})) (llvm_term {{ bytes_of (zero : [k]) }});
+       llvm_return (llvm_struct_value [ss_at stack (eval_int {{ `base + 32 : [64] }}), ss_at stack base]);
+     }) z3 "z3" (at_base base (str_concat (str_concat "zero : [" (show k)) "] (Preprocessing.cry's pad's zero)"));
+let verify_zero (k : Int) = verify_zero_at 0 0 0 k;
 
 /*
  * To_Bits (V, W): the W-bit big-endian representation of V, Cryptol's
@@ -81,7 +172,12 @@ let verify_zero (k : Int) =
  * result.
  */
 let to_bits_used (w : Int) = eval_int {{ sum [ ((32 + j + 15) / 16) * 16 | j <- [0 .. w] ] : [64] }};
-let to_bits_contract (used : Int) (keep : Int) (w : Int) = do {
+/*
+ * The two regions kept are (o1, n1) and (o2, n2): Zero's result, and
+ * Pad's message when it is on the stack (else n2 = 0). Pad on an empty
+ * stack keeps the first 32 + k bytes, (0, 32 + k): to_bits_lemmas.
+ */
+let to_bits_contract_at (used : Int) (o1 : Int) (n1 : Int) (o2 : Int) (n2 : Int) (w : Int) = do {
   let is0 = eval_bool {{ `w == (0 : Integer) }};
   let before = if is0 then 0 else to_bits_used (eval_int {{ `w - 1 : [64] }});
   let at = eval_int {{ `used + `before : [64] }};
@@ -89,24 +185,28 @@ let to_bits_contract (used : Int) (keep : Int) (w : Int) = do {
   let tw = to_bits_used w;
   let after = eval_int {{ `used + `tw : [64] }};
   stack <- secondary_stack_used used;
-  kept <- keep_pre stack keep;
+  kept1 <- keep_at stack o1 n1;
+  kept2 <- keep_at stack o2 n2;
   v <- llvm_fresh_var "v" (llvm_int 128);
   llvm_precond {{ v <= 2 ^^ 126 }};
   llvm_execute_func [llvm_term v, llvm_term {{ `w : [128] }}];
   ss_post stack after;
-  keep_post stack keep kept;
+  keep_at_post stack o1 n1 kept1;
+  keep_at_post stack o2 n2 kept2;
   llvm_points_to_untyped (ss_at stack at) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `w - 1 : [128] }}]);
   if is0 then return ()
   else llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (drop`{128 - w} v) }});
   llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
 };
-rec to_bits_lemmas (used : Int) (keep : Int) (w : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "to_bits" prev (to_bits_contract used keep w) z3 "z3"
+rec to_bits_lemmas_at (used : Int) (o1 : Int) (n1 : Int) (o2 : Int) (n2 : Int) (w : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- verify_spec "to_bits" prev (to_bits_contract_at used o1 n1 o2 n2 w) z3 "z3"
              (str_concat (str_concat (str_concat (str_concat "W = " (show w)) ", the secondary stack at ") (show used))
                 " bytes: drop`{128 - W} (v : [128]) ((`l : [2 * w]) in Preprocessing.cry's pad)");
   if eval_bool {{ `w == (64 : Integer) }} then return lemma
-  else to_bits_lemmas used keep (eval_int {{ `w + 1 : [32] }}) [lemma];
+  else to_bits_lemmas_at used o1 n1 o2 n2 (eval_int {{ `w + 1 : [32] }}) [lemma];
 };
+let to_bits_lemmas (used : Int) (keep : Int) (w : Int) (prev : [LLVMSpec]) =
+  to_bits_lemmas_at used 0 keep 0 0 w prev;
 
 /*
  * Pad (M) = Preprocessing.cry's pad`{m = 512, w = 32, l, k} M
@@ -117,25 +217,39 @@ rec to_bits_lemmas (used : Int) (keep : Int) (w : Int) (prev : [LLVMSpec]) : Top
  * allocates its result: their lemmas are the overrides, To_Bits' chain
  * proved for this stack.
  */
-let pad_contract (l : Int) = do {
+let pad_contract_at (base : Int) (mode : Int) (lo : Int) (moff : Int) (l : Int) = do {
   let k = small_k l;
   let len = eval_int {{ `l + 1 + `k + 64 : [64] }};
   let uz = ss_size 32 k;
   let t64 = to_bits_used 64;
-  let at = eval_int {{ `uz + `t64 : [64] }};
+  let at = eval_int {{ `base + `uz + `t64 : [64] }};
   let data = eval_int {{ `at + 32 : [64] }};
   let sz = ss_size 32 len;
   let after = eval_int {{ `at + `sz : [64] }};
-  stack <- secondary_stack;
-  msg <- llvm_fresh_var "msg" (llvm_array l (llvm_int 8));
-  llvm_precond {{ all (\b -> b <= 1) msg }};
-  mp <- llvm_alloc_readonly (llvm_array l (llvm_int 8));
-  llvm_points_to mp (llvm_term msg);
-  mb <- llvm_alloc_readonly bits_bounds_t;
-  llvm_points_to mb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `l - 1 : [128] }}]);
-  llvm_execute_func [llvm_struct_value [mp, mb]];
+  stack <- secondary_stack_used base;
+  (msg, m, dp, bp, below) <- msg_frame stack mode lo moff l;
+  llvm_execute_func [m];
   ss_post stack after;
+  msg_frame_post stack mode lo moff l msg dp bp below;
   llvm_points_to_untyped (ss_at stack at) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `len - 1 : [128] }}]);
   llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (pad`{512, 32, l, k} (bits_of msg)) }});
   llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
+};
+let pad_contract (l : Int) = pad_contract_at 0 0 0 0 l;
+
+/*
+ * Pad's lemma at length l, on the stack at `base` bytes with its message
+ * where `mode` says (msg_frame), and the lemmas it rests on, proved for
+ * that stack: Small_K's, Zero's (keeping the message if it is on the
+ * stack) and To_Bits' chain (keeping Zero's result, and the message).
+ */
+let verify_pad_at (base : Int) (mode : Int) (lo : Int) (moff : Int) (l : Int) = do {
+  let k = small_k l;
+  let uz = ss_size 32 k;
+  let mk = msg_keep_size mode lo moff l;
+  sk <- verify_small_k l;
+  z <- verify_zero_at base lo mk k;
+  tb <- to_bits_lemmas_at (eval_int {{ `base + `uz : [64] }}) base (eval_int {{ 32 + `k : [64] }}) lo mk 0 [];
+  verify_spec "sha256__pad" [sk, z, tb] (pad_contract_at base mode lo moff l) z3 "z3"
+    (at_base base (str_concat (str_concat "l = " (show l)) ": Preprocessing::pad`{512, 32, l, (l + 65) %^ 512}"));
 };
