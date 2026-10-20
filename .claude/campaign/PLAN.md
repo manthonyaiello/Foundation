@@ -206,8 +206,8 @@ Small items: none open. Settled on 2026-10-20 (Tony):
 * **Already done:** the bootstrap workflow's path filter (it triggers only on
   the bootstrap script, the pins and the workflow).
 * **Into issues:** `board.py`'s SAW column, board row kinds and SAW's
-  unproved pieces → #67; one bit-sequence type → #68 (AES and SHA-2 now
-  keep different index types on purpose); why SAW of the spec layer is harder
+  unproved pieces → #67; one bit-sequence type → dropped by #68 (AES and
+  SHA-2 keep different index types on purpose); why SAW of the spec layer is harder
   → #69; a cheaper SBoxCorrect → #70; gnatcov in the bootstrap → #51.
 
 Not yet, and not filed:
@@ -303,9 +303,11 @@ Not yet, and not filed:
   SHA-256 only. Library-level instances need `pragma SPARK_Mode (On)`.
 * **Bit sequences.** Ghost Boolean arrays, length < 2**64. SHA-2's index is
   128-bit because Cryptol's domain needs it: messages up to 2**64 − 1 bits,
-  padded past Ada's 64-bit range. AES's index is to be narrowed to what AES
-  needs (#68; Tony, 2026-10-20: wide types are not a way to avoid proving
-  absence of overflow). Ghost only, so no run-time cost either way.
+  padded past Ada's 64-bit range. AES's index is `range 0 .. 256`, what AES
+  needs: a 256-bit key's indices and its length (#68; Tony, 2026-10-20:
+  wide types are not a way to avoid proving absence of overflow). The two
+  types differ on purpose; no shared bit-sequence type. Ghost only, so no
+  run-time cost either way.
 * **Fixed-width words** (Tony, 2026-10-20): AES bytes are `Unsigned_8` with a
   Cryptol-order bit accessor (`Bit_Of`), not Boolean arrays; Boolean arrays
   are for arbitrary-length sequences only.
@@ -380,11 +382,12 @@ Not yet, and not filed:
 * **`llvm-link` from GNAT Pro** (2026-10-20): Tony is asking internally
   whether GNAT-LLVM can ship `llvm-link` (GNAT Pro 27 ships none). Until
   then the bootstrap keeps fetching LLVM 21.1.8's release tarball (2 GB,
-  sha256 pinned). After #68, only `llvm-link` is needed from it.
-* **crucible-llvm and wide GEP indices**: Tony is deciding whether to raise
-  `calcGEP_array`'s 64-bit limit with Galois. The draft in PR #65 predates
-  the finding that a precise request should include LangRef's `trunc nsw` /
-  `trunc nuw` rules for `nusw`/`nuw` GEPs. #68 removes our need either way.
+  sha256 pinned). Since #68 the bootstrap extracts only `llvm-link` from it.
+* **crucible-llvm and wide GEP indices**: resolved into #68, which removed
+  our need (AES's index narrowed, `gep64` retired). Raising
+  `calcGEP_array`'s 64-bit limit with Galois (draft in PR #65; a precise
+  request includes LangRef's `trunc nsw` / `trunc nuw` rules for
+  `nusw`/`nuw` GEPs) is optional now.
 
 ## Live ambushes
 
@@ -449,8 +452,10 @@ Not yet, and not filed:
   afterwards (HMAC_init at k = 65 failed until its `Hash` lemmas kept the
   bytes below the message, PR #65).
 * **SAW 1.6 rejects a GEP index wider than 64 bits** (GNAT-LLVM emits `i128`
-  when a constrained array with a 128-bit index type is indexed directly);
-  `check-saw.sh`'s `gep64` handles the one case, and dies on a new one.
+  when a constrained array with a 128-bit index type is indexed directly).
+  #68 removed the one case (AES's `Join_Block`) and the `gep64` rewrite;
+  SHA-2's index is still 128-bit, so do not reach for a wide index again.
+  `check-saw.sh` refuses a linked spec module with an `i128` GEP index.
 * **zsh**: a word starting with `=` is a command lookup; `$var` with spaces
   is not word-split (use `${(f)...}` arrays); `for` loops over a string
   of names need splitting.
