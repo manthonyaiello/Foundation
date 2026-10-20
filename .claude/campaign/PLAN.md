@@ -2,12 +2,14 @@
 
 **Provenance.** Rewritten 2026-10-19 (evening, UTC); updated 2026-10-20
 (08:15 UTC) at `9d750d8` (the merge of PR #65), on the x86_64 IOD just before
-Tony shut it down. The gnatprove board was re-counted on 2026-10-19 on
+Tony shut it down; updated again 2026-10-20 on `foundation` after Tony's
+review of E4's loose ends and the small items (no code changed; issues
+#67–#70 filed). The gnatprove board was re-counted on 2026-10-19 on
 `ec57e9e` on the IOD with FSF 16.1 (`check-proof.sh`, `-j8`, CI allowance:
-3554/3554, 786 s); PRs #57–#65 since changed no `spark/src`, `spark/cryptol`
+3554/3554, 786 s); PRs #57–#66 since changed no `spark/src`, `spark/cryptol`
 or FFI script. The SAW numbers are `spark/saw/results.txt` (default run) and
 `results-long.txt` (`SAW_LONG=1`) at `9d750d8`; the orchestrator re-ran the
-default at the head of each PR. **Nothing is open** but this plan's own PR.
+default at the head of each PR. **Open:** #67–#70 (below) and E5's #50, #51.
 **E0–E4 are closed** (epic #21 closed 2026-10-20); E5 remains.
 **The day's measurements** are in `.claude/campaign/measurements/2026-10-19-iod.md`.
 
@@ -67,22 +69,24 @@ Counted on `main` (gnatprove at `ec57e9e`, unchanged since; SAW at `9d750d8`):
   implementation), the round functions, `KeyExpansion.W` per index
   (44/52/60 lemmas, never unfolded), KeyExpansion, Cipher, InvCipher,
   InvCipher', and Main's **`Encrypt`/`Decrypt`/`AES128/192/256`** (through
-  the `gep64` rewrite of `Join_Block`, below). SHA-256: `W` per index,
+  the `gep64` rewrite of `Join_Block`, which #68 retires). SHA-256: `W` per index,
   `Step` = NSA's `step`, **`Pad` at the 12 M4.3 lengths**, `Hash` at 9
   lengths (3 more under `SAW_LONG`: 120, 128, 200 bytes). **HMAC** = NSA's
   `HMAC` at one (key, text) per key case by default ((32,3), (64,32),
   (65,3)), all seven M4.3 pairs under `SAW_LONG`. Spec-layer rows
-  SAW-proved: **38 of 40** (not: `parse` on its own, `hash` over bytes).
+  SAW-proved: **38 of 40** (not: `parse` on its own, which #67 adds; `hash`
+  over bytes, a SPARK-side representation layer, which #67 documents).
 * **SAW in all, default run:** 2829 proved, 19 negative controls fail, 3838 s
   (orchestrator's re-run at `86e7e2d`; tick's record 3785 s), peak 3.84 GB.
   `SAW_LONG=1`: 3609 proved, 7784 s, peak 7.23 GB. `board.py`'s SAW column
-  still prints "not run".
+  still prints "not run" (#67).
 
-The three incomplete rows, honestly so:
+The three rows the board counts incomplete, though complete by design (Tony,
+2026-10-20; #67 gives them row kinds so the board says so):
 
 | row | why |
 |---|---|
-| `AES::SBox::affine` | ghost-only by design (#12); the implementation reads the S-box table |
+| `AES::SBox::affine` | ghost-only by design (#12); the implementation reads the S-box table, which `SBoxCorrect` proves equal to `affine` for every byte |
 | `GF2::inverse (AES)` | same |
 | `SHA2::Preprocessing::pad` | no executable counterpart: `Final` writes only the last one or two padded blocks, proved through `Hash` |
 
@@ -133,57 +137,36 @@ Done on 2026-10-19, on the x86_64 IOD with Tony's GNAT Pro 27.0 install:
   (`.claude/campaign/runs/2026-10-19-iod/`), retrieved by Tony at shutdown;
   every number that matters is in the measurements file.
 
-1. **E5**: **M5.2 (#50)** constant time (the AES table S-box leaks), then
-   **M5.3 (#51)** binaries and performance (x86_64 numbers need an IOD).
-   Neither needs GNAT Pro.
+1. **#67** (no GNAT Pro needed except item 3): board row kinds
+   (`spec-only`, `subsumed-by`, `impl = spec`; the board goes to 40/40),
+   the statements of where spec and implementation are not one-to-one and
+   why that is intended, SAW's standalone `Parse`, the documentation of what
+   SAW proves in place or leaves out and why, fixed sizes as NSA's own
+   practice, where SPARK's proof is stronger, `board.py`'s SAW column, and
+   `alire.toml` in the slow-proof fingerprint. Tony may batch more into it.
+2. **#68**: narrow AES's `Bit_Index` to what AES needs and retire `gep64`
+   (SAW re-run needs GNAT Pro).
+3. **E5**: **M5.2 (#50)** constant time (the AES table S-box leaks), then
+   **M5.3 (#51)** binaries and performance (x86_64 numbers need an IOD; it
+   adds gnatcov to the x86_64 bootstrap when it needs it). Neither needs
+   GNAT Pro.
+4. **#69**: why SAW costs about 100 times more on the spec layer; **#70**: a
+   cheaper `SBoxCorrect` proof.
 
-Small items, any time:
-* **Pro-27 proof repair** (Tony: valuable, not urgent). Under SPARK Pro 27.0
-  (20261014) with the CI allowance, on `ec57e9e`, these do not prove:
-  `HMAC.SHA256_Impl.Lemma_HMAC_Unfold`'s postcondition
-  (`hmac-sha256_impl.adb:415`), the assertion at `hmac-sha256_impl.adb:562`,
-  the assertion at `sha2-sha256_stream.adb:342`, and `SHA256_Stream.Hash`'s
-  postcondition (`sha2-sha256_stream.ads:218`). Without the allowance, three
-  more time out (`Lemma_Pmult_Fold`, `SBoxCorrect`'s loop invariant,
-  `Init_Key`). GNAT Pro 27 also warns on unreferenced formals `K` and `Pad`
-  at `hmac-sha256_impl.adb:263` (FSF 16.1 does not). Making these robust
-  across both toolchains is the repair.
-* **`board.py`'s SAW column**: read `spark/saw/results.txt` instead of
-  printing "not run"; count lax-module results separately, and the spec
-  layer's rows apart from the implementation's.
-* **Why SAW of the spec layer is so much harder** (Tony: interesting, worth
-  an analysis): 87 results in about 36 s and 0.3 GB for the implementation
-  against 2162 in about 1885 s and 2.5 GB for the spec layer, with 4 against
-  832 lax. Numbers and first hypotheses in the measurements file. Relevant
-  to C-to-SPARK translation equivalence, where the same contrast (code
-  written to be clear against code written to run) will recur.
-* **SAW's unproved pieces**, if wanted (need GNAT Pro): implementation
-  layer: `InvCipher'` (`Decrypt_Block_Prime`, `Inv_Round_Prime`), `Dot`;
-  SHA-256's `Load_Block`, `To_Digest`, `Init`, `Update`, `Final` on their own,
-  `Hash_Chunked`, the incremental HMAC interface. Spec layer: `parse` on its
-  own, `hash` over bytes (`SHA256_Bytes` is a representation layer, not
-  spec).
-* **`board.py`** should read both `results.txt` and `results-long.txt`.
-* **The slow-proof follow-ups** (Open for Tony, below), as one small PR.
-* **Scheduler inside `prove.sh`**: use `spark-scheduler` when on PATH, direct
-  otherwise (CI, IOD), so the long wrapper command goes away.
-* **One bit-sequence type**: `AES.Spec.Main.Bits` (index `0 .. 2**127-1`) and
-  `SHA2.Bits` (`0 .. 2**126`) duplicate each other. Unify into a common unit.
-  Touches sbox_entries' inputs? Check with `slow_proofs.py inputs` first.
-* **`board-rows.txt` row kinds**, if Tony agrees (below).
-* **`#52`'s FFI job was 14m26s against `main`'s 9m55s** with only ~5 s of
-  new properties: find out why.
-* **The bootstrap workflow runs on any PR that touches `check-ffi.sh`** (49 min
-  per job, two jobs, seen on #55): narrow its path filter to the bootstrap
-  script, the pins and the workflow.
-* **x86_64 proof margins, next in line** (from #54's measurements): checks
-  at 5.9–8.5 s on the x86_64 runner against the 10 s allowance:
-  `HMAC.SHA256_Impl.Lemma_HMAC_Unfold`'s postcondition (Alt-Ergo),
-  `SBoxCorrect`'s loop invariant (8.3 s), and two assertions at 7.2–7.4 s.
-* **gnatcov in the bootstrap** (`alr -n install gnatcov=26.2.1`) for M5.3 on
-  the IOD.
-* **A cheaper SBoxCorrect proof**: about 7.5 min of its 26 is gnat2why reading
-  the 7,700-line generated unit.
+Small items: none open. Settled on 2026-10-20 (Tony):
+* **Dropped:** Pro-27 proof repair (the crate stays on FSF 16.1; Pro 27's 4
+  failures and 3 timeouts, listed in the measurements file, are known and
+  accepted); x86_64 proof margins (the gate proves on arm64); the
+  scheduler inside `prove.sh` (the scheduler is an internal tool, not part of
+  this repository); the FFI job's 14 min on #52 (runner noise: identical
+  code runs in about 8–10 or 14–15 min, the property step alone doubling,
+  e.g. PR #65 at 7m35s, 14m34s, 9m27s; do not chase it again).
+* **Already done:** the bootstrap workflow's path filter (it triggers only on
+  the bootstrap script, the pins and the workflow).
+* **Into issues:** `board.py`'s SAW column, board row kinds and SAW's
+  unproved pieces → #67; one bit-sequence type → #68 (AES and SHA-2 now
+  keep different index types on purpose); why SAW of the spec layer is harder
+  → #69; a cheaper SBoxCorrect → #70; gnatcov in the bootstrap → #51.
 
 Not yet, and not filed:
 * A T-table AES (only if speed matters; M5.3 will say).
@@ -255,7 +238,32 @@ Not yet, and not filed:
   `Is_Key_Words`/`Is_Round_Keys` preconditions. Held through M1.4; no generic.
 * **SHA-2 generality.** A generic mirroring `SHA2::Main`, instantiated for
   SHA-256 only. Library-level instances need `pragma SPARK_Mode (On)`.
-* **Bit sequences.** Ghost Boolean arrays, 128-bit index, length < 2**64.
+* **Bit sequences.** Ghost Boolean arrays, length < 2**64. SHA-2's index is
+  128-bit because Cryptol's domain needs it: messages up to 2**64 − 1 bits,
+  padded past Ada's 64-bit range. AES's index is to be narrowed to what AES
+  needs (#68; Tony, 2026-10-20: wide types are not a way to avoid proving
+  absence of overflow). Ghost only, so no run-time cost either way.
+* **Fixed-width words** (Tony, 2026-10-20): AES bytes are `Unsigned_8` with a
+  Cryptol-order bit accessor (`Bit_Of`), not Boolean arrays; Boolean arrays
+  are for arbitrary-length sequences only.
+* **Spec and implementation need not be one-to-one** (Tony, 2026-10-20):
+  `affine` and `GF2::inverse` (covered through `SBoxCorrect` and
+  `Sub_Byte`'s postcondition), `pad` (through `hash`), and the "impl = spec"
+  rows `Ch`, `Maj`, Σ, σ are complete, as designed. The board says so by row
+  kind (#67). No FFI properties for `affine` and `inverse`.
+* **SAW's scope** (Tony, 2026-10-20): implementation subprograms that nothing
+  calls (`InvCipher'`, `Dot`) stay out of SAW; SHA-256 and HMAC pieces that
+  SAW executes inside `Hash` and HMAC stay proved in place. Both are
+  documented with their reasons, alongside where gnatprove's argument is
+  stronger (#67). Fixed sizes match NSA's own Rust proofs (AES at k = 128,
+  192, 256); NSA has no SHA-256 or HMAC implementation proof.
+* **Slow-proof follow-ups from PR #44** (Tony, 2026-10-20): the `-u` run's
+  `-A=generic-not-analyzed` is accepted; the fingerprint closure keeps
+  bodies; `alire.toml` joins the fingerprint (#67); timeouts stay 30 min
+  (PR proof) and 60 min (refresh).
+* **The proof toolchain is FSF 16.1 only** (Tony, 2026-10-20): Pro 27's
+  proof results are not repaired. The `spark-scheduler` stays outside this
+  repository.
 * **Streaming.** GNAT 16 rejects ghost record components, so streaming
   contexts carry their message through ghost lemmas (`Lemma_Update`,
   `Lemma_Final`) called after each operation.
@@ -296,32 +304,14 @@ Not yet, and not filed:
 
 ## Open for Tony
 
-* **The bootstrap fetches LLVM's tools** (2 GB LLVM 21.1.8 release tarball,
-  sha256 pinned; `llvm-link`, `opt`, `llvm-extract` kept): the orchestrator's
-  default, not asked first.
-* **The `gep64` rewrite** (PR #65): `check-saw.sh` extracts `Join_Block`,
-  runs LLVM's `separate-const-offset-from-gep` on it (one `i128` GEP index
-  becomes a `trunc` to `i64`, which LangRef already defines the index to
-  mean) and links it back; the script checks that undoing the `trunc`
-  gives the compiled function exactly. It is a trusted transformation
-  between the compiler and SAW, and it is what proves `Encrypt`/`Decrypt`
-  at the spec layer. Orchestrator recommends accepting it. And: **file the
-  drafted crucible-llvm issue** (`calcGEP_array` rejects an index wider than
-  the pointer; draft in PR #65) upstream?
-* **Slow-proof follow-ups** (from PR #44), with my recommendations:
-  1. the gate's `-u` run passes `-A=generic-not-analyzed` (a command-line
-     warning tag the trust gate does not see): accept;
-  2. the fingerprint closure includes bodies, not only specs: keep
-     (conservative);
-  3. fingerprint `alire.toml` (it pins SPARKlib): add it;
-  4. timeouts 30 min (PR proof) and 60 min (refresh): keep.
-* **Board row kinds**: a fourth field in `board-rows.txt`: `impl` (default),
-  `spec-only` (with a reason; out of the denominator, counted separately),
-  `subsumed-by <row>` (`pad` → `hash`)? And should `affine` and
-  `GF2::inverse` get FFI properties?
-* **"impl = spec" rows** (`Ch`, `Maj`, Σ, σ): acceptable as complete?
-* **AES bytes as `Unsigned_8`** with a Cryptol-order bit accessor, rather
-  than ghost Boolean arrays, for fixed 8-bit words: acceptable?
+* **`llvm-link` from GNAT Pro** (2026-10-20): Tony is asking internally
+  whether GNAT-LLVM can ship `llvm-link` (GNAT Pro 27 ships none). Until
+  then the bootstrap keeps fetching LLVM 21.1.8's release tarball (2 GB,
+  sha256 pinned). After #68, only `llvm-link` is needed from it.
+* **crucible-llvm and wide GEP indices**: Tony is deciding whether to raise
+  `calcGEP_array`'s 64-bit limit with Galois. The draft in PR #65 predates
+  the finding that a precise request should include LangRef's `trunc nsw` /
+  `trunc nuw` rules for `nusw`/`nuw` GEPs. #68 removes our need either way.
 
 ## Live ambushes
 
