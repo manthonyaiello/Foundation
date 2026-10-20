@@ -699,7 +699,7 @@ names a unit that is not marked or does not exist.
 proof, never by hand except its `reason`:
 
 ```text
-unit src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
+unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
   reason      ...
   commit      <the commit proved>
   date        <its date, UTC>

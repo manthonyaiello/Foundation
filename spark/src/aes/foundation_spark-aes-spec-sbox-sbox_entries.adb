@@ -3,9 +3,31 @@
 --  Slow proof: proved on demand (scripts/proof-slow.txt). Its cold proof is
 --  too long for the default gate (README "Slow proofs").
 
-package body Foundation_Spark.AES.Spec.Properties.SBox_Entries with
+package body Foundation_Spark.AES.Spec.SBox.SBox_Entries with
   SPARK_Mode
 is
+
+   --------------------
+   -- Lemma_Inner_Eq --
+   --------------------
+
+   procedure Lemma_Inner_Eq (A, B : GF2.Poly_State) is
+   begin
+      if A (3) /= 0 then
+         pragma Assert (GF2.Inner_Step (A) = GF2.Inner_Step (B));
+         Lemma_Inner_Eq (GF2.Inner_Step (A), GF2.Inner_Step (B));
+      end if;
+   end Lemma_Inner_Eq;
+
+   ----------------
+   -- Lemma_Step --
+   ----------------
+
+   procedure Lemma_Step (S, T, F : GF2.Poly_State) is
+   begin
+      Lemma_Inner_Eq (GF2.Inner_Step (S), T);
+      pragma Assert (GF2.Inner (GF2.Inner_Step (S)) = F);
+   end Lemma_Step;
 
    function State (R, S, T, R1, S1, T1 : GF2.Poly) return GF2.Poly_State
    is ([R, S, T, R1, S1, T1]);
@@ -32,11 +54,11 @@ is
                State (283, 0, 1, 0, 1, 0),
                State (283, 0, 1, 0, 1, 0));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (0, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 0);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 0);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#01# =>
             Lemma_Step
               (State (283, 0, 1, 1, 1, 0),
@@ -47,11 +69,11 @@ is
                State (283, 0, 1, 1, 1, 0),
                State (1, 1, 0, 0, 283, 1));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (1, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 1);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 1);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#02# =>
             Lemma_Step
               (State (2, 1, 0, 1, 141, 1),
@@ -66,11 +88,11 @@ is
                State (283, 0, 1, 2, 1, 0),
                State (1, 141, 1, 0, 283, 2));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (2, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 141);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 141);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#03# =>
             Lemma_Step
               (State (3, 1, 0, 1, 246, 1),
@@ -85,11 +107,11 @@ is
                State (283, 0, 1, 3, 1, 0),
                State (1, 246, 1, 0, 283, 3));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (3, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 246);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 246);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#04# =>
             Lemma_Step
               (State (3, 70, 1, 1, 203, 3),
@@ -108,11 +130,11 @@ is
                State (283, 0, 1, 4, 1, 0),
                State (1, 203, 3, 0, 283, 4));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (4, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 203);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 203);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#05# =>
             Lemma_Step
               (State (5, 1, 0, 1, 82, 1),
@@ -127,11 +149,11 @@ is
                State (283, 0, 1, 5, 1, 0),
                State (1, 82, 1, 0, 283, 5));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (5, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 82);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 82);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#06# =>
             Lemma_Step
               (State (6, 1, 0, 1, 123, 1),
@@ -146,11 +168,11 @@ is
                State (283, 0, 1, 6, 1, 0),
                State (1, 123, 1, 0, 283, 6));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (6, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 123);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 123);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#07# =>
             Lemma_Step
               (State (3, 104, 1, 1, 209, 2),
@@ -169,11 +191,11 @@ is
                State (283, 0, 1, 7, 1, 0),
                State (1, 209, 2, 0, 283, 7));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (7, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 209);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 209);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#08# =>
             Lemma_Step
               (State (3, 35, 1, 1, 232, 7),
@@ -192,11 +214,11 @@ is
                State (283, 0, 1, 8, 1, 0),
                State (1, 232, 7, 0, 283, 8));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (8, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 232);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 232);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#09# =>
             Lemma_Step
               (State (4, 39, 1, 1, 79, 2),
@@ -215,11 +237,11 @@ is
                State (283, 0, 1, 9, 1, 0),
                State (1, 79, 2, 0, 283, 9));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (9, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 79);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 79);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#0A# =>
             Lemma_Step
               (State (10, 1, 0, 1, 41, 1),
@@ -234,11 +256,11 @@ is
                State (283, 0, 1, 10, 1, 0),
                State (1, 41, 1, 0, 283, 10));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (10, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 41);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 41);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#0B# =>
             Lemma_Step
               (State (3, 91, 2, 1, 192, 7),
@@ -261,11 +283,11 @@ is
                State (283, 0, 1, 11, 1, 0),
                State (1, 192, 7, 0, 283, 11));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (11, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 192);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 192);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#0C# =>
             Lemma_Step
               (State (2, 123, 2, 1, 176, 7),
@@ -288,11 +310,11 @@ is
                State (283, 0, 1, 12, 1, 0),
                State (1, 176, 7, 0, 283, 12));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (12, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 176);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 176);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#0D# =>
             Lemma_Step
               (State (3, 56, 1, 1, 225, 4),
@@ -311,11 +333,11 @@ is
                State (283, 0, 1, 13, 1, 0),
                State (1, 225, 4, 0, 283, 13));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (13, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 225);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 225);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#0E# =>
             Lemma_Step
               (State (3, 52, 1, 1, 229, 5),
@@ -334,11 +356,11 @@ is
                State (283, 0, 1, 14, 1, 0),
                State (1, 229, 5, 0, 283, 14));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (14, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 229);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 229);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#0F# =>
             Lemma_Step
               (State (3, 82, 3, 1, 199, 4),
@@ -361,11 +383,11 @@ is
                State (283, 0, 1, 15, 1, 0),
                State (1, 199, 4, 0, 283, 15));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (15, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 199);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 199);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -400,11 +422,11 @@ is
                State (283, 0, 1, 16, 1, 0),
                State (1, 116, 7, 0, 283, 16));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (16, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 116);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 116);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#11# =>
             Lemma_Step
               (State (2, 115, 7, 1, 180, 11),
@@ -431,11 +453,11 @@ is
                State (283, 0, 1, 17, 1, 0),
                State (1, 180, 11, 0, 283, 17));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (17, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 180);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 180);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#12# =>
             Lemma_Step
               (State (2, 79, 4, 1, 170, 11),
@@ -462,11 +484,11 @@ is
                State (283, 0, 1, 18, 1, 0),
                State (1, 170, 11, 0, 283, 18));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (18, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 170);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 170);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#13# =>
             Lemma_Step
               (State (4, 55, 3, 1, 75, 4),
@@ -489,11 +511,11 @@ is
                State (283, 0, 1, 19, 1, 0),
                State (1, 75, 4, 0, 283, 19));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (19, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 75);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 75);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#14# =>
             Lemma_Step
               (State (2, 41, 2, 1, 153, 11),
@@ -516,11 +538,11 @@ is
                State (283, 0, 1, 20, 1, 0),
                State (1, 153, 11, 0, 283, 20));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (20, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 153);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 153);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#15# =>
             Lemma_Step
               (State (10, 21, 1, 1, 43, 2),
@@ -539,11 +561,11 @@ is
                State (283, 0, 1, 21, 1, 0),
                State (1, 43, 2, 0, 283, 21));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (21, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 43);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 43);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#16# =>
             Lemma_Step
               (State (7, 59, 3, 1, 96, 7),
@@ -566,11 +588,11 @@ is
                State (283, 0, 1, 22, 1, 0),
                State (1, 96, 7, 0, 283, 22));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (22, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 96);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 96);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#17# =>
             Lemma_Step
               (State (5, 56, 3, 1, 95, 4),
@@ -593,11 +615,11 @@ is
                State (283, 0, 1, 23, 1, 0),
                State (1, 95, 4, 0, 283, 23));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (23, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 95);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 95);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#18# =>
             Lemma_Step
               (State (5, 35, 3, 1, 88, 7),
@@ -620,11 +642,11 @@ is
                State (283, 0, 1, 24, 1, 0),
                State (1, 88, 7, 0, 283, 24));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (24, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 88);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 88);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#19# =>
             Lemma_Step
               (State (12, 31, 1, 1, 63, 2),
@@ -643,11 +665,11 @@ is
                State (283, 0, 1, 25, 1, 0),
                State (1, 63, 2, 0, 283, 25));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (25, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 63);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 63);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#1A# =>
             Lemma_Step
               (State (3, 28, 1, 1, 253, 9),
@@ -666,11 +688,11 @@ is
                State (283, 0, 1, 26, 1, 0),
                State (1, 253, 9, 0, 283, 26));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (26, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 253);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 253);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#1B# =>
             Lemma_Step
               (State (3, 79, 6, 1, 204, 11),
@@ -693,11 +715,11 @@ is
                State (283, 0, 1, 27, 1, 0),
                State (1, 204, 11, 0, 283, 27));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (27, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 204);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 204);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#1C# =>
             Lemma_Step
               (State (3, 26, 1, 1, 255, 11),
@@ -716,11 +738,11 @@ is
                State (283, 0, 1, 28, 1, 0),
                State (1, 255, 11, 0, 283, 28));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (28, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 255);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 255);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#1D# =>
             Lemma_Step
               (State (4, 27, 1, 1, 64, 7),
@@ -739,11 +761,11 @@ is
                State (283, 0, 1, 29, 1, 0),
                State (1, 64, 7, 0, 283, 29));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (29, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 64);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 64);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#1E# =>
             Lemma_Step
               (State (3, 41, 3, 1, 238, 11),
@@ -766,11 +788,11 @@ is
                State (283, 0, 1, 30, 1, 0),
                State (1, 238, 11, 0, 283, 30));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (30, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 238);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 238);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#1F# =>
             Lemma_Step
               (State (2, 127, 5, 1, 178, 13),
@@ -797,11 +819,11 @@ is
                State (283, 0, 1, 31, 1, 0),
                State (1, 178, 13, 0, 283, 31));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (31, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 178);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 178);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -836,11 +858,11 @@ is
                State (283, 0, 1, 32, 1, 0),
                State (1, 58, 7, 0, 283, 32));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (32, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 58);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 58);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#21# =>
             Lemma_Step
               (State (7, 17, 2, 1, 110, 13),
@@ -863,11 +885,11 @@ is
                State (283, 0, 1, 33, 1, 0),
                State (1, 110, 13, 0, 283, 33));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (33, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 110);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 110);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#22# =>
             Lemma_Step
               (State (5, 41, 5, 1, 90, 11),
@@ -890,11 +912,11 @@ is
                State (283, 0, 1, 34, 1, 0),
                State (1, 90, 11, 0, 283, 34));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (34, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 90);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 90);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#23# =>
             Lemma_Step
               (State (3, 8, 1, 1, 241, 30),
@@ -913,11 +935,11 @@ is
                State (283, 0, 1, 35, 1, 0),
                State (1, 241, 30, 0, 283, 35));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (35, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 241);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 241);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#24# =>
             Lemma_Step
               (State (5, 26, 3, 1, 85, 11),
@@ -940,11 +962,11 @@ is
                State (283, 0, 1, 36, 1, 0),
                State (1, 85, 11, 0, 283, 36));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (36, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 85);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 85);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#25# =>
             Lemma_Step
               (State (4, 47, 5, 1, 77, 8),
@@ -971,11 +993,11 @@ is
                State (283, 0, 1, 37, 1, 0),
                State (1, 77, 8, 0, 283, 37));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (37, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 77);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 77);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#26# =>
             Lemma_Step
               (State (2, 75, 8, 1, 168, 23),
@@ -1002,11 +1024,11 @@ is
                State (283, 0, 1, 38, 1, 0),
                State (1, 168, 23, 0, 283, 38));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (38, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 168);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 168);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#27# =>
             Lemma_Step
               (State (3, 64, 9, 1, 201, 26),
@@ -1029,11 +1051,11 @@ is
                State (283, 0, 1, 39, 1, 0),
                State (1, 201, 26, 0, 283, 39));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (39, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 201);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 201);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#28# =>
             Lemma_Step
               (State (3, 88, 9, 1, 193, 31),
@@ -1060,11 +1082,11 @@ is
                State (283, 0, 1, 40, 1, 0),
                State (1, 193, 31, 0, 283, 40));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (40, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 193);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 193);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#29# =>
             Lemma_Step
               (State (41, 1, 0, 1, 10, 1),
@@ -1079,11 +1101,11 @@ is
                State (283, 0, 1, 41, 1, 0),
                State (1, 10, 1, 0, 283, 41));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (41, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 10);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 10);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#2A# =>
             Lemma_Step
               (State (2, 43, 4, 1, 152, 23),
@@ -1110,11 +1132,11 @@ is
                State (283, 0, 1, 42, 1, 0),
                State (1, 152, 23, 0, 283, 42));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (42, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 152);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 152);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#2B# =>
             Lemma_Step
               (State (21, 10, 1, 1, 21, 2),
@@ -1133,11 +1155,11 @@ is
                State (283, 0, 1, 43, 1, 0),
                State (1, 21, 2, 0, 283, 43));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (43, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 21);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 21);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#2C# =>
             Lemma_Step
               (State (15, 11, 1, 1, 48, 7),
@@ -1156,11 +1178,11 @@ is
                State (283, 0, 1, 44, 1, 0),
                State (1, 48, 7, 0, 283, 44));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (44, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 48);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 48);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#2D# =>
             Lemma_Step
               (State (4, 11, 1, 1, 68, 11),
@@ -1179,11 +1201,11 @@ is
                State (283, 0, 1, 45, 1, 0),
                State (1, 68, 11, 0, 283, 45));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (45, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 68);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 68);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#2E# =>
             Lemma_Step
               (State (2, 95, 8, 1, 162, 19),
@@ -1210,11 +1232,11 @@ is
                State (283, 0, 1, 46, 1, 0),
                State (1, 162, 19, 0, 283, 46));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (46, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 162);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 162);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#2F# =>
             Lemma_Step
               (State (3, 93, 8, 1, 194, 29),
@@ -1245,11 +1267,11 @@ is
                State (283, 0, 1, 47, 1, 0),
                State (1, 194, 29, 0, 283, 47));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (47, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 194);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 194);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -1280,11 +1302,11 @@ is
                State (283, 0, 1, 48, 1, 0),
                State (1, 44, 7, 0, 283, 48));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (48, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 44);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 44);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#31# =>
             Lemma_Step
               (State (4, 15, 1, 1, 69, 12),
@@ -1303,11 +1325,11 @@ is
                State (283, 0, 1, 49, 1, 0),
                State (1, 69, 12, 0, 283, 49));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (49, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 69);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 69);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#32# =>
             Lemma_Step
               (State (2, 63, 4, 1, 146, 27),
@@ -1334,11 +1356,11 @@ is
                State (283, 0, 1, 50, 1, 0),
                State (1, 146, 27, 0, 283, 50));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (50, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 146);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 146);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#33# =>
             Lemma_Step
               (State (7, 31, 2, 1, 108, 11),
@@ -1361,11 +1383,11 @@ is
                State (283, 0, 1, 51, 1, 0),
                State (1, 108, 11, 0, 283, 51));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (51, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 108);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 108);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#34# =>
             Lemma_Step
               (State (3, 14, 1, 1, 243, 19),
@@ -1384,11 +1406,11 @@ is
                State (283, 0, 1, 52, 1, 0),
                State (1, 243, 19, 0, 283, 52));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (52, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 243);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 243);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#35# =>
             Lemma_Step
               (State (13, 14, 1, 1, 57, 4),
@@ -1407,11 +1429,11 @@ is
                State (283, 0, 1, 53, 1, 0),
                State (1, 57, 4, 0, 283, 53));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (53, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 57);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 57);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#36# =>
             Lemma_Step
               (State (7, 41, 7, 1, 102, 11),
@@ -1438,11 +1460,11 @@ is
                State (283, 0, 1, 54, 1, 0),
                State (1, 102, 11, 0, 283, 54));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (54, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 102);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 102);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#37# =>
             Lemma_Step
               (State (4, 19, 3, 1, 66, 13),
@@ -1465,11 +1487,11 @@ is
                State (283, 0, 1, 55, 1, 0),
                State (1, 66, 13, 0, 283, 55));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (55, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 66);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 66);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#38# =>
             Lemma_Step
               (State (3, 13, 1, 1, 242, 23),
@@ -1488,11 +1510,11 @@ is
                State (283, 0, 1, 56, 1, 0),
                State (1, 242, 23, 0, 283, 56));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (56, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 242);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 242);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#39# =>
             Lemma_Step
               (State (14, 13, 1, 1, 53, 4),
@@ -1511,11 +1533,11 @@ is
                State (283, 0, 1, 57, 1, 0),
                State (1, 53, 4, 0, 283, 57));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (57, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 53);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 53);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#3A# =>
             Lemma_Step
               (State (8, 27, 2, 1, 32, 7),
@@ -1538,11 +1560,11 @@ is
                State (283, 0, 1, 58, 1, 0),
                State (1, 32, 7, 0, 283, 58));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (58, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 32);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 32);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#3B# =>
             Lemma_Step
               (State (7, 22, 3, 1, 111, 8),
@@ -1565,11 +1587,11 @@ is
                State (283, 0, 1, 59, 1, 0),
                State (1, 111, 8, 0, 283, 59));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (59, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 111);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 111);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#3C# =>
             Lemma_Step
               (State (6, 41, 6, 1, 119, 11),
@@ -1592,11 +1614,11 @@ is
                State (283, 0, 1, 60, 1, 0),
                State (1, 119, 11, 0, 283, 60));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (60, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 119);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 119);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#3D# =>
             Lemma_Step
               (State (2, 109, 9, 1, 187, 26),
@@ -1619,11 +1641,11 @@ is
                State (283, 0, 1, 61, 1, 0),
                State (1, 187, 26, 0, 283, 61));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (61, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 187);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 187);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#3E# =>
             Lemma_Step
               (State (5, 38, 7, 1, 89, 13),
@@ -1650,11 +1672,11 @@ is
                State (283, 0, 1, 62, 1, 0),
                State (1, 89, 13, 0, 283, 62));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (62, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 89);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 89);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#3F# =>
             Lemma_Step
               (State (31, 12, 1, 1, 25, 2),
@@ -1673,11 +1695,11 @@ is
                State (283, 0, 1, 63, 1, 0),
                State (1, 25, 2, 0, 283, 63));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (63, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 25);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 25);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -1708,11 +1730,11 @@ is
                State (283, 0, 1, 64, 1, 0),
                State (1, 29, 7, 0, 283, 64));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (64, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 29);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 29);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#41# =>
             Lemma_Step
               (State (3, 25, 6, 1, 254, 61),
@@ -1735,11 +1757,11 @@ is
                State (283, 0, 1, 65, 1, 0),
                State (1, 254, 61, 0, 283, 65));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (65, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 254);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 254);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#42# =>
             Lemma_Step
               (State (14, 17, 4, 1, 55, 13),
@@ -1762,11 +1784,11 @@ is
                State (283, 0, 1, 66, 1, 0),
                State (1, 55, 13, 0, 283, 66));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (66, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 55);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 55);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#43# =>
             Lemma_Step
               (State (7, 46, 11, 1, 103, 24),
@@ -1793,11 +1815,11 @@ is
                State (283, 0, 1, 67, 1, 0),
                State (1, 103, 24, 0, 283, 67));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (67, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 103);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 103);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#44# =>
             Lemma_Step
               (State (11, 4, 1, 1, 45, 11),
@@ -1816,11 +1838,11 @@ is
                State (283, 0, 1, 68, 1, 0),
                State (1, 45, 11, 0, 283, 68));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (68, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 45);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 45);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#45# =>
             Lemma_Step
               (State (15, 4, 1, 1, 49, 12),
@@ -1839,11 +1861,11 @@ is
                State (283, 0, 1, 69, 1, 0),
                State (1, 49, 12, 0, 283, 69));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (69, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 49);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 49);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#46# =>
             Lemma_Step
               (State (3, 4, 1, 1, 245, 61),
@@ -1862,11 +1884,11 @@ is
                State (283, 0, 1, 70, 1, 0),
                State (1, 245, 61, 0, 283, 70));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (70, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 245);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 245);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#47# =>
             Lemma_Step
               (State (7, 4, 1, 1, 105, 26),
@@ -1885,11 +1907,11 @@ is
                State (283, 0, 1, 71, 1, 0),
                State (1, 105, 26, 0, 283, 71));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (71, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 105);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 105);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#48# =>
             Lemma_Step
               (State (2, 85, 22, 1, 167, 47),
@@ -1916,11 +1938,11 @@ is
                State (283, 0, 1, 72, 1, 0),
                State (1, 167, 47, 0, 283, 72));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (72, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 167);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 167);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#49# =>
             Lemma_Step
               (State (7, 39, 8, 1, 100, 27),
@@ -1947,11 +1969,11 @@ is
                State (283, 0, 1, 73, 1, 0),
                State (1, 100, 27, 0, 283, 73));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (73, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 100);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 100);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#4A# =>
             Lemma_Step
               (State (2, 77, 16, 1, 171, 45),
@@ -1986,11 +2008,11 @@ is
                State (283, 0, 1, 74, 1, 0),
                State (1, 171, 45, 0, 283, 74));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (74, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 171);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 171);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#4B# =>
             Lemma_Step
               (State (18, 13, 3, 1, 19, 4),
@@ -2013,11 +2035,11 @@ is
                State (283, 0, 1, 75, 1, 0),
                State (1, 19, 4, 0, 283, 75));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (75, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 19);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 19);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#4C# =>
             Lemma_Step
               (State (5, 31, 7, 1, 84, 23),
@@ -2044,11 +2066,11 @@ is
                State (283, 0, 1, 76, 1, 0),
                State (1, 84, 23, 0, 283, 76));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (76, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 84);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 84);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#4D# =>
             Lemma_Step
               (State (9, 22, 5, 1, 37, 8),
@@ -2075,11 +2097,11 @@ is
                State (283, 0, 1, 77, 1, 0),
                State (1, 37, 8, 0, 283, 77));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (77, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 37);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 37);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#4E# =>
             Lemma_Step
               (State (3, 32, 9, 1, 233, 61),
@@ -2106,11 +2128,11 @@ is
                State (283, 0, 1, 78, 1, 0),
                State (1, 233, 61, 0, 283, 78));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (78, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 233);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 233);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#4F# =>
             Lemma_Step
               (State (39, 4, 1, 1, 9, 2),
@@ -2129,11 +2151,11 @@ is
                State (283, 0, 1, 79, 1, 0),
                State (1, 9, 2, 0, 283, 79));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (79, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 9);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 9);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -2168,11 +2190,11 @@ is
                State (283, 0, 1, 80, 1, 0),
                State (1, 237, 55, 0, 283, 80));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (80, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 237);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 237);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#51# =>
             Lemma_Step
               (State (5, 55, 14, 1, 92, 19),
@@ -2195,11 +2217,11 @@ is
                State (283, 0, 1, 81, 1, 0),
                State (1, 92, 19, 0, 283, 81));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (81, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 92);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 92);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#52# =>
             Lemma_Step
               (State (82, 1, 0, 1, 5, 1),
@@ -2214,11 +2236,11 @@ is
                State (283, 0, 1, 82, 1, 0),
                State (1, 5, 1, 0, 283, 82));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (82, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 5);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 5);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#53# =>
             Lemma_Step
               (State (3, 69, 20, 1, 202, 61),
@@ -2241,11 +2263,11 @@ is
                State (283, 0, 1, 83, 1, 0),
                State (1, 202, 61, 0, 283, 83));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (83, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 202);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 202);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#54# =>
             Lemma_Step
               (State (4, 43, 8, 1, 76, 23),
@@ -2272,11 +2294,11 @@ is
                State (283, 0, 1, 84, 1, 0),
                State (1, 76, 23, 0, 283, 84));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (84, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 76);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 76);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#55# =>
             Lemma_Step
               (State (9, 31, 6, 1, 36, 11),
@@ -2299,11 +2321,11 @@ is
                State (283, 0, 1, 85, 1, 0),
                State (1, 36, 11, 0, 283, 85));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (85, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 36);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 36);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#56# =>
             Lemma_Step
               (State (2, 21, 4, 1, 135, 41),
@@ -2326,11 +2348,11 @@ is
                State (283, 0, 1, 86, 1, 0),
                State (1, 135, 41, 0, 283, 86));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (86, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 135);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 135);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#57# =>
             Lemma_Step
               (State (2, 101, 31, 1, 191, 36),
@@ -2357,11 +2379,11 @@ is
                State (283, 0, 1, 87, 1, 0),
                State (1, 191, 36, 0, 283, 87));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (87, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 191);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 191);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#58# =>
             Lemma_Step
               (State (30, 11, 2, 1, 24, 7),
@@ -2384,11 +2406,11 @@ is
                State (283, 0, 1, 88, 1, 0),
                State (1, 24, 7, 0, 283, 88));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (88, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 24);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 24);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#59# =>
             Lemma_Step
               (State (12, 19, 5, 1, 62, 13),
@@ -2415,11 +2437,11 @@ is
                State (283, 0, 1, 89, 1, 0),
                State (1, 62, 13, 0, 283, 89));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (89, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 62);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 62);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#5A# =>
             Lemma_Step
               (State (8, 11, 2, 1, 34, 11),
@@ -2442,11 +2464,11 @@ is
                State (283, 0, 1, 90, 1, 0),
                State (1, 34, 11, 0, 283, 90));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (90, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 34);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 34);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#5B# =>
             Lemma_Step
               (State (3, 11, 2, 1, 240, 55),
@@ -2469,11 +2491,11 @@ is
                State (283, 0, 1, 91, 1, 0),
                State (1, 240, 55, 0, 283, 91));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (91, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 240);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 240);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#5C# =>
             Lemma_Step
               (State (5, 14, 3, 1, 81, 19),
@@ -2496,11 +2518,11 @@ is
                State (283, 0, 1, 92, 1, 0),
                State (1, 81, 19, 0, 283, 92));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (92, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 81);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 81);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#5D# =>
             Lemma_Step
               (State (3, 47, 8, 1, 236, 51),
@@ -2527,11 +2549,11 @@ is
                State (283, 0, 1, 93, 1, 0),
                State (1, 236, 51, 0, 283, 93));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (93, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 236);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 236);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#5E# =>
             Lemma_Step
               (State (7, 60, 13, 1, 97, 29),
@@ -2562,11 +2584,11 @@ is
                State (283, 0, 1, 94, 1, 0),
                State (1, 97, 29, 0, 283, 94));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (94, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 97);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 97);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#5F# =>
             Lemma_Step
               (State (23, 14, 3, 1, 23, 4),
@@ -2589,11 +2611,11 @@ is
                State (283, 0, 1, 95, 1, 0),
                State (1, 23, 4, 0, 283, 95));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (95, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 23);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 23);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -2628,11 +2650,11 @@ is
                State (283, 0, 1, 96, 1, 0),
                State (1, 22, 7, 0, 283, 96));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (96, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 22);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 22);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#61# =>
             Lemma_Step
               (State (5, 61, 8, 1, 94, 29),
@@ -2663,11 +2685,11 @@ is
                State (283, 0, 1, 97, 1, 0),
                State (1, 94, 29, 0, 283, 97));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (97, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 94);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 94);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#62# =>
             Lemma_Step
               (State (2, 69, 24, 1, 175, 61),
@@ -2698,11 +2720,11 @@ is
                State (283, 0, 1, 98, 1, 0),
                State (1, 175, 61, 0, 283, 98));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (98, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 175);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 175);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#63# =>
             Lemma_Step
               (State (3, 110, 23, 1, 211, 44),
@@ -2729,11 +2751,11 @@ is
                State (283, 0, 1, 99, 1, 0),
                State (1, 211, 44, 0, 283, 99));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (99, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 211);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 211);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#64# =>
             Lemma_Step
               (State (4, 63, 8, 1, 73, 27),
@@ -2760,11 +2782,11 @@ is
                State (283, 0, 1, 100, 1, 0),
                State (1, 73, 27, 0, 283, 100));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (100, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 73);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 73);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#65# =>
             Lemma_Step
               (State (2, 87, 31, 1, 166, 61),
@@ -2791,11 +2813,11 @@ is
                State (283, 0, 1, 101, 1, 0),
                State (1, 166, 61, 0, 283, 101));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (101, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 166);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 166);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#66# =>
             Lemma_Step
               (State (14, 31, 4, 1, 54, 11),
@@ -2822,11 +2844,11 @@ is
                State (283, 0, 1, 102, 1, 0),
                State (1, 54, 11, 0, 283, 102));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (102, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 54);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 54);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#67# =>
             Lemma_Step
               (State (4, 23, 7, 1, 67, 24),
@@ -2853,11 +2875,11 @@ is
                State (283, 0, 1, 103, 1, 0),
                State (1, 67, 24, 0, 283, 103));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (103, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 67);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 67);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#68# =>
             Lemma_Step
               (State (3, 7, 1, 1, 244, 39),
@@ -2876,11 +2898,11 @@ is
                State (283, 0, 1, 104, 1, 0),
                State (1, 244, 39, 0, 283, 104));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (104, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 244);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 244);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#69# =>
             Lemma_Step
               (State (4, 7, 1, 1, 71, 26),
@@ -2899,11 +2921,11 @@ is
                State (283, 0, 1, 105, 1, 0),
                State (1, 71, 26, 0, 283, 105));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (105, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 71);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 71);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#6A# =>
             Lemma_Step
               (State (2, 57, 8, 1, 145, 49),
@@ -2926,11 +2948,11 @@ is
                State (283, 0, 1, 106, 1, 0),
                State (1, 145, 49, 0, 283, 106));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (106, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 145);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 145);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#6B# =>
             Lemma_Step
               (State (3, 122, 19, 1, 223, 40),
@@ -2957,11 +2979,11 @@ is
                State (283, 0, 1, 107, 1, 0),
                State (1, 223, 40, 0, 283, 107));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (107, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 223);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 223);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#6C# =>
             Lemma_Step
               (State (15, 26, 5, 1, 51, 11),
@@ -2984,11 +3006,11 @@ is
                State (283, 0, 1, 108, 1, 0),
                State (1, 51, 11, 0, 283, 108));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (108, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 51);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 51);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#6D# =>
             Lemma_Step
               (State (2, 61, 9, 1, 147, 50),
@@ -3015,11 +3037,11 @@ is
                State (283, 0, 1, 109, 1, 0),
                State (1, 147, 50, 0, 283, 109));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (109, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 147);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 147);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#6E# =>
             Lemma_Step
               (State (8, 19, 6, 1, 33, 13),
@@ -3042,11 +3064,11 @@ is
                State (283, 0, 1, 110, 1, 0),
                State (1, 33, 13, 0, 283, 110));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (110, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 33);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 33);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#6F# =>
             Lemma_Step
               (State (13, 20, 7, 1, 59, 8),
@@ -3069,11 +3091,11 @@ is
                State (283, 0, 1, 111, 1, 0),
                State (1, 59, 8, 0, 283, 111));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (111, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 59);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 59);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -3108,11 +3130,11 @@ is
                State (283, 0, 1, 112, 1, 0),
                State (1, 121, 23, 0, 283, 112));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (112, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 121);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 121);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#71# =>
             Lemma_Step
               (State (2, 117, 21, 1, 183, 50),
@@ -3143,11 +3165,11 @@ is
                State (283, 0, 1, 113, 1, 0),
                State (1, 183, 50, 0, 283, 113));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (113, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 183);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 183);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#72# =>
             Lemma_Step
               (State (2, 53, 8, 1, 151, 61),
@@ -3178,11 +3200,11 @@ is
                State (283, 0, 1, 114, 1, 0),
                State (1, 151, 61, 0, 283, 114));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (114, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 151);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 151);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#73# =>
             Lemma_Step
               (State (2, 17, 7, 1, 133, 58),
@@ -3209,11 +3231,11 @@ is
                State (283, 0, 1, 115, 1, 0),
                State (1, 133, 58, 0, 283, 115));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (115, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 133);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 133);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#74# =>
             Lemma_Step
               (State (17, 11, 3, 1, 16, 7),
@@ -3236,11 +3258,11 @@ is
                State (283, 0, 1, 116, 1, 0),
                State (1, 16, 7, 0, 283, 116));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (116, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 16);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 16);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#75# =>
             Lemma_Step
               (State (2, 113, 21, 1, 181, 48),
@@ -3275,11 +3297,11 @@ is
                State (283, 0, 1, 117, 1, 0),
                State (1, 181, 48, 0, 283, 117));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (117, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 181);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 181);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#76# =>
             Lemma_Step
               (State (2, 111, 16, 1, 186, 51),
@@ -3306,11 +3328,11 @@ is
                State (283, 0, 1, 118, 1, 0),
                State (1, 186, 51, 0, 283, 118));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (118, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 186);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 186);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#77# =>
             Lemma_Step
               (State (12, 11, 3, 1, 60, 11),
@@ -3333,11 +3355,11 @@ is
                State (283, 0, 1, 119, 1, 0),
                State (1, 60, 11, 0, 283, 119));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (119, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 60);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 60);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#78# =>
             Lemma_Step
               (State (2, 119, 22, 1, 182, 55),
@@ -3364,11 +3386,11 @@ is
                State (283, 0, 1, 120, 1, 0),
                State (1, 182, 55, 0, 283, 120));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (120, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 182);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 182);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#79# =>
             Lemma_Step
               (State (6, 59, 11, 1, 112, 23),
@@ -3391,11 +3413,11 @@ is
                State (283, 0, 1, 121, 1, 0),
                State (1, 112, 23, 0, 283, 121));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (121, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 112);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 112);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#7A# =>
             Lemma_Step
               (State (3, 107, 19, 1, 208, 39),
@@ -3418,11 +3440,11 @@ is
                State (283, 0, 1, 122, 1, 0),
                State (1, 208, 39, 0, 283, 122));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (122, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 208);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 208);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#7B# =>
             Lemma_Step
               (State (123, 1, 0, 1, 6, 1),
@@ -3437,11 +3459,11 @@ is
                State (283, 0, 1, 123, 1, 0),
                State (1, 6, 1, 0, 283, 123));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (123, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 6);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 6);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#7C# =>
             Lemma_Step
               (State (2, 89, 26, 1, 161, 51),
@@ -3468,11 +3490,11 @@ is
                State (283, 0, 1, 124, 1, 0),
                State (1, 161, 51, 0, 283, 124));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (124, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 161);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 161);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#7D# =>
             Lemma_Step
               (State (3, 21, 6, 1, 250, 41),
@@ -3495,11 +3517,11 @@ is
                State (283, 0, 1, 125, 1, 0),
                State (1, 250, 41, 0, 283, 125));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (125, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 250);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 250);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#7E# =>
             Lemma_Step
               (State (2, 25, 4, 1, 129, 61),
@@ -3522,11 +3544,11 @@ is
                State (283, 0, 1, 126, 1, 0),
                State (1, 129, 61, 0, 283, 126));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (126, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 129);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 129);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#7F# =>
             Lemma_Step
               (State (2, 31, 5, 1, 130, 61),
@@ -3549,11 +3571,11 @@ is
                State (283, 0, 1, 127, 1, 0),
                State (1, 130, 61, 0, 283, 127));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (127, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 130);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 130);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -3588,11 +3610,11 @@ is
                State (283, 0, 1, 128, 1, 0),
                State (1, 131, 71, 0, 283, 128));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (128, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 131);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 131);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#81# =>
             Lemma_Step
               (State (6, 31, 15, 1, 126, 61),
@@ -3615,11 +3637,11 @@ is
                State (283, 0, 1, 129, 1, 0),
                State (1, 126, 61, 0, 283, 129));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (129, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 126);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 126);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#82# =>
             Lemma_Step
               (State (6, 25, 12, 1, 127, 61),
@@ -3642,11 +3664,11 @@ is
                State (283, 0, 1, 130, 1, 0),
                State (1, 127, 61, 0, 283, 130));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (130, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 127);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 127);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#83# =>
             Lemma_Step
               (State (2, 27, 13, 1, 128, 71),
@@ -3669,11 +3691,11 @@ is
                State (283, 0, 1, 131, 1, 0),
                State (1, 128, 71, 0, 283, 131));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (131, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 128);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 128);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#84# =>
             Lemma_Step
               (State (2, 55, 26, 1, 150, 79),
@@ -3700,11 +3722,11 @@ is
                State (283, 0, 1, 132, 1, 0),
                State (1, 150, 79, 0, 283, 132));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (132, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 150);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 150);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#85# =>
             Lemma_Step
               (State (6, 49, 25, 1, 115, 58),
@@ -3731,11 +3753,11 @@ is
                State (283, 0, 1, 133, 1, 0),
                State (1, 115, 58, 0, 283, 133));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (133, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 115);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 115);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#86# =>
             Lemma_Step
               (State (2, 103, 48, 1, 190, 91),
@@ -3762,11 +3784,11 @@ is
                State (283, 0, 1, 134, 1, 0),
                State (1, 190, 91, 0, 283, 134));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (134, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 190);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 190);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#87# =>
             Lemma_Step
               (State (5, 21, 10, 1, 86, 41),
@@ -3789,11 +3811,11 @@ is
                State (283, 0, 1, 135, 1, 0),
                State (1, 86, 41, 0, 283, 135));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (135, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 86);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 86);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#88# =>
             Lemma_Step
               (State (2, 45, 22, 1, 155, 79),
@@ -3816,11 +3838,11 @@ is
                State (283, 0, 1, 136, 1, 0),
                State (1, 155, 79, 0, 283, 136));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (136, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 155);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 155);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#89# =>
             Lemma_Step
               (State (2, 39, 19, 1, 158, 77),
@@ -3843,11 +3865,11 @@ is
                State (283, 0, 1, 137, 1, 0),
                State (1, 158, 77, 0, 283, 137));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (137, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 158);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 158);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#8A# =>
             Lemma_Step
               (State (2, 49, 24, 1, 149, 73),
@@ -3870,11 +3892,11 @@ is
                State (283, 0, 1, 138, 1, 0),
                State (1, 149, 73, 0, 283, 138));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (138, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 149);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 149);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#8B# =>
             Lemma_Step
               (State (3, 112, 57, 1, 217, 110),
@@ -3901,11 +3923,11 @@ is
                State (283, 0, 1, 139, 1, 0),
                State (1, 217, 110, 0, 283, 139));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (139, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 217);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 217);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#8C# =>
             Lemma_Step
               (State (3, 2, 1, 1, 247, 123),
@@ -3924,11 +3946,11 @@ is
                State (283, 0, 1, 140, 1, 0),
                State (1, 247, 123, 0, 283, 140));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (140, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 247);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 247);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#8D# =>
             Lemma_Step
               (State (141, 1, 0, 1, 2, 1),
@@ -3943,11 +3965,11 @@ is
                State (283, 0, 1, 141, 1, 0),
                State (1, 2, 1, 0, 283, 141));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (141, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 2);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 2);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#8E# =>
             Lemma_Step
               (State (2, 105, 52, 1, 185, 93),
@@ -3970,11 +3992,11 @@ is
                State (283, 0, 1, 142, 1, 0),
                State (1, 185, 93, 0, 283, 142));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (142, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 185);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 185);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#8F# =>
             Lemma_Step
               (State (2, 83, 41, 1, 164, 83),
@@ -3997,11 +4019,11 @@ is
                State (283, 0, 1, 143, 1, 0),
                State (1, 164, 83, 0, 283, 143));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (143, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 164);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 164);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -4044,11 +4066,11 @@ is
                State (283, 0, 1, 144, 1, 0),
                State (1, 222, 103, 0, 283, 144));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (144, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 222);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 222);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#91# =>
             Lemma_Step
               (State (7, 13, 6, 1, 106, 49),
@@ -4071,11 +4093,11 @@ is
                State (283, 0, 1, 145, 1, 0),
                State (1, 106, 49, 0, 283, 145));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (145, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 106);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 106);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#92# =>
             Lemma_Step
               (State (15, 21, 11, 1, 50, 27),
@@ -4102,11 +4124,11 @@ is
                State (283, 0, 1, 146, 1, 0),
                State (1, 50, 27, 0, 283, 146));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (146, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 50);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 50);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#93# =>
             Lemma_Step
               (State (7, 24, 13, 1, 109, 50),
@@ -4133,11 +4155,11 @@ is
                State (283, 0, 1, 147, 1, 0),
                State (1, 109, 50, 0, 283, 147));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (147, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 109);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 109);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#94# =>
             Lemma_Step
               (State (3, 115, 61, 1, 216, 103),
@@ -4168,11 +4190,11 @@ is
                State (283, 0, 1, 148, 1, 0),
                State (1, 216, 103, 0, 283, 148));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (148, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 216);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 216);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#95# =>
             Lemma_Step
               (State (2, 15, 7, 1, 138, 73),
@@ -4195,11 +4217,11 @@ is
                State (283, 0, 1, 149, 1, 0),
                State (1, 138, 73, 0, 283, 149));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (149, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 138);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 138);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#96# =>
             Lemma_Step
               (State (2, 19, 8, 1, 132, 79),
@@ -4226,11 +4248,11 @@ is
                State (283, 0, 1, 150, 1, 0),
                State (1, 132, 79, 0, 283, 150));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (150, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 132);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 132);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#97# =>
             Lemma_Step
               (State (6, 55, 25, 1, 114, 61),
@@ -4261,11 +4283,11 @@ is
                State (283, 0, 1, 151, 1, 0),
                State (1, 114, 61, 0, 283, 151));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (151, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 114);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 114);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#98# =>
             Lemma_Step
               (State (10, 31, 14, 1, 42, 23),
@@ -4292,11 +4314,11 @@ is
                State (283, 0, 1, 152, 1, 0),
                State (1, 42, 23, 0, 283, 152));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (152, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 42);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 42);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#99# =>
             Lemma_Step
               (State (20, 11, 5, 1, 20, 11),
@@ -4319,11 +4341,11 @@ is
                State (283, 0, 1, 153, 1, 0),
                State (1, 20, 11, 0, 283, 153));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (153, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 20);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 20);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#9A# =>
             Lemma_Step
               (State (2, 37, 16, 1, 159, 69),
@@ -4350,11 +4372,11 @@ is
                State (283, 0, 1, 154, 1, 0),
                State (1, 159, 69, 0, 283, 154));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (154, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 159);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 159);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#9B# =>
             Lemma_Step
               (State (2, 11, 5, 1, 136, 79),
@@ -4377,11 +4399,11 @@ is
                State (283, 0, 1, 155, 1, 0),
                State (1, 136, 79, 0, 283, 155));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (155, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 136);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 136);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#9C# =>
             Lemma_Step
               (State (3, 16, 9, 1, 249, 115),
@@ -4408,11 +4430,11 @@ is
                State (283, 0, 1, 156, 1, 0),
                State (1, 249, 115, 0, 283, 156));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (156, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 249);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 249);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#9D# =>
             Lemma_Step
               (State (3, 127, 56, 1, 220, 99),
@@ -4447,11 +4469,11 @@ is
                State (283, 0, 1, 157, 1, 0),
                State (1, 220, 99, 0, 283, 157));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (157, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 220);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 220);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#9E# =>
             Lemma_Step
               (State (2, 9, 4, 1, 137, 77),
@@ -4474,11 +4496,11 @@ is
                State (283, 0, 1, 158, 1, 0),
                State (1, 137, 77, 0, 283, 158));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (158, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 137);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 137);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#9F# =>
             Lemma_Step
               (State (2, 47, 21, 1, 154, 69),
@@ -4505,11 +4527,11 @@ is
                State (283, 0, 1, 159, 1, 0),
                State (1, 154, 69, 0, 283, 159));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (159, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 154);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 154);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -4548,11 +4570,11 @@ is
                State (283, 0, 1, 160, 1, 0),
                State (1, 251, 103, 0, 283, 160));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (160, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 251);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 251);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A1# =>
             Lemma_Step
               (State (6, 19, 11, 1, 124, 51),
@@ -4579,11 +4601,11 @@ is
                State (283, 0, 1, 161, 1, 0),
                State (1, 124, 51, 0, 283, 161));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (161, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 124);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 124);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A2# =>
             Lemma_Step
               (State (11, 25, 15, 1, 46, 19),
@@ -4610,11 +4632,11 @@ is
                State (283, 0, 1, 162, 1, 0),
                State (1, 46, 19, 0, 283, 162));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (162, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 46);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 46);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A3# =>
             Lemma_Step
               (State (3, 94, 39, 1, 195, 124),
@@ -4649,11 +4671,11 @@ is
                State (283, 0, 1, 163, 1, 0),
                State (1, 195, 124, 0, 283, 163));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (163, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 195);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 195);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A4# =>
             Lemma_Step
               (State (2, 5, 2, 1, 143, 83),
@@ -4676,11 +4698,11 @@ is
                State (283, 0, 1, 164, 1, 0),
                State (1, 143, 83, 0, 283, 164));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (164, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 143);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 143);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A5# =>
             Lemma_Step
               (State (2, 107, 59, 1, 184, 79),
@@ -4707,11 +4729,11 @@ is
                State (283, 0, 1, 165, 1, 0),
                State (1, 184, 79, 0, 283, 165));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (165, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 184);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 184);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A6# =>
             Lemma_Step
               (State (7, 32, 21, 1, 101, 61),
@@ -4738,11 +4760,11 @@ is
                State (283, 0, 1, 166, 1, 0),
                State (1, 101, 61, 0, 283, 166));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (166, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 101);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 101);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A7# =>
             Lemma_Step
               (State (4, 59, 27, 1, 72, 47),
@@ -4769,11 +4791,11 @@ is
                State (283, 0, 1, 167, 1, 0),
                State (1, 72, 47, 0, 283, 167));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (167, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 72);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 72);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A8# =>
             Lemma_Step
               (State (9, 13, 7, 1, 38, 23),
@@ -4800,11 +4822,11 @@ is
                State (283, 0, 1, 168, 1, 0),
                State (1, 38, 23, 0, 283, 168));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (168, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 38);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 38);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#A9# =>
             Lemma_Step
               (State (3, 67, 40, 1, 200, 127),
@@ -4835,11 +4857,11 @@ is
                State (283, 0, 1, 169, 1, 0),
                State (1, 200, 127, 0, 283, 169));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (169, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 200);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 200);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#AA# =>
             Lemma_Step
               (State (19, 13, 7, 1, 18, 11),
@@ -4866,11 +4888,11 @@ is
                State (283, 0, 1, 170, 1, 0),
                State (1, 18, 11, 0, 283, 170));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (170, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 18);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 18);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#AB# =>
             Lemma_Step
               (State (4, 51, 31, 1, 74, 45),
@@ -4905,11 +4927,11 @@ is
                State (283, 0, 1, 171, 1, 0),
                State (1, 74, 45, 0, 283, 171));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (171, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 74);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 74);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#AC# =>
             Lemma_Step
               (State (3, 73, 45, 1, 206, 127),
@@ -4944,11 +4966,11 @@ is
                State (283, 0, 1, 172, 1, 0),
                State (1, 206, 127, 0, 283, 172));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (172, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 206);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 206);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#AD# =>
             Lemma_Step
               (State (3, 50, 31, 1, 231, 110),
@@ -4983,11 +5005,11 @@ is
                State (283, 0, 1, 173, 1, 0),
                State (1, 231, 110, 0, 283, 173));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (173, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 231);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 231);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#AE# =>
             Lemma_Step
               (State (3, 109, 59, 1, 210, 115),
@@ -5018,11 +5040,11 @@ is
                State (283, 0, 1, 174, 1, 0),
                State (1, 210, 115, 0, 283, 174));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (174, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 210);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 210);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#AF# =>
             Lemma_Step
               (State (7, 53, 28, 1, 98, 61),
@@ -5053,11 +5075,11 @@ is
                State (283, 0, 1, 175, 1, 0),
                State (1, 98, 61, 0, 283, 175));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (175, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 98);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 98);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -5092,11 +5114,11 @@ is
                State (283, 0, 1, 176, 1, 0),
                State (1, 12, 7, 0, 283, 176));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (176, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 12);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 12);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B1# =>
             Lemma_Step
               (State (3, 59, 24, 1, 224, 103),
@@ -5127,11 +5149,11 @@ is
                State (283, 0, 1, 177, 1, 0),
                State (1, 224, 103, 0, 283, 177));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (177, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 224);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 224);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B2# =>
             Lemma_Step
               (State (25, 12, 7, 1, 31, 13),
@@ -5158,11 +5180,11 @@ is
                State (283, 0, 1, 178, 1, 0),
                State (1, 31, 13, 0, 283, 178));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (178, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 31);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 31);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B3# =>
             Lemma_Step
               (State (3, 42, 19, 1, 239, 96),
@@ -5197,11 +5219,11 @@ is
                State (283, 0, 1, 179, 1, 0),
                State (1, 239, 96, 0, 283, 179));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (179, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 239);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 239);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B4# =>
             Lemma_Step
               (State (16, 11, 4, 1, 17, 11),
@@ -5228,11 +5250,11 @@ is
                State (283, 0, 1, 180, 1, 0),
                State (1, 17, 11, 0, 283, 180));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (180, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 17);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 17);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B5# =>
             Lemma_Step
               (State (6, 37, 21, 1, 117, 48),
@@ -5267,11 +5289,11 @@ is
                State (283, 0, 1, 181, 1, 0),
                State (1, 117, 48, 0, 283, 181));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (181, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 117);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 117);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B6# =>
             Lemma_Step
               (State (6, 11, 4, 1, 120, 55),
@@ -5298,11 +5320,11 @@ is
                State (283, 0, 1, 182, 1, 0),
                State (1, 120, 55, 0, 283, 182));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (182, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 120);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 120);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B7# =>
             Lemma_Step
               (State (6, 61, 27, 1, 113, 50),
@@ -5333,11 +5355,11 @@ is
                State (283, 0, 1, 183, 1, 0),
                State (1, 113, 50, 0, 283, 183));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (183, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 113);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 113);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B8# =>
             Lemma_Step
               (State (2, 81, 38, 1, 165, 79),
@@ -5364,11 +5386,11 @@ is
                State (283, 0, 1, 184, 1, 0),
                State (1, 165, 79, 0, 283, 184));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (184, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 165);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 165);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#B9# =>
             Lemma_Step
               (State (2, 7, 3, 1, 142, 93),
@@ -5391,11 +5413,11 @@ is
                State (283, 0, 1, 185, 1, 0),
                State (1, 142, 93, 0, 283, 185));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (185, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 142);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 142);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#BA# =>
             Lemma_Step
               (State (6, 47, 16, 1, 118, 51),
@@ -5422,11 +5444,11 @@ is
                State (283, 0, 1, 186, 1, 0),
                State (1, 118, 51, 0, 283, 186));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (186, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 118);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 118);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#BB# =>
             Lemma_Step
               (State (12, 7, 3, 1, 61, 26),
@@ -5449,11 +5471,11 @@ is
                State (283, 0, 1, 187, 1, 0),
                State (1, 61, 26, 0, 283, 187));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (187, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 61);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 61);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#BC# =>
             Lemma_Step
               (State (2, 97, 58, 1, 189, 67),
@@ -5484,11 +5506,11 @@ is
                State (283, 0, 1, 188, 1, 0),
                State (1, 189, 67, 0, 283, 188));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (188, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 189);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 189);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#BD# =>
             Lemma_Step
               (State (2, 99, 59, 1, 188, 67),
@@ -5519,11 +5541,11 @@ is
                State (283, 0, 1, 189, 1, 0),
                State (1, 188, 67, 0, 283, 189));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (189, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 188);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 188);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#BE# =>
             Lemma_Step
               (State (2, 23, 8, 1, 134, 91),
@@ -5550,11 +5572,11 @@ is
                State (283, 0, 1, 190, 1, 0),
                State (1, 134, 91, 0, 283, 190));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (190, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 134);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 134);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#BF# =>
             Lemma_Step
               (State (5, 16, 11, 1, 87, 36),
@@ -5581,11 +5603,11 @@ is
                State (283, 0, 1, 191, 1, 0),
                State (1, 87, 36, 0, 283, 191));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (191, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 87);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 87);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -5620,11 +5642,11 @@ is
                State (283, 0, 1, 192, 1, 0),
                State (1, 11, 7, 0, 283, 192));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (192, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 11);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 11);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C1# =>
             Lemma_Step
               (State (10, 11, 7, 1, 40, 31),
@@ -5651,11 +5673,11 @@ is
                State (283, 0, 1, 193, 1, 0),
                State (1, 40, 31, 0, 283, 193));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (193, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 40);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 40);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C2# =>
             Lemma_Step
               (State (11, 18, 13, 1, 47, 29),
@@ -5686,11 +5708,11 @@ is
                State (283, 0, 1, 194, 1, 0),
                State (1, 47, 29, 0, 283, 194));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (194, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 47);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 47);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C3# =>
             Lemma_Step
               (State (2, 93, 59, 1, 163, 124),
@@ -5725,11 +5747,11 @@ is
                State (283, 0, 1, 195, 1, 0),
                State (1, 163, 124, 0, 283, 195));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (195, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 163);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 163);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C4# =>
             Lemma_Step
               (State (3, 117, 37, 1, 218, 95),
@@ -5768,11 +5790,11 @@ is
                State (283, 0, 1, 196, 1, 0),
                State (1, 218, 95, 0, 283, 196));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (196, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 218);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 218);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C5# =>
             Lemma_Step
               (State (3, 103, 40, 1, 212, 91),
@@ -5807,11 +5829,11 @@ is
                State (283, 0, 1, 197, 1, 0),
                State (1, 212, 91, 0, 283, 197));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (197, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 212);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 212);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C6# =>
             Lemma_Step
               (State (3, 55, 23, 1, 228, 79),
@@ -5842,11 +5864,11 @@ is
                State (283, 0, 1, 198, 1, 0),
                State (1, 228, 79, 0, 283, 198));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (198, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 228);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 228);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C7# =>
             Lemma_Step
               (State (49, 4, 3, 1, 15, 4),
@@ -5869,11 +5891,11 @@ is
                State (283, 0, 1, 199, 1, 0),
                State (1, 15, 4, 0, 283, 199));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (199, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 15);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 15);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C8# =>
             Lemma_Step
               (State (2, 73, 54, 1, 169, 127),
@@ -5904,11 +5926,11 @@ is
                State (283, 0, 1, 200, 1, 0),
                State (1, 169, 127, 0, 283, 200));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (200, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 169);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 169);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#C9# =>
             Lemma_Step
               (State (9, 4, 3, 1, 39, 26),
@@ -5931,11 +5953,11 @@ is
                State (283, 0, 1, 201, 1, 0),
                State (1, 39, 26, 0, 283, 201));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (201, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 39);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 39);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#CA# =>
             Lemma_Step
               (State (5, 4, 3, 1, 83, 61),
@@ -5958,11 +5980,11 @@ is
                State (283, 0, 1, 202, 1, 0),
                State (1, 83, 61, 0, 283, 202));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (202, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 83);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 83);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#CB# =>
             Lemma_Step
               (State (70, 3, 1, 1, 4, 3),
@@ -5981,11 +6003,11 @@ is
                State (283, 0, 1, 203, 1, 0),
                State (1, 4, 3, 0, 283, 203));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (203, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 4);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 4);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#CC# =>
             Lemma_Step
               (State (29, 4, 3, 1, 27, 11),
@@ -6008,11 +6030,11 @@ is
                State (283, 0, 1, 204, 1, 0),
                State (1, 27, 11, 0, 283, 204));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (204, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 27);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 27);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#CD# =>
             Lemma_Step
               (State (3, 31, 8, 1, 252, 67),
@@ -6039,11 +6061,11 @@ is
                State (283, 0, 1, 205, 1, 0),
                State (1, 252, 67, 0, 283, 205));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (205, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 252);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 252);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#CE# =>
             Lemma_Step
               (State (2, 67, 48, 1, 172, 127),
@@ -6078,11 +6100,11 @@ is
                State (283, 0, 1, 206, 1, 0),
                State (1, 172, 127, 0, 283, 206));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (206, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 172);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 172);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#CF# =>
             Lemma_Step
               (State (3, 49, 20, 1, 230, 73),
@@ -6113,11 +6135,11 @@ is
                State (283, 0, 1, 207, 1, 0),
                State (1, 230, 73, 0, 283, 207));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (207, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 230);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 230);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -6152,11 +6174,11 @@ is
                State (283, 0, 1, 208, 1, 0),
                State (1, 122, 39, 0, 283, 208));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (208, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 122);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 122);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D1# =>
             Lemma_Step
               (State (104, 3, 1, 1, 7, 2),
@@ -6175,11 +6197,11 @@ is
                State (283, 0, 1, 209, 1, 0),
                State (1, 7, 2, 0, 283, 209));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (209, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 7);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 7);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D2# =>
             Lemma_Step
               (State (2, 71, 52, 1, 174, 115),
@@ -6210,11 +6232,11 @@ is
                State (283, 0, 1, 210, 1, 0),
                State (1, 174, 115, 0, 283, 210));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (210, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 174);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 174);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D3# =>
             Lemma_Step
               (State (7, 50, 23, 1, 99, 44),
@@ -6241,11 +6263,11 @@ is
                State (283, 0, 1, 211, 1, 0),
                State (1, 99, 44, 0, 283, 211));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (211, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 99);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 99);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D4# =>
             Lemma_Step
               (State (3, 84, 57, 1, 197, 91),
@@ -6280,11 +6302,11 @@ is
                State (283, 0, 1, 212, 1, 0),
                State (1, 197, 91, 0, 283, 212));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (212, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 197);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 197);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D5# =>
             Lemma_Step
               (State (3, 118, 35, 1, 219, 82),
@@ -6319,11 +6341,11 @@ is
                State (283, 0, 1, 213, 1, 0),
                State (1, 219, 82, 0, 283, 213));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (213, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 219);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 219);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D6# =>
             Lemma_Step
               (State (3, 61, 19, 1, 226, 67),
@@ -6354,11 +6376,11 @@ is
                State (283, 0, 1, 214, 1, 0),
                State (1, 226, 67, 0, 283, 214));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (214, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 226);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 226);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D7# =>
             Lemma_Step
               (State (3, 37, 24, 1, 234, 69),
@@ -6389,11 +6411,11 @@ is
                State (283, 0, 1, 215, 1, 0),
                State (1, 234, 69, 0, 283, 215));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (215, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 234);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 234);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D8# =>
             Lemma_Step
               (State (2, 51, 22, 1, 148, 103),
@@ -6424,11 +6446,11 @@ is
                State (283, 0, 1, 216, 1, 0),
                State (1, 148, 103, 0, 283, 216));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (216, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 148);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 148);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#D9# =>
             Lemma_Step
               (State (2, 13, 5, 1, 139, 110),
@@ -6455,11 +6477,11 @@ is
                State (283, 0, 1, 217, 1, 0),
                State (1, 139, 110, 0, 283, 217));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (217, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 139);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 139);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#DA# =>
             Lemma_Step
               (State (3, 87, 59, 1, 196, 95),
@@ -6498,11 +6520,11 @@ is
                State (283, 0, 1, 218, 1, 0),
                State (1, 196, 95, 0, 283, 218));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (218, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 196);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 196);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#DB# =>
             Lemma_Step
               (State (3, 100, 45, 1, 213, 82),
@@ -6537,11 +6559,11 @@ is
                State (283, 0, 1, 219, 1, 0),
                State (1, 213, 82, 0, 283, 219));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (219, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 213);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 213);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#DC# =>
             Lemma_Step
               (State (2, 33, 26, 1, 157, 99),
@@ -6576,11 +6598,11 @@ is
                State (283, 0, 1, 220, 1, 0),
                State (1, 157, 99, 0, 283, 220));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (220, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 157);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 157);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#DD# =>
             Lemma_Step
               (State (3, 19, 12, 1, 248, 79),
@@ -6611,11 +6633,11 @@ is
                State (283, 0, 1, 221, 1, 0),
                State (1, 248, 79, 0, 283, 221));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (221, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 248);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 248);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#DE# =>
             Lemma_Step
               (State (2, 59, 16, 1, 144, 103),
@@ -6646,11 +6668,11 @@ is
                State (283, 0, 1, 222, 1, 0),
                State (1, 144, 103, 0, 283, 222));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (222, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 144);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 144);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#DF# =>
             Lemma_Step
               (State (7, 10, 7, 1, 107, 40),
@@ -6677,11 +6699,11 @@ is
                State (283, 0, 1, 223, 1, 0),
                State (1, 107, 40, 0, 283, 223));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (223, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 107);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 107);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -6724,11 +6746,11 @@ is
                State (283, 0, 1, 224, 1, 0),
                State (1, 177, 103, 0, 283, 224));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (224, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 177);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 177);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E1# =>
             Lemma_Step
               (State (56, 3, 1, 1, 13, 4),
@@ -6747,11 +6769,11 @@ is
                State (283, 0, 1, 225, 1, 0),
                State (1, 13, 4, 0, 283, 225));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (225, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 13);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 13);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E2# =>
             Lemma_Step
               (State (3, 97, 39, 1, 214, 67),
@@ -6782,11 +6804,11 @@ is
                State (283, 0, 1, 226, 1, 0),
                State (1, 214, 67, 0, 283, 226));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (226, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 214);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 214);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E3# =>
             Lemma_Step
               (State (3, 38, 31, 1, 235, 84),
@@ -6817,11 +6839,11 @@ is
                State (283, 0, 1, 227, 1, 0),
                State (1, 235, 84, 0, 283, 227));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (227, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 235);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 235);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E4# =>
             Lemma_Step
               (State (3, 81, 53, 1, 198, 79),
@@ -6852,11 +6874,11 @@ is
                State (283, 0, 1, 228, 1, 0),
                State (1, 198, 79, 0, 283, 228));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (228, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 198);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 198);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E5# =>
             Lemma_Step
               (State (52, 3, 1, 1, 14, 5),
@@ -6875,11 +6897,11 @@ is
                State (283, 0, 1, 229, 1, 0),
                State (1, 14, 5, 0, 283, 229));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (229, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 14);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 14);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E6# =>
             Lemma_Step
               (State (3, 74, 61, 1, 207, 73),
@@ -6910,11 +6932,11 @@ is
                State (283, 0, 1, 230, 1, 0),
                State (1, 207, 73, 0, 283, 230));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (230, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 207);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 207);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E7# =>
             Lemma_Step
               (State (2, 65, 59, 1, 173, 110),
@@ -6949,11 +6971,11 @@ is
                State (283, 0, 1, 231, 1, 0),
                State (1, 173, 110, 0, 283, 231));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (231, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 173);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 173);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E8# =>
             Lemma_Step
               (State (35, 3, 1, 1, 8, 7),
@@ -6972,11 +6994,11 @@ is
                State (283, 0, 1, 232, 1, 0),
                State (1, 8, 7, 0, 283, 232));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (232, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 8);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 8);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#E9# =>
             Lemma_Step
               (State (4, 35, 29, 1, 78, 61),
@@ -7003,11 +7025,11 @@ is
                State (283, 0, 1, 233, 1, 0),
                State (1, 78, 61, 0, 283, 233));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (233, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 78);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 78);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#EA# =>
             Lemma_Step
               (State (3, 98, 37, 1, 215, 69),
@@ -7038,11 +7060,11 @@ is
                State (283, 0, 1, 234, 1, 0),
                State (1, 215, 69, 0, 283, 234));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (234, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 215);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 215);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#EB# =>
             Lemma_Step
               (State (3, 62, 23, 1, 227, 84),
@@ -7073,11 +7095,11 @@ is
                State (283, 0, 1, 235, 1, 0),
                State (1, 227, 84, 0, 283, 235));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (235, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 227);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 227);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#EC# =>
             Lemma_Step
               (State (5, 50, 19, 1, 93, 51),
@@ -7104,11 +7126,11 @@ is
                State (283, 0, 1, 236, 1, 0),
                State (1, 93, 51, 0, 283, 236));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (236, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 93);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 93);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#ED# =>
             Lemma_Step
               (State (5, 11, 6, 1, 80, 55),
@@ -7131,11 +7153,11 @@ is
                State (283, 0, 1, 237, 1, 0),
                State (1, 80, 55, 0, 283, 237));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (237, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 80);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 80);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#EE# =>
             Lemma_Step
               (State (24, 11, 6, 1, 30, 11),
@@ -7158,11 +7180,11 @@ is
                State (283, 0, 1, 238, 1, 0),
                State (1, 30, 11, 0, 283, 238));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (238, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 30);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 30);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#EF# =>
             Lemma_Step
               (State (2, 125, 47, 1, 179, 96),
@@ -7197,11 +7219,11 @@ is
                State (283, 0, 1, 239, 1, 0),
                State (1, 179, 96, 0, 283, 239));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (239, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 179);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 179);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -7236,11 +7258,11 @@ is
                State (283, 0, 1, 240, 1, 0),
                State (1, 91, 55, 0, 283, 240));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (240, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 91);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 91);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F1# =>
             Lemma_Step
               (State (8, 3, 1, 1, 35, 30),
@@ -7259,11 +7281,11 @@ is
                State (283, 0, 1, 241, 1, 0),
                State (1, 35, 30, 0, 283, 241));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (241, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 35);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 35);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F2# =>
             Lemma_Step
               (State (13, 3, 1, 1, 56, 23),
@@ -7282,11 +7304,11 @@ is
                State (283, 0, 1, 242, 1, 0),
                State (1, 56, 23, 0, 283, 242));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (242, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 56);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 56);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F3# =>
             Lemma_Step
               (State (14, 3, 1, 1, 52, 19),
@@ -7305,11 +7327,11 @@ is
                State (283, 0, 1, 243, 1, 0),
                State (1, 52, 19, 0, 283, 243));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (243, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 52);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 52);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F4# =>
             Lemma_Step
               (State (7, 3, 1, 1, 104, 39),
@@ -7328,11 +7350,11 @@ is
                State (283, 0, 1, 244, 1, 0),
                State (1, 104, 39, 0, 283, 244));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (244, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 104);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 104);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F5# =>
             Lemma_Step
               (State (4, 3, 1, 1, 70, 61),
@@ -7351,11 +7373,11 @@ is
                State (283, 0, 1, 245, 1, 0),
                State (1, 70, 61, 0, 283, 245));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (245, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 70);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 70);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F6# =>
             Lemma_Step
               (State (246, 1, 0, 1, 3, 1),
@@ -7370,11 +7392,11 @@ is
                State (283, 0, 1, 246, 1, 0),
                State (1, 3, 1, 0, 283, 246));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (246, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 3);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 3);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F7# =>
             Lemma_Step
               (State (2, 3, 1, 1, 140, 123),
@@ -7393,11 +7415,11 @@ is
                State (283, 0, 1, 247, 1, 0),
                State (1, 140, 123, 0, 283, 247));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (247, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 140);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 140);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F8# =>
             Lemma_Step
               (State (3, 124, 41, 1, 221, 79),
@@ -7428,11 +7450,11 @@ is
                State (283, 0, 1, 248, 1, 0),
                State (1, 221, 79, 0, 283, 248));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (248, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 221);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 221);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#F9# =>
             Lemma_Step
               (State (2, 35, 31, 1, 156, 115),
@@ -7459,11 +7481,11 @@ is
                State (283, 0, 1, 249, 1, 0),
                State (1, 156, 115, 0, 283, 249));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (249, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 156);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 156);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#FA# =>
             Lemma_Step
               (State (6, 21, 12, 1, 125, 41),
@@ -7486,11 +7508,11 @@ is
                State (283, 0, 1, 250, 1, 0),
                State (1, 125, 41, 0, 283, 250));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (250, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 125);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 125);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#FB# =>
             Lemma_Step
               (State (2, 91, 53, 1, 160, 103),
@@ -7517,11 +7539,11 @@ is
                State (283, 0, 1, 251, 1, 0),
                State (1, 160, 103, 0, 283, 251));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (251, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 160);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 160);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#FC# =>
             Lemma_Step
               (State (3, 76, 57, 1, 205, 67),
@@ -7548,11 +7570,11 @@ is
                State (283, 0, 1, 252, 1, 0),
                State (1, 205, 67, 0, 283, 252));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (252, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 205);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 205);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#FD# =>
             Lemma_Step
               (State (28, 3, 1, 1, 26, 9),
@@ -7571,11 +7593,11 @@ is
                State (283, 0, 1, 253, 1, 0),
                State (1, 26, 9, 0, 283, 253));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (253, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 26);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 26);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#FE# =>
             Lemma_Step
               (State (4, 31, 10, 1, 65, 61),
@@ -7598,11 +7620,11 @@ is
                State (283, 0, 1, 254, 1, 0),
                State (1, 65, 61, 0, 283, 254));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (254, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 65);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 65);
+            pragma Assert (Affine (B) = SBox (B));
          when 16#FF# =>
             Lemma_Step
               (State (26, 3, 1, 1, 28, 11),
@@ -7621,11 +7643,11 @@ is
                State (283, 0, 1, 255, 1, 0),
                State (1, 28, 11, 0, 283, 255));
             Lemma_Inner_Eq
-              ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],
+              ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],
                State (255, 1, 0, 283, 0, 1));
             pragma Assert
-              (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 28);
-            pragma Assert (SBox.Affine (B) = SBox.SBox (B));
+              (GF2.Pgcd (B, SBoxPolynomial) (1) = 28);
+            pragma Assert (Affine (B) = SBox (B));
          when others =>
             null;
       end case;
@@ -7658,4 +7680,4 @@ is
       end case;
    end Lemma_SBox_Entry;
 
-end Foundation_Spark.AES.Spec.Properties.SBox_Entries;
+end Foundation_Spark.AES.Spec.SBox.SBox_Entries;

@@ -23,30 +23,23 @@
 #     input       <sha256, 16 hex> <name>     one per input, computed by
 #                                             scripts/slow_proofs.py
 
-unit src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
-  reason      SBoxCorrect by a generated case enumeration over the 256 bytes (7,700 lines, level 4). Cold: 1h40m47s in CI (#41 at 09475b8); 1102 s of gnatprove on the campaign machine at 46c5799 (6 tokens)
-  commit      33db1c170b047e8c1a1c464ccf7d023f0905f256
+unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
+  reason      SBoxCorrect by a generated case enumeration over the 256 bytes (7,700 lines, level 4). Cold: 1h40m47s in CI (#41 at 09475b8); 1102 s of gnatprove on the campaign machine at 46c5799 (6 tokens); 1122 s at f3243aa as a child of SBox (#70), 2501 checks with the two pgcd lemmas it now carries (6 tokens, pool otherwise idle)
+  commit      f3243aaa46f052a767d3dda64d3e30d8e264e659
   date        2026-10-20
   level       4
-  checks      2482/2482
-  fingerprint sha256:659e3b8cb6e93a25a570a23895f50c5ae6375287e5d95e70461ffe99653a71d3
+  checks      2501/2501
+  fingerprint sha256:22486b017f340abb73e7307f3f4e523fcf5e85dd936f4afd219550cb5f54e6b4
   input       ad09bcbb5ff17488 gpr: Proof_Switches ("Ada")
   input       97881b83f6e39847 gpr: Proof_Switches ("foundation_spark-aes-spec-gf2.ads")
-  input       6b31396743fd59e2 gpr: Proof_Switches ("foundation_spark-aes-spec-properties-sbox_entries.adb")
+  input       aa059e55e489211e gpr: Proof_Switches ("foundation_spark-aes-spec-sbox-sbox_entries.adb")
   input       3eaa6e154b2487e7 gpr: Prove level definitions
-  input       1311f37ae5258f62 scripts/gen-sbox-entries.py
-  input       d226a3424529069a src/aes/foundation_spark-aes-lemmas.adb
-  input       c001096ae0be1f2d src/aes/foundation_spark-aes-lemmas.ads
-  input       1445f27c011ec740 src/aes/foundation_spark-aes-spec-cipher.ads
+  input       bc5a9beb26947e5a scripts/gen-sbox-entries.py
   input       2a8b5954e432b09b src/aes/foundation_spark-aes-spec-gf2.ads
   input       7344617b51cf7327 src/aes/foundation_spark-aes-spec-gf28.ads
-  input       93af4f6592da175a src/aes/foundation_spark-aes-spec-keyexpansion.ads
-  input       6bc9c254310d8c65 src/aes/foundation_spark-aes-spec-main.ads
-  input       4ae092a7cf3ea69a src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
-  input       d7f70065b4109258 src/aes/foundation_spark-aes-spec-properties-sbox_entries.ads
-  input       a479f854024d94b4 src/aes/foundation_spark-aes-spec-properties.adb
-  input       3fb2ef19ced9f6d4 src/aes/foundation_spark-aes-spec-properties.ads
-  input       fb0ac536331acdec src/aes/foundation_spark-aes-spec-sbox.ads
+  input       41b92b26cf9a6798 src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
+  input       f1724078835a0ef9 src/aes/foundation_spark-aes-spec-sbox-sbox_entries.ads
+  input       b91e355aff08b22d src/aes/foundation_spark-aes-spec-sbox.ads
   input       1a4e06160b49b147 src/aes/foundation_spark-aes-spec-types.ads
   input       7b4ee9d71433c9bc src/aes/foundation_spark-aes-spec.ads
   input       17a5f08744da9620 src/aes/foundation_spark-aes.ads
