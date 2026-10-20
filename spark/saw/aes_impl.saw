@@ -22,7 +22,7 @@ include "aes_impl_common.saw";
 
 /*
  * Nk and Nr (Types.cry: type Nk k = k / 32, type Nr k = Nk k + 6) under
- * the precondition Key (K). z3, not rme: rme does not finish on the 32-bit
+ * K : Key_Size (128 | 192 | 256). z3, not rme: rme does not finish on the 32-bit
  * division.
  */
 types_nk <- verify_symbol (types_symbol "nk") "spec.types.nk" []

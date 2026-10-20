@@ -5,9 +5,26 @@
  *
  * Run from spark/saw/ by spark/scripts/check-saw.sh, which first compiles
  * the spec units (AES.Spec.Types, .GF28, .GF2, .SBox, .Cipher,
- * .KeyExpansion) with GNAT Pro's LLVM back end, ghost code enabled
+ * .KeyExpansion, .Main, and the instances .AES128, .AES192 and .AES256
+ * of the generic AES_K) with GNAT Pro's LLVM back end, ghost code enabled
  * (saw/spec.adc) and inlining off, into obj/spec/, and links them into
  * obj/spec/aes_spec.bc. Not run by CI: see spark/README.md, "SAW".
+ *
+ * The {k} functions (KeyExpansion and its W, Cipher, InvCipher,
+ * InvCipher', Split_Key, Encrypt, Decrypt) are the generic AES_K's (#80):
+ * one symbol per instance, aes128__cipher and so on (instance_symbol),
+ * with no K argument, and their arrays of the instance's constrained
+ * subtypes (Key_Words (0 .. Nk - 1), Round_Keys (0 .. Nr), Key_Bits
+ * (0 .. K - 1)) passed without bounds. UNVERIFIED: these contracts were
+ * rewritten for #80 on a machine without GNAT-LLVM or SAW; until the
+ * next SAW session runs them, results.txt records the contracts as they
+ * were before #80. What they assume of the ABI, from GNAT-LLVM's rule as
+ * the contracts already observe it (a Block, 16 bytes, by value; a
+ * Block_Bits, 128 bytes, by reference and returned through sret): a
+ * constrained array of at most 16 bytes is passed and returned by value,
+ * a larger one by reference and returned through a pointer the caller
+ * passes first (sret). So the key words at k = 128 (16 bytes) go by
+ * value, at 192 and 256 (24 and 32 bytes) by reference.
  */
 
 enable_experimental;
@@ -40,6 +57,13 @@ aes_spec <- llvm_load_module "obj/spec/aes_spec.bc";
 let spec_symbol name = str_concat "foundation_spark__aes__spec__" name;
 
 /*
+ * The name, under spec_symbol, of a function of the instance of AES_K at
+ * key size k: Spec.AES128's Cipher is "aes128__cipher".
+ */
+let instance_symbol (k : Int) (name : String) =
+  str_concat (str_concat (str_concat "aes" (show k)) "__") name;
+
+/*
  * The LLVM types of the Ada ones: Byte is i8, a Boolean i8 (0 or 1),
  * Natural and Integer i32, GF28.Poly and GF2.Poly i16, GF2.Product i32,
  * AESWord [4 x i8], Block [16 x i8], Columns [4 x [4 x i8]],
@@ -49,6 +73,31 @@ let byte_t = llvm_int 8;
 let poly_t = llvm_int 16;
 let word_t = llvm_array 4 byte_t;
 let block_t = llvm_array 16 byte_t;
+
+/*
+ * Whether the instance at nk key words passes and returns its
+ * Key_Words by value (16 bytes, at k = 128) rather than by reference
+ * (see the header).
+ */
+let key_words_by_value (nk : Int) = eval_bool {{ `nk == (4 : Integer) }};
+
+/*
+ * A Key_Words argument of nk words: by value, or a writable pointer to
+ * them (the caller's is a stack temporary). Returns the words and the
+ * argument; key_words_kept states a pointed-to one unchanged after the
+ * call.
+ */
+let key_words_arg (nk : Int) = do {
+  key <- llvm_fresh_var "key" (llvm_array nk word_t);
+  if key_words_by_value nk then return (key, llvm_term key)
+  else do {
+    keyp <- llvm_alloc (llvm_array nk word_t);
+    llvm_points_to keyp (llvm_term key);
+    return (key, keyp);
+  };
+};
+let key_words_kept (nk : Int) (key : Term) (arg : SetupValue) =
+  if key_words_by_value nk then return () else llvm_points_to arg (llvm_term key);
 
 /*
  * The bounds record { i32, i32 } (First, Last) of Key_Words' and
@@ -164,8 +213,10 @@ let block_block_contract (f : Term) = do {
 };
 
 /*
- * function F (K : Natural) return Positive, with Pre => Key (K):
- * AES.Spec.Types' Nk and Nr, as aes_impl_common.saw states them.
+ * function F (K : Key_Size) return Positive (Key_Size: 128 | 192 | 256):
+ * AES.Spec.Types' Nk and Nr, as aes_impl_common.saw states them. They
+ * are Static (#80); the instances read them as constants, and nothing in
+ * the spec module calls them, so their symbols may not be emitted.
  */
 let key_size_contract (f : Term) = do {
   k <- llvm_fresh_var "k" (llvm_int 32);
@@ -217,25 +268,33 @@ rec foldls (name : String) (round : LLVMSpec) (f : Term) (cry : String) (m : Int
 };
 
 /*
- * function Cipher (K : Natural; W : Round_Keys; Input : Block) return
- * Block, at one key size k with Nr = nr: W is a fat pointer to the nr + 1
- * round keys with bounds {0, nr}, which is Is_Round_Keys (K, W), as
- * aes_impl_common.saw's cipher_contract, but both writable and stated
- * unchanged: the fold lemmas take a writable slice, and Main's Encrypt
- * passes the round keys KeyExpansion leaves on the secondary stack. With ss, the
- * secondary stack is set up first (InvCipher and InvCipher' use it). f is
- * the Cryptol at that size.
+ * The bytes InvCipher and InvCipher' take on the secondary stack for the
+ * reversed round keys W (1 .. Nr - 1), between their mark and its
+ * release: a bounds record, then nr - 1 blocks.
  */
-let spec_cipher_contract_ss (ss : Bool) (k : Int) (nr : Int) (f : Term) = do {
-  if ss then do { secondary_stack; return (); } else return ();
+let rv_size (nr : Int) = ss_size 8 (eval_int {{ 16 * (`nr - 1) : [64] }});
+
+/*
+ * function Cipher (W : Round_Keys; Input : Block) return Block of the
+ * instance with Nr = nr (and InvCipher, InvCipher'): W, of the instance's
+ * constrained Round_Keys (0 .. Nr), is a pointer to the nr + 1 round keys,
+ * with no bounds, writable and stated unchanged (the fold lemmas take a
+ * writable slice, and Main's Encrypt and Decrypt pass the round keys
+ * KeyExpansion leaves in a stack temporary). With ss, the secondary
+ * stack is set up empty first (InvCipher and InvCipher' use it): they
+ * mark it, reverse ws onto it, and release the mark, so it is left empty,
+ * its High_Water_Mark rv_size nr (Decrypt then states it). f is the
+ * Cryptol at that size.
+ */
+let spec_cipher_contract_ss (ss : Bool) (nr : Int) (f : Term) = do {
+  stack <- if ss then secondary_stack else return llvm_null;
   w <- llvm_fresh_var "w" (llvm_array (eval_int {{ `nr + 1 : [32] }}) block_t);
   wp <- llvm_alloc (llvm_array (eval_int {{ `nr + 1 : [32] }}) block_t);
   llvm_points_to wp (llvm_term w);
-  wb <- slice_bounds {{ 0 : [32] }} {{ `nr : [32] }};
   input <- llvm_fresh_var "input" block_t;
-  llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [wp, wb], llvm_term input];
+  llvm_execute_func [wp, llvm_term input];
+  if ss then ss_post_hwm stack 0 (rv_size nr) else return ();
   llvm_points_to wp (llvm_term w);
-  llvm_points_to wb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
   llvm_return (llvm_term {{ f w input }});
 };
 let spec_cipher_contract = spec_cipher_contract_ss false;
@@ -258,32 +317,27 @@ let reverse_keys_contract (m : Int) = do {
 };
 
 /*
- * function KeyExpansion (K : Natural; Key : Key_Words) return Round_Keys
- * at key size k: Key as in w_contract; the result is on the secondary
- * stack, its bounds {0, nr} then the nr + 1 round keys.
+ * function KeyExpansion (Key : Key_Words) return Round_Keys of the
+ * instance at key size k: Key as in w_contract; the result, of the
+ * constrained Round_Keys (0 .. Nr), nr + 1 round keys, is written
+ * through the pointer the caller passes first (sret), not on the
+ * secondary stack as the K-explicit KeyExpansion's was before #80.
  */
 let keyexpansion_contract (k : Int) (nk : Int) (nr : Int) = do {
-  stack <- secondary_stack;
-  key <- llvm_fresh_var "key" (llvm_array nk word_t);
-  keyp <- llvm_alloc (llvm_array nk word_t);
-  llvm_points_to keyp (llvm_term key);
-  keyb <- slice_bounds {{ 0 : [32] }} {{ `nk - 1 : [32] }};
-  llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [keyp, keyb]];
-  llvm_points_to keyp (llvm_term key);
-  llvm_points_to keyb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
-  llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nr : [32] }}]);
-  llvm_points_to_untyped (ss_at stack 8) (llvm_term {{ KeyExpansion`{k} key }});
-  llvm_return (llvm_struct_value [ss_at stack 8, ss_at stack 0]);
+  (key, keyarg) <- key_words_arg nk;
+  ret <- llvm_alloc (llvm_array (eval_int {{ `nr + 1 : [32] }}) block_t);
+  llvm_execute_func [ret, keyarg];
+  key_words_kept nk key keyarg;
+  llvm_points_to ret (llvm_term {{ KeyExpansion`{k} key }});
 };
 
 /*
- * function W (K : Natural; Key : Key_Words; I : Natural) return AESWord
- * at key size k (nk key words) and index i: Key is a fat pointer to the
- * nk words with bounds {0, nk - 1} (Is_Key_Words (K, Key)), both writable
- * and stated unchanged (Main's Encrypt passes the key words Split_Key
- * leaves on the secondary stack).
- * W's recursive calls pass the same fat pointer, so each lemma's Key is
- * its caller's.
+ * function W (Key : Key_Words; I : Word_Index) return AESWord of the
+ * instance at key size k (nk key words), at index i: Key is passed as
+ * key_words_arg says (by value at k = 128, else a writable pointer,
+ * stated unchanged: Main's Encrypt passes the key words Split_Key leaves
+ * in a stack temporary). W's recursive calls pass the same Key, so each
+ * lemma's Key is its caller's.
  *
  * The Cryptol is KeyExpansion.cry's w @ i, the element i of the expanded
  * key in KeyExpansion's where clause [FIPS-PUB-197 Section 5.2]. w is
@@ -292,13 +346,9 @@ let keyexpansion_contract (k : Int) (nk : Int) (nr : Int) = do {
  * w))), so w = groupBy`{4} (join (KeyExpansion key)).
  */
 let w_contract (k : Int) (nk : Int) (i : Int) (key_of : Term) = do {
-  key <- llvm_fresh_var "key" (llvm_array nk word_t);
-  keyp <- llvm_alloc (llvm_array nk word_t);
-  llvm_points_to keyp (llvm_term key);
-  keyb <- slice_bounds {{ 0 : [32] }} {{ `nk - 1 : [32] }};
-  llvm_execute_func [llvm_term {{ `k : [32] }}, llvm_struct_value [keyp, keyb], llvm_term {{ `i : [32] }}];
-  llvm_points_to keyp (llvm_term key);
-  llvm_points_to keyb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ `nk - 1 : [32] }}]);
+  (key, keyarg) <- key_words_arg nk;
+  llvm_execute_func [keyarg, llvm_term {{ `i : [32] }}];
+  key_words_kept nk key keyarg;
   llvm_return (llvm_term {{ (groupBy`{4} (join (KeyExpansion`{k} (key_of key)))) @ (`i : [32]) }});
 };
 
@@ -307,14 +357,15 @@ let w_contract (k : Int) (nk : Int) (i : Int) (key_of : Term) = do {
  * W's recursion: the lemma at I has the lemmas at the nk indices below it
  * (window) as the overrides for its two recursive calls, at I - 1 and
  * I - Nk (SAW applies the one whose index matches), and the leaves'
- * (Nk's, RotWord's, SubWord's, "xor"'s) for its other calls. z3 with
+ * (RotWord's, SubWord's, "xor"'s; the instance reads Nk as a constant)
+ * for its other calls. z3 with
  * SubWord uninterpreted: the Cryptol's w @ i, evaluated, is then
  * w @ (i - Nk) ^ SubWord (RotWord (w @ (i - 1))) ^ Rcon @ (i / Nk) (or
  * the case that applies) over the same terms as the overrides'. Returns
  * all the lemmas, those in all first.
  */
 rec w_lemmas (leaves : [LLVMSpec]) (k : Int) (nk : Int) (last : Int) (i : Int) (window : [LLVMSpec]) (all : [LLVMSpec]) : TopLevel [LLVMSpec] = do {
-  lemma <- verify_spec "keyexpansion__w" (concat window leaves)
+  lemma <- verify_spec (instance_symbol k "w") (concat window leaves)
              (w_contract k nk i {{ \(key : [nk][4][8]) -> key }}) (w4_unint_z3 ["SubWord"]) "w4_unint_z3 SubWord"
              (str_concat (str_concat (str_concat (str_concat "K = " (show k)) ", I = ") (show i))
                 ": (groupBy`{4} (join (KeyExpansion::KeyExpansion`{K} key))) @ I (KeyExpansion's w @ i)");
