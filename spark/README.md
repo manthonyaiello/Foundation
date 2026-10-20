@@ -992,8 +992,8 @@ shared parts in `sha256_spec_common.saw`; the HMAC units are linked into
 | `Foldl_Step` | ``foldl step h (take`{N} ms)`` | N = 0 .. 1 of 1 block, 0 .. 2 of 2 | N - 1, `Step` | z3, `step` uninterpreted |
 | **`Hash`** | `Main.cry`: ``hash`{l}`` | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes; with `SAW_LONG=1` also 120, 128, 200 | `Pad`, `Word_Of` at 32, `Foldl_Step` (`Parse`, `Parse_Block`, `Join`, `Bit` executed) | z3, `step` uninterpreted |
 | `Hash` (for HMAC), with its `Pad`, `Zero`, `To_Bits` chain | as above | at each base of the secondary stack where HMAC calls it (below) | as above | as above |
-| `HMAC.SHA256.HMAC_init` | `saw/HMACInit.cry` (ours: a copy of `HMAC/Main.cry`'s private `HMAC_init`): ``HMAC_init`{64, k, 32} hash`` | k = 0, 32, 64, 65, 100 bytes, at the two stack bases HMAC calls it at | for k > 64, `Hash` at 8k bits, its message on the secondary stack | z3 (k > 64: `step` uninterpreted) |
-| **`HMAC.SHA256.HMAC`** | **`HMAC/Main.cry`: ``HMAC`{256, 64, k, n, 32} hash hash hash``** (Hash.cry's `HMAC` at SHA-256) | (key, text) = (0, 0), (32, 3), (32, 32), (64, 3), (64, 32), (65, 3), (100, 32) bytes, λ = 256 | `HMAC_init` twice, `Hash` (Hn at 512 + n bits, HL at 768) | z3, `step` uninterpreted (at (0, 0): none) |
+| `HMAC.SHA256.HMAC_init` | `saw/HMACInit.cry` (ours: a copy of `HMAC/Main.cry`'s private `HMAC_init`): ``HMAC_init`{64, k, 32} hash`` | each key length HMAC is proved at, at the two stack bases HMAC calls it at | for k > 64, `Hash` at 8k bits, its message on the secondary stack | z3 (k > 64: `step` uninterpreted) |
+| **`HMAC.SHA256.HMAC`** | **`HMAC/Main.cry`: ``HMAC`{256, 64, k, n, 32} hash hash hash``** (Hash.cry's `HMAC` at SHA-256) | (key, text) = (32, 3), (64, 32), (65, 3) bytes (one per case of `HMAC_init`); with `SAW_LONG=1` also (0, 0), (32, 32), (64, 3), (100, 32); λ = 256 | `HMAC_init` twice, `Hash` (Hn at 512 + n bits, HL at 768) | z3, `step` uninterpreted (at (0, 0): none; with `step` uninterpreted z3 reports a spurious counterexample there, as for `Hash` at 0) |
 
 `Pad` (`pad` has no executable counterpart: `Final` writes only the last
 blocks) and `Hash` are proved in a load of the module with lax arithmetic
@@ -1048,7 +1048,11 @@ controls of the spec layer failing as they must. `aes_spec.saw` takes
 - `SHA2.SHA256_Bytes` (`Hash_Bytes` and its helpers): not the spec layer,
   but a ghost representation change (bytes for bits) proved equal to it by
   gnatprove (`Lemma_Hash_Bytes`); not attempted.
-- HMAC at other (key, text) lengths, or λ < 256.
+- HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and (100, 32) bytes
+  only with `SAW_LONG=1`: each call of a hash is at a secondary-stack base
+  of its own, and each base costs `Pad`'s `To_Bits` chain again (65
+  lemmas, about 70 s); the default run proves one length per case of
+  `HMAC_init`. HMAC at other lengths, or λ < 256: not attempted.
 - On their own: `Parse`, `Parse_Block`, `Join` and `Bit` (executed within
   `Hash`), `Ceil_Div` and `Ceil_Mod` (within `Small_K`), GF2's `Inner`,
   `Inner_Step`, `Inner_Next`, `Sub_Mult`, `Term`, `Lead`, `Reduce` and

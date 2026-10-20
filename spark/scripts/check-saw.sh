@@ -65,7 +65,9 @@
 #   SAW_MEMORY_MAX optional: the memory cap of each saw run (default 10G).
 #   SAW_LONG       optional: 1 adds the long proofs to sha256_spec.saw (the
 #                  spec layer's Hash at 120, 128 and 200 bytes, 3 and 4
-#                  padded blocks); 0 (the default) leaves them out. The
+#                  padded blocks, and HMAC at (key, text) = (0, 0),
+#                  (32, 32), (64, 3) and (100, 32) bytes); 0 (the default)
+#                  leaves them out. The
 #                  record says which ran (line "options"); a SAW_LONG=1
 #                  run writes saw/results-long.txt, not saw/results.txt.
 #   saw, cryptol and z3 must be on PATH (the x86_64 bootstrap's env.sh).
@@ -451,10 +453,10 @@ mkdir -p "$LOG_DIR"
 
 # The options the scripts read (sha256_spec.saw includes obj/options.saw).
 if [ "$SAW_LONG" -eq 1 ]; then
-  OPTIONS_NOTE="SAW_LONG=1: the long proofs included (sha256_spec.saw: Hash at 120, 128, 200 bytes)"
+  OPTIONS_NOTE="SAW_LONG=1: the long proofs included (sha256_spec.saw: Hash at 120, 128, 200 bytes; HMAC at (0, 0), (32, 32), (64, 3), (100, 32))"
   echo "let saw_long = true;" > "$OBJ_DIR/options.saw"
 else
-  OPTIONS_NOTE="SAW_LONG=0 (default): the long proofs left out (sha256_spec.saw: Hash at 120, 128, 200 bytes)"
+  OPTIONS_NOTE="SAW_LONG=0 (default): the long proofs left out (sha256_spec.saw: Hash at 120, 128, 200 bytes; HMAC at (0, 0), (32, 32), (64, 3), (100, 32))"
   echo "let saw_long = false;" > "$OBJ_DIR/options.saw"
 fi
 

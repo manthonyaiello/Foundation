@@ -122,13 +122,19 @@ for pad_length_groups verify_pad_hash_group;
 /*
  * HMAC.SHA256's HMAC_init and HMAC at M4.3's (key, text) lengths in
  * bytes (sha256_spec_hmac.saw), each with the Hash lemmas its calls need,
- * proved at the secondary stack's base for each call.
+ * proved at the secondary stack's base for each call (each base costs a
+ * To_Bits chain, about 70 s). By default one length per case of
+ * HMAC_init: (32, 3) for k < B, (64, 32) for k = B, (65, 3) for k > B;
+ * with saw_long also (0, 0), (32, 32), (64, 3) and (100, 32).
  */
 include "sha256_spec_hmac.saw";
-verify_hmac 0 0;
 verify_hmac 32 3;
-verify_hmac 32 32;
-verify_hmac 64 3;
 verify_hmac 64 32;
 verify_hmac 65 3;
-verify_hmac 100 32;
+if saw_long then do {
+  verify_hmac 0 0;
+  verify_hmac 32 32;
+  verify_hmac 64 3;
+  verify_hmac 100 32;
+  return ();
+} else return ();

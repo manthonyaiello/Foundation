@@ -153,6 +153,12 @@ let verify_hmac (k : Int) (t : Int) = do {
   init2 <- verify_init_at k b2 (eval_int {{ `u - 544 : [64] }}) 1168;
   hn <- verify_hash_at hn_base 1 0 0 ln;
   hl <- verify_hash_at hl_base 1 0 0 768;
+  /*
+   * At (0, 0) nothing is symbolic: the hashes' lemmas give step on
+   * constants, and with step uninterpreted z3 finds the spurious
+   * counterexample (882 s, measured); with nothing uninterpreted it
+   * proves it (886 s), as sha256_spec.saw's Hash at 0.
+   */
   let none = eval_bool {{ `k == (0 : Integer) /\ `t == (0 : Integer) }};
   verify_hmac_spec "hmac" [init1, init2, hn, hl]
     (do {
