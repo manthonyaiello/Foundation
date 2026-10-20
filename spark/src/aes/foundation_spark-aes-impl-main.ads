@@ -14,8 +14,10 @@
 --  the spec layer.
 --
 --  Key sizes. As in Impl, one unconstrained implementation serves k = 128,
---  192 and 256, with the key size K as an explicit parameter and
---  Is_Key_Bytes as the precondition.
+--  192 and 256, with the key size K : Key_Size as an explicit parameter and
+--  Is_Key_Bytes as the precondition. Its postconditions name Main.cry's
+--  AES`{k}.Encrypt and Decrypt through the dispatchers Spec.Dispatch.Encrypt
+--  and Decrypt, which select the instance of the generic Spec.AES_K.
 --
 --  Nothing executable here calls ghost code: Join_Key and the spec appear
 --  only in contracts, and the proof's lemmas (AES.Main_Lemmas) only in
@@ -23,7 +25,6 @@
 
 with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Main;
-with Foundation_Spark.AES.Spec.Types;
 
 package Foundation_Spark.AES.Impl.Main with
   SPARK_Mode,
@@ -41,14 +42,13 @@ is
    --  as split cuts it, byte 0 first. Its length is fixed by K through
    --  Is_Key_Bytes.
 
-   function Is_Key_Bytes (K : Natural; Key : Key_Bytes) return Boolean
-   is (Spec.Types.Key (K) and then Key'First = 0
-       and then Key'Length = K / 8);
-   --  The typing key : [k / 8][8] under the constraint Key k, with
-   --  Cryptol's zero-based indexing.
+   function Is_Key_Bytes (K : Key_Size; Key : Key_Bytes) return Boolean
+   is (Key'First = 0 and then Key'Length = K / 8);
+   --  The typing key : [k / 8][8], with Cryptol's zero-based indexing. The
+   --  constraint Key k is K's subtype.
    --  @param K The key size in bits.
    --  @param Key The key bytes.
-   --  @return Whether K is a key size and Key has K / 8 bytes from index 0.
+   --  @return Whether Key has K / 8 bytes from index 0.
 
    function Join_Key (Key : Key_Bytes) return Spec.Main.Bits
    is [for N in 0 .. 8 * Spec.Main.Bit_Index (Key'Length) - 1 =>
@@ -62,7 +62,7 @@ is
    --  @param Key The key bytes, from index 0.
    --  @return Their 8 * Key'Length bits, indexed from 0.
 
-   function Key_Words_Of (K : Natural; Key : Key_Bytes) return Key_Words
+   function Key_Words_Of (K : Key_Size; Key : Key_Bytes) return Key_Words
    with
      Pre  => Is_Key_Bytes (K, Key),
      Post =>
@@ -77,7 +77,7 @@ is
    --  @param Key The key, K / 8 bytes.
    --  @return The key words.
 
-   function Encrypt (K : Natural; Key : Key_Bytes; Input : Block)
+   function Encrypt (K : Key_Size; Key : Key_Bytes; Input : Block)
      return Block
    with
      Pre  => Is_Key_Bytes (K, Key),
@@ -93,7 +93,7 @@ is
    --  @param Input The plaintext block.
    --  @return The ciphertext block.
 
-   function Decrypt (K : Natural; Key : Key_Bytes; Input : Block)
+   function Decrypt (K : Key_Size; Key : Key_Bytes; Input : Block)
      return Block
    with
      Pre  => Is_Key_Bytes (K, Key),

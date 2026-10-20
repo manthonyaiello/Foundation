@@ -1,7 +1,7 @@
 --  The key schedule's helpers, mirroring algorithms/AES/KeyExpansion.cry
 --  [FIPS-PUB-197 Section 5.2]: Rcon, RotWord and SubWord, which have no
 --  {k}. KeyExpansion itself, KeyExpansion : {k} (Key k) => ..., is in the
---  generic AES_K (spike #74), one instance per key size.
+--  generic AES_K (issue #80), one instance per key size.
 
 with Foundation_Spark.AES.Spec.SBox;
 with Foundation_Spark.AES.Spec.Types;
@@ -65,9 +65,8 @@ is
    --  @param A The word [a0, a1, a2, a3].
    --  @return The word with the S-box applied to each byte.
 
-   function Words (K : Natural) return Positive
-   is (4 * (Nr (K) + 1))
-   with Pre => Types.Key (K);
+   function Words (K : Key_Size) return Positive
+   is (4 * (Nr (K) + 1));
    --  The length of KeyExpansion.cry's w : [4 * (Nr k + 1)]AESWord: 44,
    --  52 or 60.
    --  @param K The key size in bits.

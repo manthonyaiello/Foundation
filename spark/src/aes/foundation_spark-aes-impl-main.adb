@@ -9,7 +9,7 @@ is
    -- Key_Words_Of --
    ------------------
 
-   function Key_Words_Of (K : Natural; Key : Key_Bytes) return Key_Words is
+   function Key_Words_Of (K : Key_Size; Key : Key_Bytes) return Key_Words is
       Ws : Key_Words (0 .. Nk (K) - 1) := [others => [others => 0]];
    begin
       for J in Ws'Range loop
@@ -26,7 +26,7 @@ is
    -- Encrypt --
    -------------
 
-   function Encrypt (K : Natural; Key : Key_Bytes; Input : Block)
+   function Encrypt (K : Key_Size; Key : Key_Bytes; Input : Block)
      return Block
    is
       Ws    : constant Key_Words := Key_Words_Of (K, Key);
@@ -64,7 +64,7 @@ is
    -- Decrypt --
    -------------
 
-   function Decrypt (K : Natural; Key : Key_Bytes; Input : Block)
+   function Decrypt (K : Key_Size; Key : Key_Bytes; Input : Block)
      return Block
    is
       Ws    : constant Key_Words := Key_Words_Of (K, Key);

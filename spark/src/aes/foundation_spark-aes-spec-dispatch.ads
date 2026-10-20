@@ -36,9 +36,14 @@ is
    use type Main.Bits;
 
    procedure Lemma_Key_Size (K : Natural)
-   with Post => Key (K) = (K in Key_Size);
-   --  The values that Key_Size lists are those that Types.cry's Key k
-   --  allows, clause for clause (Types.Key).
+   with
+     Post =>
+       (K in Key_Size)
+       = (K mod 64 = 0 and then K / 64 >= 2 and then K / 64 <= 4);
+   --  The values that Types.Key_Size lists, 128 | 192 | 256, are those that
+   --  Types.cry's type constraint Key k = (fin k, k % 64 == 0,
+   --  k / 64 >= 2, k / 64 <= 4) allows, stated here clause for clause.
+   --  Fin k holds of any Natural.
    --  @param K A key size in bits.
 
    function W (K : Key_Size; Key : Key_Words; I : Natural) return AESWord

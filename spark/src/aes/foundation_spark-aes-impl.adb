@@ -53,7 +53,7 @@ is
    -- Expand_Key --
    ----------------
 
-   procedure Expand_Key (K : Natural; Key : Key_Words; W : out Round_Keys) is
+   procedure Expand_Key (K : Key_Size; Key : Key_Words; W : out Round_Keys) is
 
       subtype Word_Index is Natural range 0 .. 4 * (Max_Nr + 1) - 1;
       --  The indices of the expanded key's words, for the largest key.
@@ -332,7 +332,7 @@ is
    -- Encrypt_Block --
    -------------------
 
-   procedure Encrypt_Block (K : Natural; W : Round_Keys; State : in out Block)
+   procedure Encrypt_Block (K : Key_Size; W : Round_Keys; State : in out Block)
    is
       S0 : constant Block := Spec.Cipher.AddRoundKey (State, W (0))
       with Ghost;
@@ -357,7 +357,7 @@ is
    -- Decrypt_Block --
    -------------------
 
-   procedure Decrypt_Block (K : Natural; W : Round_Keys; State : in out Block)
+   procedure Decrypt_Block (K : Key_Size; W : Round_Keys; State : in out Block)
    is
       S0 : constant Block := Spec.Cipher.AddRoundKey (State, W (Nr (K)))
       with Ghost;
@@ -387,7 +387,7 @@ is
    -------------------------
 
    procedure Decrypt_Block_Prime
-     (K : Natural; W : Round_Keys; State : in out Block)
+     (K : Key_Size; W : Round_Keys; State : in out Block)
    is
       S0 : constant Block :=
         Spec.Cipher.InvSubBytes

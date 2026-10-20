@@ -31,7 +31,7 @@ is
 
    use type Spec.Types.Byte;
 
-   procedure Lemma_Split_Join_Key (K : Natural; Key : Impl.Main.Key_Bytes)
+   procedure Lemma_Split_Join_Key (K : Key_Size; Key : Impl.Main.Key_Bytes)
    with
      Pre  => Impl.Main.Is_Key_Bytes (K, Key),
      Post =>
@@ -47,7 +47,7 @@ is
    --  @param K The key size in bits.
    --  @param Key The key, K / 8 bytes.
 
-   procedure Lemma_W_Eq (K : Natural; A, B : Key_Words; I : Natural)
+   procedure Lemma_W_Eq (K : Key_Size; A, B : Key_Words; I : Natural)
    with
      Pre                =>
        Is_Key_Words (K, A) and then Is_Key_Words (K, B) and then A = B
@@ -63,7 +63,7 @@ is
    --  @param B A key equal to A.
    --  @param I The last index of w compared.
 
-   procedure Lemma_KeyExpansion_Eq (K : Natural; A, B : Key_Words)
+   procedure Lemma_KeyExpansion_Eq (K : Key_Size; A, B : Key_Words)
    with
      Pre  => Is_Key_Words (K, A) and then Is_Key_Words (K, B) and then A = B,
      Post =>
@@ -96,7 +96,7 @@ is
    --  @param Xs Round keys.
    --  @param Ys Round keys equal to Xs.
 
-   procedure Lemma_Cipher_Eq (K : Natural; V, W : Round_Keys; A, B : Block)
+   procedure Lemma_Cipher_Eq (K : Key_Size; V, W : Round_Keys; A, B : Block)
    with
      Pre  =>
        Is_Round_Keys (K, V) and then Is_Round_Keys (K, W)
@@ -109,7 +109,7 @@ is
    --  @param A A block.
    --  @param B A block equal to A.
 
-   procedure Lemma_InvCipher_Eq (K : Natural; V, W : Round_Keys; A, B : Block)
+   procedure Lemma_InvCipher_Eq (K : Key_Size; V, W : Round_Keys; A, B : Block)
    with
      Pre  =>
        Is_Round_Keys (K, V) and then Is_Round_Keys (K, W)

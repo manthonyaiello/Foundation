@@ -18,6 +18,6 @@
 # every precondition they appear in at each call site, which is the
 # assurance they carry.
 
-foundation_spark-aes-impl-main.ads | is (Spec.Types.Key (K) and then Key'First = 0 | contract-only: AES.Impl.Main.Is_Key_Bytes is called only by the preconditions of Key_Words_Of, Encrypt and Decrypt (proved at each call, FFI.AES_Impl's included)
+foundation_spark-aes-impl-main.ads | is (Key'First = 0 and then Key'Length = K / 8); | contract-only: AES.Impl.Main.Is_Key_Bytes is called only by the preconditions of Key_Words_Of, Encrypt and Decrypt (proved at each call, FFI.AES_Impl's included)
 foundation_spark-hmac-sha256_impl.ads | (SHA2.SHA256_Stream.Count (C.Inner)); | contract-only: HMAC.SHA256_Impl.Count is called only by the contracts of Init, Update and Final and by FFI.HMAC_SHA256_Impl.HMAC_Chunked's loop invariant
 foundation_spark-sha2-sha256_stream.ads | function Count (C : Context) return SHA256_Bytes.Byte_Index is (C.Count); | contract-only: SHA2.SHA256_Stream.Count is called only by the contracts of Init, Update, Final and Lemma_Final, and by HMAC.SHA256_Impl.Count (itself contract-only)

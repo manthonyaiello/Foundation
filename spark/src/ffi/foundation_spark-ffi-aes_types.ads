@@ -61,13 +61,14 @@ is
    is (Natural (K))
    with
      Pre  => Is_Key_Size (K),
-     Post => Key (Key_Size_Of'Result)
-             and then Key_Size_Of'Result = Natural (K);
-   --  The key size as the spec takes it, in the place of `{k}. Spike #74:
-   --  renamed from Key_Size, which is now Types.Key_Size, the subtype it
-   --  returns.
+     Post => Key_Size_Of'Result = Natural (K);
+   --  The key size as the spec takes it, in the place of `{k}: the
+   --  conversion of K to Types.Key_Size, whose predicate Is_Key_Size
+   --  discharges. Named Key_Size_Of, not Key_Size, so that it does not
+   --  hide (and is not hidden by) Types.Key_Size under the shims' use
+   --  clauses (issue #80, from spike #74).
    --  @param K The key size Cryptol passed.
-   --  @return K, a Natural with Key (K).
+   --  @return K, as a Key_Size.
 
    function Round_Keys_Of (K : C_Size; W : All_Round_Keys) return Round_Keys
    is (W (0 .. Nr (Key_Size_Of (K))))

@@ -421,7 +421,7 @@ is
    --------------------------
 
    procedure InvCipherEquivalence
-     (K : Natural; Ws : Round_Keys; State : Block)
+     (K : Key_Size; Ws : Round_Keys; State : Block)
    is
       Rev : constant Round_Keys := Reverse_Keys (Ws (1 .. Nr (K) - 1));
       S0  : constant Block := AddRoundKey (State, Ws (Nr (K)));
@@ -463,7 +463,7 @@ is
    -------------------------
 
    procedure CipherInverts_Prime
-     (K : Natural; Ws : Round_Keys; State : Block)
+     (K : Key_Size; Ws : Round_Keys; State : Block)
    is
       Mid : constant Round_Keys := Ws (1 .. Nr (K) - 1);
       F   : constant Block :=
@@ -489,7 +489,7 @@ is
    -- CipherInverts --
    -------------------
 
-   procedure CipherInverts (K : Natural; Ws : Round_Keys; State : Block) is
+   procedure CipherInverts (K : Key_Size; Ws : Round_Keys; State : Block) is
    begin
       InvCipherEquivalence (K, Ws, Dispatch.Cipher (K, Ws, State));
       CipherInverts_Prime (K, Ws, State);
@@ -526,7 +526,7 @@ is
    -- Lemma_InvCipher_Eq --
    ------------------------
 
-   procedure Lemma_InvCipher_Eq (K : Natural; Ws : Round_Keys; A, B : Block)
+   procedure Lemma_InvCipher_Eq (K : Key_Size; Ws : Round_Keys; A, B : Block)
    is
       Rev : constant Round_Keys := Reverse_Keys (Ws (1 .. Nr (K) - 1));
    begin
@@ -540,7 +540,7 @@ is
    --------------------
 
    procedure EncryptInverts
-     (K : Natural; Key : Main.Bits; Input : Main.Block_Bits)
+     (K : Key_Size; Key : Main.Bits; Input : Main.Block_Bits)
    is
       W  : constant Round_Keys :=
         Dispatch.KeyExpansion (K, Dispatch.Split_Key (K, Key));

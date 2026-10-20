@@ -4,13 +4,13 @@
 --  Round_Keys, and one block is encrypted or decrypted in place, a round
 --  at a time, with loops.
 --
---  Key sizes. Following the campaign's decision, one unconstrained
---  implementation serves k = 128, 192 and 256, with the key size K as an
---  explicit parameter and Is_Key_Words or the bounds of a Round_Keys as
---  the precondition. No generic per key size is needed. Spike #74: the
---  spec's KeyExpansion and Cipher are generic in the key size (AES_K), and
---  Expand_Key and Encrypt_Block name them through the ghost dispatchers
---  Spec.Dispatch.KeyExpansion and Spec.Dispatch.Cipher.
+--  Key sizes. One unconstrained implementation serves k = 128, 192 and
+--  256, with the key size K : Key_Size as an explicit parameter and
+--  Is_Key_Words or Is_Round_Keys as the precondition: no executable code is
+--  tripled. The spec's {k} functions are generic in the key size
+--  (Spec.AES_K, issue #80), and the postconditions name them through the
+--  ghost dispatchers Spec.Dispatch.KeyExpansion, Cipher, InvCipher and
+--  InvCipher_Prime, which select the instance by K.
 --
 --  Every subprogram's postcondition states equality with the spec-layer
 --  function it implements. The arithmetic of MixColumns and InvMixColumns
@@ -176,7 +176,7 @@ is
    --  @param I The index, 1 .. 10.
    --  @return KeyExpansion.cry's Rcon @ I.
 
-   procedure Expand_Key (K : Natural; Key : Key_Words; W : out Round_Keys)
+   procedure Expand_Key (K : Key_Size; Key : Key_Words; W : out Round_Keys)
    with
      Pre  => Is_Key_Words (K, Key)
              and then W'First = 0 and then W'Length = Nr (K) + 1,
@@ -257,7 +257,7 @@ is
    --  @param State The state.
    --  @param Key The round key.
 
-   procedure Encrypt_Block (K : Natural; W : Round_Keys; State : in out Block)
+   procedure Encrypt_Block (K : Key_Size; W : Round_Keys; State : in out Block)
    with
      Pre  => Is_Round_Keys (K, W),
      Post => State = Spec.Dispatch.Cipher (K, W, State'Old);
@@ -268,7 +268,7 @@ is
    --  @param W The round keys, from Expand_Key.
    --  @param State The plaintext block on entry, the ciphertext on exit.
 
-   procedure Decrypt_Block (K : Natural; W : Round_Keys; State : in out Block)
+   procedure Decrypt_Block (K : Key_Size; W : Round_Keys; State : in out Block)
    with
      Pre  => Is_Round_Keys (K, W),
      Post => State = Spec.Dispatch.InvCipher (K, W, State'Old);
@@ -281,7 +281,7 @@ is
    --  @param State The ciphertext block on entry, the plaintext on exit.
 
    procedure Decrypt_Block_Prime
-     (K : Natural; W : Round_Keys; State : in out Block)
+     (K : Key_Size; W : Round_Keys; State : in out Block)
    with
      Pre  => Is_Round_Keys (K, W),
      Post => State = Spec.Dispatch.InvCipher_Prime (K, W, State'Old);
