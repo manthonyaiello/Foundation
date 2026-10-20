@@ -7,17 +7,24 @@
  * aes_spec_*.saw files, whose lemmas it uses.
  *
  * Main.cry's bit sequences [n] are the spec's ghost Boolean arrays Bits,
- * indexed by a 128-bit integer (README "The bitcode ABI"): an Ada Boolean
+ * indexed by Bit_Index, range 0 .. 256, a 16-bit integer (Object_Size 16;
+ * README "The bitcode ABI"): an Ada Boolean
  * is a byte, 0 or 1, so a [n] is n bytes, each holding one bit, the
  * Cryptol's first (most significant) bit first. The contracts take the
  * bytes as fresh variables under the precondition that each is 0 or 1
  * (the validity of an Ada Boolean), and read them as Cryptol bits with
  * bits_of. Unconstrained bit sequences (the key) are fat pointers whose
- * bounds record is two i128, {First, Last}; Block_Bits, Bits (0 .. 127),
+ * bounds record is two i16, {First, Last}; Block_Bits, Bits (0 .. 127),
  * is passed by reference.
+ *
+ * Until #68 Bit_Index was 128-bit, and these contracts said i128. The i16
+ * here is unverified until the next GNAT-LLVM/SAW session: it is what
+ * Bit_Index'Object_Size gives (GNAT 16.1, -gnatR2), not read from the IR.
  */
 
 let bits_bounds_t = llvm_alias "foundation_spark__aes__spec__main__bits_BOUNDS";
+/* Bit_Index's width in the bitcode. */
+let bit_index_t = llvm_int 16;
 let bits_t (n : Int) = llvm_array n byte_t;
 
 /* Bytes, each 0 or 1, as Cryptol bits. */
@@ -35,12 +42,12 @@ let fresh_bits (name : String) (n : Int) = do {
 };
 
 /*
- * A fat pointer to n bits with bounds {0, n - 1} (i128), read-only.
+ * A fat pointer to n bits with bounds {0, n - 1} (i16), read-only.
  */
 let fresh_bits_fp (name : String) (n : Int) = do {
   (bs, p) <- fresh_bits name n;
   b <- llvm_alloc_readonly bits_bounds_t;
-  llvm_points_to b (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `n - 1 : [128] }}]);
+  llvm_points_to b (llvm_struct_value [llvm_term {{ 0 : [16] }}, llvm_term {{ `n - 1 : [16] }}]);
   return (bs, llvm_struct_value [p, b]);
 };
 
@@ -68,7 +75,7 @@ let verify_byte_at (n : Int) =
   verify_spec "main__byte_at" []
     (do {
        (bs, fp) <- fresh_bits_fp "bs" n;
-       from <- llvm_fresh_var "from" (llvm_int 128);
+       from <- llvm_fresh_var "from" bit_index_t;
        llvm_precond {{ from <= `n - 8 }};
        llvm_execute_func [fp, llvm_term from];
        llvm_return (llvm_term {{ take`{8} ((bits_of bs) << from) }});
@@ -111,11 +118,11 @@ m_split_key_256 <- verify_split_key 256 8 m_byte_at_256;
  * Join_Block = Main.cry's join : Block -> [128] (Encrypt's and Decrypt's
  * join). Block_Bits, constrained, is returned through a pointer to the
  * caller's [128 x i8] (sret). Join_Block's aggregate over
- * Block_Bits'Range indexes its temporary by the 128-bit Bit_Index
- * (getelementptr [128 x i8], ptr, i64 0, i128 %n), which SAW 1.6 rejects
- * ("Invalid index value in GEP"); check-saw.sh rewrites that one index to
- * its truncation to i64 (gep64, README "SAW"), which LangRef says the GEP
- * does anyway, and checks that nothing else changed.
+ * Block_Bits'Range indexes its temporary by Bit_Index. While Bit_Index
+ * was 128-bit, that GEP index was an i128, which SAW 1.6 rejects ("Invalid
+ * index value in GEP"), and check-saw.sh rewrote it (gep64). #68 narrowed
+ * Bit_Index and retired the rewrite: the index is now at most 64 bits
+ * (unverified until the next SAW session).
  */
 m_join_block <- verify_spec "main__join_block" [m_bit_of]
                   (do {
@@ -220,7 +227,7 @@ let main_contract (k : Int) (hwm : Int) (wrap : Bool) (f : Term) = do {
   (key, kp) <- fresh_bits "key" k;
   kb <- llvm_alloc_readonly bits_bounds_t;
   if wrap then return ()
-  else llvm_points_to kb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `k - 1 : [128] }}]);
+  else llvm_points_to kb (llvm_struct_value [llvm_term {{ 0 : [16] }}, llvm_term {{ `k - 1 : [16] }}]);
   (input, ip) <- fresh_bits "input" 128;
   ret <- llvm_alloc (bits_t 128);
   if wrap then llvm_execute_func [ret, kp, ip]

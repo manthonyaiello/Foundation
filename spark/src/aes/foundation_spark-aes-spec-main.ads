@@ -4,9 +4,10 @@
 --
 --  Main.cry's Encrypt and Decrypt take a key [k] and a block [128] as bit
 --  sequences. Following the campaign's decision on bit sequences, a bit
---  sequence is a ghost Boolean array (Bits) with a 128-bit integer index,
---  and Cryptol's join and split between [128] and Block, and between [k]
---  and [Nk k]AESWord, are stated here over it. Cryptol sequences are
+--  sequence is a ghost Boolean array (Bits) with an integer index wide
+--  enough for AES's longest, a 256-bit key, and Cryptol's join and split
+--  between [128] and Block, and between [k] and [Nk k]AESWord, are stated
+--  here over it. Cryptol sequences are
 --  big-endian: bit 0 of a [8] is the most significant bit of the Byte, and
 --  byte 0 of a [128] is its first eight bits.
 --
@@ -29,10 +30,17 @@ is
 
    use type Types.Byte;
 
-   type Bit_Index is range 0 .. 2 ** 127 - 1;
-   --  The index of a bit sequence: a 128-bit integer, per the campaign's
-   --  decision on bit sequences, so that the length of any sequence below
-   --  2 ** 64 bits, and arithmetic on its indices, cannot overflow.
+   type Bit_Index is range 0 .. 256;
+   --  The index, or the length, of an AES bit sequence. The longest is a
+   --  key [k] at k = 256 (Main.cry's Key k: k is 128, 192 or 256), so its
+   --  indices are 0 .. 255 and its length 256; a block [128] is shorter.
+   --  Arithmetic on indices (From + 7 in Byte_At, 8 * Key'Length - 1 in
+   --  Impl.Main.Join_Key) is proved free of overflow in this range and in
+   --  Bit_Index'Base. Unlike SHA-2's Bit_Index (Foundation_Spark.SHA2),
+   --  which must hold message lengths past 2 ** 64, AES needs no wider
+   --  type. And 256 needs nine bits, so no value is held in 8 bits, where
+   --  LLVM, whose getelementptr indices are signed, would read 255 as -1
+   --  (#68).
 
    type Bits is array (Bit_Index range <>) of Boolean;
    --  A Cryptol bit sequence [n], indexed from 0 as Cryptol's @ indexes

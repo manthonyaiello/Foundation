@@ -406,10 +406,10 @@ begin gnat-llvm
 #
 # check-saw.sh also needs llvm-link (M4.2, #23), which GNAT Pro does not
 # ship: it comes from LLVM's own release of the same LLVM version, pinned in
-# toolchain-pins.env. The tarball is 2 GB; only bin/llvm-link, and bin/opt
-# and bin/llvm-extract (#59: check-saw.sh rewrites one GEP index of the AES
-# spec layer, README "SAW"), each linked against libc and libz only, are
-# extracted, to $TOOLS/llvm-<version>, written to env.sh as LLVM_LINK_DIR.
+# toolchain-pins.env. The tarball is 2 GB; only bin/llvm-link, linked
+# against libc and libz only, is extracted, to $TOOLS/llvm-<version>,
+# written to env.sh as LLVM_LINK_DIR. (Until #68, bin/opt and
+# bin/llvm-extract were extracted too, for a GEP rewrite #68 retired.)
 # Only when GNAT_LLVM_DIR is set: nothing else uses it.
 GNAT_LLVM_ENV=""
 LLVM_LINK_DIR="$TOOLS/llvm-$LLVM_LINK_VERSION"
@@ -423,8 +423,7 @@ if [ -n "${GNAT_LLVM_DIR:-}" ]; then
   [ "$gnat_llvm_version" = "$LLVM_LINK_VERSION" ] \
     || die "GNAT_LLVM_DIR's LLVM is ${gnat_llvm_version:-?}, but toolchain-pins.env pins llvm-link $LLVM_LINK_VERSION: they must match"
 
-  if [ -x "$LLVM_LINK_DIR/bin/llvm-link" ] && [ -x "$LLVM_LINK_DIR/bin/opt" ] \
-     && [ -x "$LLVM_LINK_DIR/bin/llvm-extract" ] && [ -f "$LLVM_LINK_DIR/.bootstrap-sha256" ] \
+  if [ -x "$LLVM_LINK_DIR/bin/llvm-link" ] && [ -f "$LLVM_LINK_DIR/.bootstrap-sha256" ] \
      && [ "$(cat "$LLVM_LINK_DIR/.bootstrap-sha256")" = "$LLVM_LINK_SHA256" ]; then
     echo ">> $LLVM_LINK_DIR: already installed"
   else
@@ -432,11 +431,9 @@ if [ -n "${GNAT_LLVM_DIR:-}" ]; then
           "$TOOLS/downloads/$LLVM_LINK_TARBALL" "$LLVM_LINK_SHA256"
     rm -rf "$LLVM_LINK_DIR.new"
     mkdir -p "$LLVM_LINK_DIR.new"
-    echo ">> extracting bin/llvm-link, bin/opt, bin/llvm-extract from $LLVM_LINK_TARBALL"
+    echo ">> extracting bin/llvm-link from $LLVM_LINK_TARBALL"
     tar -xJf "$TOOLS/downloads/$LLVM_LINK_TARBALL" -C "$LLVM_LINK_DIR.new" --strip-components=1 \
-        "${LLVM_LINK_TARBALL%.tar.xz}/bin/llvm-link" \
-        "${LLVM_LINK_TARBALL%.tar.xz}/bin/opt" \
-        "${LLVM_LINK_TARBALL%.tar.xz}/bin/llvm-extract"
+        "${LLVM_LINK_TARBALL%.tar.xz}/bin/llvm-link"
     echo "$LLVM_LINK_SHA256" > "$LLVM_LINK_DIR.new/.bootstrap-sha256"
     rm -rf "$LLVM_LINK_DIR"
     mv "$LLVM_LINK_DIR.new" "$LLVM_LINK_DIR"
