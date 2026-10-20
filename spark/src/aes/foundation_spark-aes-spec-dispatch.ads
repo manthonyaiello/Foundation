@@ -66,6 +66,20 @@ is
    --  @param Key The cipher key as Nk (K) words.
    --  @param I The index of the word.
 
+   function Round_Key (K : Key_Size; Key : Key_Words; R : Natural)
+     return Block
+   is (Join ([for J in AESWord_Index => W (K, Key, 4 * R + J)]))
+   with Pre => Is_Key_Words (K, Key) and then R <= Nr (K);
+   --  Round key R of KeyExpansion.cry's split (split (join (join w))):
+   --  Join of w @ (4 * R) to w @ (4 * R + 3). A function of its own
+   --  because GNAT 16.1, compiling assertions (the FFI build), rejects
+   --  this aggregate inside KeyExpansion's quantified postcondition ("R
+   --  is undefined").
+   --  @param K The key size in bits.
+   --  @param Key The cipher key as Nk (K) words.
+   --  @param R The round, 0 .. Nr (K).
+   --  @return The round key.
+
    function KeyExpansion (K : Key_Size; Key : Key_Words) return Round_Keys
    is (case K is
          when 128 => AES128.KeyExpansion (Key),
@@ -77,8 +91,7 @@ is
        Is_Round_Keys (K, KeyExpansion'Result)
        and then
          (for all R in 0 .. Nr (K) =>
-            KeyExpansion'Result (R)
-            = Join ([for J in AESWord_Index => W (K, Key, 4 * R + J)]));
+            KeyExpansion'Result (R) = Round_Key (K, Key, R));
    --  KeyExpansion.cry's KeyExpansion`{k} at k = K: the instance's
    --  KeyExpansion. The postcondition is its body, uniformly in K.
    --  @param K The key size in bits, the Cryptol's k.
