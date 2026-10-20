@@ -11,12 +11,19 @@ remembering it. It reads, relative to spark/:
   foundation_spark.gpr         each unit's committed level (package Prove)
   scripts/trust-surface.txt    the trust manifest: every site gnatprove does
                                not prove (the trust gate keeps it exact)
-  scripts/board-rows.txt       the rows: function -> spec entity, impl entity
+  scripts/board-rows.txt       the rows: function -> spec entity, impl entity,
+                               and the row's kind (#67)
   obj/ffi/ffi-results.txt      the FFI log written by scripts/check-ffi.sh
                                (M0.3); "not run" while it does not exist
   scripts/proof-slow.txt       the units proved on demand: their recorded
                                proofs, checked against their fingerprints
                                (README "Slow proofs")
+  saw/results.txt              the record of the last default SAW run
+  saw/results-long.txt         (scripts/check-saw.sh, local only) and of
+                               the last SAW_LONG=1 run: what SAW proved,
+                               at which commit, and the hashes of the
+                               sources and Cryptol it read, which say
+                               whether the record is still this tree's
 
 and prints the board as markdown (default) or JSON. Python 3 standard library
 only. The formats of board-rows.txt and the FFI log are in spark/README.md
@@ -30,7 +37,7 @@ Usage:
   scripts/board.py                    # markdown on stdout
   scripts/board.py --json             # JSON on stdout
   scripts/board.py --json-out F       # markdown on stdout, JSON into F
-  scripts/board.py --rows F --ffi-log F --root DIR
+  scripts/board.py --rows F --ffi-log F --saw F --saw-long F --root DIR
 """
 
 import argparse
@@ -64,6 +71,20 @@ HOLE_TITLES = {
 
 #: gnatprove severities that mean "this check is not proved".
 UNPROVED_SEVERITIES = {"low", "medium", "high", "error"}
+
+#: Row kinds (board-rows.txt's fourth field; README "The board"). The
+#: first two have an implementation entity; the last two have none, by
+#: design, and are complete when what covers them is.
+KINDS = ["impl", "impl = spec", "spec-only", "subsumed-by"]
+
+#: The SAW records, relative to the crate (scripts/check-saw.sh).
+SAW_RESULTS = "saw/results.txt"
+SAW_RESULTS_LONG = "saw/results-long.txt"
+
+#: What SAW reads besides the hashed sources and Cryptol: the scripts and
+#: check-saw.sh. A change to one since the recorded commit makes the record
+#: stale too. Relative to the crate; the results files themselves excluded.
+SAW_SCRIPTS = ["saw", "scripts/check-saw.sh", "scripts/toolchain-pins.env"]
 
 
 def git(root, *args):
@@ -329,6 +350,142 @@ def slow_cell(slow, unit, name):
             "unit_checks": None, "unit_holes": None, "unit_output": "slow"}
 
 
+def parse_kind(field, impl_name):
+    """A row's kind from board-rows.txt's fourth field ("" for the default).
+
+    Returns {"kind", "covers", "error"}: COVERS is the entities a
+    spec-only row names, or the function a subsumed-by row names.
+    """
+    s = " ".join(field.split())
+    kind = next((k for k in sorted(KINDS, key=len, reverse=True)
+                 if s == k or s.startswith(k + " ")), None) if s else "impl"
+    if kind is None:
+        return {"kind": s, "covers": None, "error": "unknown kind `%s`" % s}
+    arg = s[len(kind):].strip() if s else ""
+    rec = {"kind": kind, "covers": None, "error": None}
+    has_impl = impl_name not in ("", "-")
+    if kind in ("impl", "impl = spec"):
+        if arg:
+            rec["error"] = "kind `%s` takes no argument" % kind
+        elif not has_impl:
+            rec["error"] = "kind `%s` needs an impl entity" % kind
+    elif has_impl:
+        rec["error"] = "kind `%s` has no impl entity (`-`)" % kind
+    elif not arg:
+        rec["error"] = "kind `%s` needs %s" % (
+            kind, "the entities that cover it" if kind == "spec-only" else "a function")
+    else:
+        rec["covers"] = arg.split() if kind == "spec-only" else arg
+    return rec
+
+
+def sha256_file(path):
+    """The full sha256 hex digest of a file, or None if it does not exist."""
+    import hashlib
+    try:
+        with open(path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def saw_name_parts(name):
+    """A SAW result's subprogram name as lower-case parts.
+
+    The implementation's results name it with dots (sha256_stream.hash), the
+    spec layer's with the symbol's double underscores (cipher__subbytes).
+    """
+    return [p for p in re.split(r"__|\.", name.lower()) if p]
+
+
+def read_saw(root, rel):
+    """Read a SAW record (saw/results.txt) into a dictionary, or None if absent.
+
+    Each "proved" line is one result, or N when it says "(N proofs"; a
+    "spec layer:" line is of the spec layer, any other of the
+    implementation; "(lax arithmetic module)" marks a lax-arithmetic result.
+    The "source" and "cryptol" lines' hashes are compared with the files as
+    they are now, and the SAW scripts with the recorded commit's (git), to
+    say whether the record is still this tree's.
+    """
+    path = os.path.join(root, rel)
+    if not os.path.exists(path):
+        return None
+    rec = {"file": rel, "commit": "", "date": "", "options": "", "results": [],
+           "inputs": 0, "changed": [], "scripts_checked": False}
+    top = git(root, "rev-parse", "--show-toplevel") or os.path.dirname(root)
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            s = line.rstrip("\n")
+            key, _, val = s.partition(" ")
+            val = val.strip()
+            if key in ("commit", "date", "options") and not rec[key]:
+                rec[key] = val
+            elif key == "proved":
+                layer = "impl"
+                if val.startswith("spec layer:"):
+                    layer, val = "spec", val[len("spec layer:"):].strip()
+                n = re.search(r"\((\d+) proofs", val)
+                rec["results"].append({
+                    "layer": layer,
+                    "name": val.split()[0] if val else "",
+                    "lax": "(lax arithmetic module)" in val.split(" = ", 1)[0],
+                    "count": int(n.group(1)) if n else 1,
+                })
+            elif key in ("source", "cryptol", "spec.adc"):
+                m = re.match(r"^([0-9a-f]{64}) (\S+)", val)
+                if not m:
+                    continue  # the version line "cryptol Cryptol 3.6.0 ..."
+                digest, f_rel = m.group(1), m.group(2).rstrip(":")
+                base = top if key == "cryptol" else root
+                rec["inputs"] += 1
+                if sha256_file(os.path.join(base, f_rel)) != digest:
+                    rec["changed"].append(f_rel)
+    # The scripts are not hashed in the record: compare them with the
+    # recorded commit's, when this checkout has it.
+    if rec["commit"] and git(root, "cat-file", "-t", rec["commit"]) == "commit":
+        rec["scripts_checked"] = True
+        out = git(root, "diff", "--name-only", rec["commit"], "--", *SAW_SCRIPTS,
+                  ":!saw/results.txt", ":!saw/results-long.txt")
+        prefix = git(root, "rev-parse", "--show-prefix")
+        for p in out.splitlines():
+            p = p[len(prefix):] if prefix and p.startswith(prefix) else p
+            if p not in rec["changed"]:
+                rec["changed"].append(p)
+    rec["stale"] = bool(rec["changed"])
+    return rec
+
+
+def saw_totals(rec):
+    """Count a SAW record's results: in all, per layer, and the lax ones."""
+    t = {"proved": 0, "lax": 0, "impl": 0, "impl_lax": 0, "spec": 0, "spec_lax": 0}
+    for r in rec["results"]:
+        t["proved"] += r["count"]
+        t[r["layer"]] += r["count"]
+        if r["lax"]:
+            t["lax"] += r["count"]
+            t[r["layer"] + "_lax"] += r["count"]
+    return t
+
+
+def saw_cell(rec, layer, entity):
+    """The results of LAYER ("spec" or "impl") whose subprogram is ENTITY.
+
+    A result matches when its name's parts are the last parts of the
+    entity's qualified name (sha256_stream.hash is ...SHA2.SHA256_Stream.Hash).
+    """
+    if rec is None or entity in (None, "", "-"):
+        return None
+    want = entity.lower().split(".")
+    c = {"proved": 0, "lax": 0}
+    for r in rec["results"]:
+        parts = saw_name_parts(r["name"])
+        if r["layer"] == layer and parts and want[-len(parts):] == parts:
+            c["proved"] += r["count"]
+            c["lax"] += r["count"] if r["lax"] else 0
+    return c
+
+
 def build(args):
     """Assemble the whole board as one JSON-ready dictionary."""
     root = args.root
@@ -345,42 +502,97 @@ def build(args):
             u.update(output="slow", slow=slow[u["unit"]])
     by_name = {u["unit"]: u for u in urows}
     ffi = read_ffi(os.path.join(root, args.ffi_log))
+    saw = read_saw(root, args.saw)
+    saw_long = read_saw(root, args.saw_long)
     head = git(root, "rev-parse", "HEAD")
 
+    def cell_of(name):
+        su = slow_unit_of(slow, name) if name not in ("", "-") else None
+        return slow_cell(slow, su, name) if su else entity_cell(spark, by_name, name)
+
+    def proved(cell):
+        if cell.get("slow"):
+            return cell["slow"]["current"] is True
+        return bool(cell.get("found") and cell.get("analyzed")
+                    and cell["checks"]["unproved"] == 0
+                    and cell["unit_checks"]["unproved"] == 0)
+
     rows = []
-    for _, f in table_lines(os.path.join(root, args.rows)):
-        if len(f) != 3:
+    for n, f in table_lines(os.path.join(root, args.rows)):
+        if len(f) not in (3, 4):
+            print("board.py: %s:%d: expected 3 or 4 fields, skipped" % (args.rows, n),
+                  file=sys.stderr)
             continue
-        cells = []
-        for name in (f[1], f[2]):
-            su = slow_unit_of(slow, name) if name not in ("", "-") else None
-            cells.append(slow_cell(slow, su, name) if su
-                         else entity_cell(spark, by_name, name))
-        spec, impl = cells
+        kind = parse_kind(f[3] if len(f) == 4 else "", f[2])
+        if kind["kind"] == "impl = spec" and f[1] != f[2]:
+            kind["error"] = "kind `impl = spec` but the impl entity is not the spec entity"
+        if kind["error"]:
+            print("board.py: %s:%d: %s" % (args.rows, n, kind["error"]), file=sys.stderr)
+        spec, impl = cell_of(f[1]), cell_of(f[2])
         props = None if ffi is None else ffi.get(f[0], [])
-        holes = holes_of([spec, impl])
-        if impl.get("slow"):
-            impl_proved = impl["slow"]["current"] is True
-        else:
-            impl_proved = bool(impl.get("found") and impl.get("analyzed")
-                               and impl["checks"]["unproved"] == 0
-                               and impl["unit_checks"]["unproved"] == 0)
         ffi_ok = bool(props) and all(p["passed"] == p["run"] > 0 for p in props)
+        if kind["kind"] == "spec-only" and kind["covers"]:
+            covers = [cell_of(e) for e in kind["covers"]]
+            holes = holes_of([spec] + covers)
+            # Covered by proofs, not by an implementation of its own: the
+            # spec's unit is proved, and so is each entity that covers it.
+            # No FFI property is needed (PLAN: "Spec and implementation need
+            # not be one-to-one"); one that exists must pass.
+            impl_proved = all(proved(c) for c in covers)
+            ffi_cond = ffi_ok or (props is not None and not props)
+            spec_ok = bool(spec.get("found") and spec.get("analyzed")
+                           and (spec["unit_checks"] or {}).get("unproved", 0) == 0)
+        elif kind["kind"] == "subsumed-by" and kind["covers"]:
+            covers = []
+            holes = holes_of([spec])
+            impl_proved = None  # settled below, from the row it names
+            ffi_cond = ffi_ok
+            spec_ok = bool(spec.get("found"))
+        else:
+            covers = None
+            holes = holes_of([spec, impl])
+            impl_proved = proved(impl)
+            ffi_cond = ffi_ok
+            spec_ok = bool(spec.get("found"))
         rows.append({
             "function": f[0],
+            "kind": kind["kind"],
+            "kind_error": kind["error"],
+            "covered_by": kind["covers"],
+            "covers": covers,
             "spec": spec,
             "impl": impl,
             "ffi": props,
             "ffi_checked": ffi_ok,
             "impl_proved": impl_proved,
-            "saw": None,
+            "saw": None if saw is None else {
+                "spec": saw_cell(saw, "spec", f[1]),
+                "impl": saw_cell(saw, "impl", f[2]),
+                "stale": saw["stale"],
+            },
             "holes": holes,
             # PLAN: complete = spec exists and FFI-checked, impl proved with
-            # zero unproved, assumptions and justifications, and (E4) SAW.
-            "complete": bool(spec.get("found") and ffi_ok and impl_proved
+            # zero unproved, assumptions and justifications. A spec-only or
+            # subsumed-by row is complete when what covers it is (#67).
+            "complete": bool(not kind["error"] and spec_ok and ffi_cond and impl_proved
                              and holes["assume"] == 0 and holes["justification"] == 0
                              and holes["unproved"] == 0),
+            "by_design": kind["kind"] in ("spec-only", "subsumed-by"),
         })
+    # A subsumed-by row is complete when the row it names is.
+    by_function = {r["function"]: r for r in rows}
+    for r in rows:
+        if r["kind"] == "subsumed-by" and not r["kind_error"]:
+            target = by_function.get(r["covered_by"])
+            if target is None or target["kind"] == "subsumed-by":
+                r["kind_error"] = "subsumed-by names `%s`, which is not an impl row" % r["covered_by"]
+                print("board.py: %s: %s" % (args.rows, r["kind_error"]), file=sys.stderr)
+            r["impl_proved"] = bool(target and not r["kind_error"] and target["complete"])
+            r["complete"] = bool(not r["kind_error"] and r["spec"].get("found")
+                                 and r["ffi_checked"] and r["impl_proved"]
+                                 and r["holes"]["assume"] == 0
+                                 and r["holes"]["justification"] == 0
+                                 and r["holes"]["unproved"] == 0)
 
     totals = {"units": len(urows), "checks": 0, "proved": 0, "justified": 0,
               "unproved": 0, **{k: 0 for k in HOLE_KINDS}}
@@ -397,6 +609,8 @@ def build(args):
         "generated": datetime.datetime.now(datetime.timezone.utc)
                      .strftime("%Y-%m-%dT%H:%M:%SZ"),
         "ffi_log": args.ffi_log if ffi is not None else None,
+        "saw": [dict({k: v for k, v in s.items() if k != "results"}, totals=saw_totals(s))
+                for s in (saw, saw_long) if s is not None],
         "units": urows,
         "rows": rows,
         "totals": totals,
@@ -458,6 +672,72 @@ def fmt_ffi(props, head):
     return "; ".join(parts)
 
 
+def fmt_kind(r):
+    """The kind cell of a function row."""
+    if r["kind_error"]:
+        return "**%s** (%s)" % (r["kind"], r["kind_error"])
+    if r["kind"] == "subsumed-by":
+        return "subsumed by `%s`" % r["covered_by"]
+    return r["kind"]
+
+
+def fmt_impl(r, head):
+    """The impl-proved cell: the impl entity, or what covers a row without one."""
+    if r["kind"] == "spec-only" and r["covers"]:
+        return "none by design; covered by " + ", ".join(
+            "`%s` %s" % (c["entity"].rsplit(".", 1)[-1], fmt_entity(c, head))
+            for c in r["covers"])
+    if r["kind"] == "subsumed-by" and not r["kind_error"]:
+        return "none by design; proved within `%s`'s (%s)" % (
+            r["covered_by"], "complete" if r["impl_proved"] else "**not complete**")
+    return fmt_entity(r["impl"], head)
+
+
+def fmt_saw_count(c):
+    """One layer's SAW results for a row: the count, and how many are lax."""
+    if c is None:
+        return None
+    if not c["proved"]:
+        return "-"
+    return "%d%s" % (c["proved"], " (%d lax)" % c["lax"] if c["lax"] else "")
+
+
+def fmt_saw(r):
+    """The SAW cell of a function row: spec-layer and implementation results."""
+    s = r["saw"]
+    if s is None:
+        return "not run"
+    parts = ["spec %s" % fmt_saw_count(s["spec"])]
+    impl = fmt_saw_count(s["impl"])
+    if impl is not None:
+        parts.append("impl %s" % impl)
+    return ", ".join(parts) + (" (stale)" if s["stale"] else "")
+
+
+def fmt_saw_record(s):
+    """A sentence on one SAW record: where it was run, what it proved, and
+    whether it is still this tree's."""
+    t = s["totals"]
+    out = ("`%s` (%s), recorded at %s on %s: %d proved, %d of the implementation "
+           "(%d lax) and %d of the spec layer (%d lax)"
+           % (s["file"], s["options"].split(":")[0] or "options not recorded",
+              s["commit"][:7] or "?", s["date"][:10] or "?", t["proved"], t["impl"],
+              t["impl_lax"], t["spec"], t["spec_lax"]))
+    if s["stale"]:
+        shown = ", ".join("`%s`" % c for c in s["changed"][:6])
+        more = len(s["changed"]) - 6
+        out += ("; **STALE**: %d of SAW's inputs changed since (%s%s), so these results "
+                "are not this tree's until `check-saw.sh` is run again (GNAT Pro)"
+                % (len(s["changed"]), shown, ", and %d more" % more if more > 0 else ""))
+    else:
+        out += "; current: none of its %d hashed inputs changed" % s["inputs"]
+        if s["scripts_checked"]:
+            out += ", nor the SAW scripts since %s" % s["commit"][:7]
+        else:
+            out += " (the SAW scripts not checked: %s is not in this checkout)" % s["commit"][:7]
+    return out
+
+
 def fmt_holes(h):
     """Every non-zero hole count of a row, or 0."""
     parts = ["%d %s" % (v, "unproved" if k == "unproved" else HOLE_TITLES[k])
@@ -470,22 +750,52 @@ def markdown(b):
     head = b["commit"]
     out = ["## Board at %s%s" % (head[:7] or "?", " (dirty)" if b["dirty"] else ""),
            "",
-           "Counted by `spark/scripts/board.py` at %s. FFI log: %s. SAW: not run (E4)."
-           % (b["generated"], "`%s`" % b["ffi_log"] if b["ffi_log"] else "not run"),
+           "Counted by `spark/scripts/board.py` at %s. FFI log: %s. SAW: %s."
+           % (b["generated"], "`%s`" % b["ffi_log"] if b["ffi_log"] else "not run",
+              ("**STALE** record (below)" if any(s["stale"] for s in b["saw"])
+               else "recorded (below)") if b["saw"] else "not run"),
            ""]
     if b["rows"]:
-        out += ["| function | spec | FFI-checked | impl proved | SAW | holes | complete |",
-                "|---|---|---|---|---|---|---|"]
+        out += ["| function | kind | spec | FFI-checked | impl proved | SAW | holes | complete |",
+                "|---|---|---|---|---|---|---|---|"]
         for r in b["rows"]:
-            out.append("| %s | %s | %s | %s | %s | %s | %s |" % (
-                r["function"], fmt_entity(r["spec"], head), fmt_ffi(r["ffi"], head),
-                fmt_entity(r["impl"], head), "not run", fmt_holes(r["holes"]),
-                "yes" if r["complete"] else "no"))
-        done = sum(1 for r in b["rows"] if r["complete"])
-        out += ["", "%d of %d functions complete. *spec*, *impl proved*: the unit's "
-                "committed level, then the entity's own checks proved/total (its "
-                "unit's are below). *holes*: unproved checks and trust-manifest "
-                "entries in the spec and impl units." % (done, len(b["rows"])), ""]
+            ffi = fmt_ffi(r["ffi"], head)
+            if r["kind"] == "spec-only" and r["ffi"] == []:
+                ffi = "not required"
+            out.append("| %s | %s | %s | %s | %s | %s | %s | %s |" % (
+                r["function"], fmt_kind(r), fmt_entity(r["spec"], head), ffi,
+                fmt_impl(r, head), fmt_saw(r), fmt_holes(r["holes"]),
+                ("yes, by design" if r["by_design"] else "yes") if r["complete"] else "no"))
+        done = [r for r in b["rows"] if r["complete"]]
+        design = [r["function"] for r in done if r["by_design"]]
+        out += ["", "%d of %d functions complete%s. *kind*: `impl`, an implementation "
+                "entity proved equal to the spec; `impl = spec`, the spec function is "
+                "executable and is the implementation; `spec-only`, no implementation "
+                "by design, complete when the proofs it names are; `subsumed by`, no "
+                "implementation by design, complete when the row it names is (README "
+                "\"Where spec and implementation are not one-to-one\"). *spec*, *impl "
+                "proved*: the unit's committed level, then the entity's own checks "
+                "proved/total (its unit's are below). *SAW*: the default run's results "
+                "whose subprogram is the row's spec entity (spec) or impl entity "
+                "(impl), and how many are in the lax-arithmetic module; `-` for none. "
+                "*holes*: unproved checks and trust-manifest entries in the spec and "
+                "impl units (and, for `spec-only`, the units of the proofs it names)."
+                % (len(done), len(b["rows"]),
+                   " (%d by design: %s)" % (len(design), ", ".join("`%s`" % d for d in design))
+                   if design else ""), ""]
+        if b["saw"]:
+            out += ["SAW (local only, GNAT Pro; `scripts/check-saw.sh`):", ""]
+            out += ["- " + fmt_saw_record(s) + "." for s in b["saw"]]
+            if any(r["saw"] for r in b["rows"]):
+                spec_rows = sum(1 for r in b["rows"] if r["saw"]["spec"]["proved"])
+                with_impl = [r for r in b["rows"] if r["saw"]["impl"] is not None]
+                impl_rows = sum(1 for r in with_impl if r["saw"]["impl"]["proved"])
+                out += ["- The default run has a result of its own for the spec entity "
+                        "of %d of %d rows, and for the impl entity of %d of the %d rows "
+                        "that have one. README \"SAW\" says what the others are proved "
+                        "within, and why." % (spec_rows, len(b["rows"]), impl_rows,
+                                              len(with_impl))]
+            out += [""]
     else:
         out += ["No functions on the board yet (`scripts/board-rows.txt` is empty).", ""]
 
@@ -527,6 +837,8 @@ def main():
     ap.add_argument("--rows", default="scripts/board-rows.txt")
     ap.add_argument("--manifest", default="scripts/trust-surface.txt")
     ap.add_argument("--ffi-log", default="obj/ffi/ffi-results.txt")
+    ap.add_argument("--saw", default=SAW_RESULTS, help="the default SAW run's record")
+    ap.add_argument("--saw-long", default=SAW_RESULTS_LONG, help="the SAW_LONG=1 run's record")
     ap.add_argument("--json", action="store_true", help="print JSON, not markdown")
     ap.add_argument("--json-out", metavar="FILE", help="also write the JSON to FILE")
     args = ap.parse_args()
