@@ -95,11 +95,11 @@ let hash_used (l : Int) = do {
   return (eval_int {{ `uz + `t64 + `sp + `sparse + 288 + 288 : [64] }});
 };
 /*
- * hash_contract_at base mode moff l: on the stack at `base` bytes, with
- * the message where `mode` says (sha256_spec_pad.saw's msg_frame);
+ * hash_contract_at base mode lo moff l: on the stack at `base` bytes,
+ * with the message where `mode` says (sha256_spec_pad.saw's msg_frame);
  * hash_contract l is base 0, mode 0.
  */
-let hash_contract_at (base : Int) (mode : Int) (moff : Int) (l : Int) = do {
+let hash_contract_at (base : Int) (mode : Int) (lo : Int) (moff : Int) (l : Int) = do {
   let k = small_k l;
   let len = eval_int {{ `l + 1 + `k + 64 : [64] }};
   let nb = eval_int {{ `len / 512 : [64] }};
@@ -112,12 +112,12 @@ let hash_contract_at (base : Int) (mode : Int) (moff : Int) (l : Int) = do {
   let data = eval_int {{ `at + 32 : [64] }};
   let after = eval_int {{ `at + 288 : [64] }};
   stack <- secondary_stack_used base;
-  (msg, m, dp, bp) <- msg_frame stack mode moff l;
+  (msg, m, dp, bp, below) <- msg_frame stack mode lo moff l;
   llvm_execute_func [m];
   ss_post stack after;
-  msg_frame_post mode l msg dp bp;
+  msg_frame_post stack mode lo moff l msg dp bp below;
   llvm_points_to_untyped (ss_at stack at) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 255 : [128] }}]);
   llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (hash`{l} (bits_of msg)) }});
   llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
 };
-let hash_contract (l : Int) = hash_contract_at 0 0 0 l;
+let hash_contract (l : Int) = hash_contract_at 0 0 0 0 l;

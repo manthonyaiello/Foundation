@@ -24,6 +24,7 @@ import "../../algorithms/AES/SBox.cry";
 import "../../algorithms/AES/Cipher.cry";
 import "../../algorithms/AES/KeyExpansion.cry";
 import "../../shared/algebra/Polynomial/GF2.cry" (pdeg, pgcd, inverse);
+import "../../algorithms/AES/Main.cry" (AES, AES128, AES192, AES256);
 
 /*
  * The spec units as bitcode, compiled with -O0, without -g and with

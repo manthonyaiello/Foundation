@@ -71,13 +71,13 @@ let mode_name (mode : Int) (moff : Int) =
   if eval_bool {{ `mode == (0 : Integer) }} then ""
   else if eval_bool {{ `mode == (1 : Integer) }} then ", M a writable temporary"
   else str_concat (str_concat ", M on the secondary stack at " (show moff)) " bytes";
-let verify_hash_at (base : Int) (mode : Int) (moff : Int) (l : Int) = do {
-  pad_l <- verify_pad_at base mode moff l;
+let verify_hash_at (base : Int) (mode : Int) (lo : Int) (moff : Int) (l : Int) = do {
+  pad_l <- verify_pad_at base mode lo moff l;
   let nb = eval_int {{ (`l + 65 + 511) / 512 : [64] }};
   let one = eval_bool {{ `nb == (1 : Integer) }};
   verify_spec "sha256__hash"
     [pad_l, if one then i_word_of_1 else i_word_of_2, if one then i_foldl_step_1 else i_foldl_step_2]
-    (hash_contract_at base mode moff l)
+    (hash_contract_at base mode lo moff l)
     (w4_unint_z3 ["step"]) "w4_unint_z3 step"
     (str_concat (at_base base (str_concat (str_concat "l = " (show l)) ": SHA256Main::hash`{l} (Main.cry's hash at SHA-256)"))
                 (mode_name mode moff));
@@ -112,7 +112,7 @@ let verify_init_at (k : Int) (base : Int) (ko : Int) (kn : Int) = do {
   let lk = eval_int {{ 8 * `k : [64] }};
   let j = ss_size 32 lk;
   hk <- if long then do {
-          h <- verify_hash_at (eval_int {{ `base + `j : [64] }}) 2 base lk;
+          h <- verify_hash_at (eval_int {{ `base + `j : [64] }}) 2 (if eval_bool {{ `kn == (0 : Integer) }} then base else ko) base lk;
           return [h];
         } else return [];
   verify_hmac_spec "hmac_init" hk
@@ -151,8 +151,8 @@ let verify_hmac (k : Int) (t : Int) = do {
   let after = eval_int {{ `res + 288 : [64] }};
   init1 <- verify_init_at k 0 0 0;
   init2 <- verify_init_at k b2 (eval_int {{ `u - 544 : [64] }}) 1168;
-  hn <- verify_hash_at hn_base 1 0 ln;
-  hl <- verify_hash_at hl_base 1 0 768;
+  hn <- verify_hash_at hn_base 1 0 0 ln;
+  hl <- verify_hash_at hl_base 1 0 0 768;
   let none = eval_bool {{ `k == (0 : Integer) /\ `t == (0 : Integer) }};
   verify_hmac_spec "hmac" [init1, init2, hn, hl]
     (do {

@@ -963,6 +963,10 @@ AES (`aes_spec.saw`, with `aes_spec_gf.saw`, `aes_spec_cipher.saw`,
 | `KeyExpansion.W` | `w @ i` = `(groupBy`{4} (join (KeyExpansion`{k} key))) @ i` | each I at each k: 44, 52, 60 | the lemmas below I (SAW applies those at I - 1 and I - Nk), the leaves | z3, `SubWord` uninterpreted |
 | `KeyExpansion.KeyExpansion` | ``KeyExpansion`{k}`` | 128, 192, 256 | the W lemmas, `Nr`, `Join` | z3, `SubWord` uninterpreted |
 | `Main.Bit_Of`, `.Byte_At`, `.Split_Block`, `.Split_Key` | `Main.cry`'s `split`s: `b @ j`, ``take`{8} (bs << from)``, `split in`, `split (split key)` | `Byte_At` at 128, 192, 256 bits; `Split_Key` at each k | `Byte_At` | z3 |
+| `Main.Join_Block` | `Main.cry`'s `join : Block -> [128]` | | `Bit_Of` | z3 (its one `i128` GEP index rewritten, "The bitcode ABI") |
+| `KeyExpansion.KeyExpansion`, `Cipher.InvCipher` (as `Main` calls them) | as above | 128, 192, 256, their argument on the secondary stack (Split_Key's key words; KeyExpansion's round keys) | as above | as above |
+| **`Main.Encrypt`, `.Decrypt`** | **`Main.cry`: ``AES`{k}.Encrypt``, ``.Decrypt``** | 128, 192, 256 | `Split_Key`, `KeyExpansion`, `Split_Block`, `Cipher` or `InvCipher`, `Join_Block` | z3, `Cipher`, `InvCipher`, `KeyExpansion` uninterpreted |
+| `Main.AES128.Encrypt`, `.Decrypt`, and `AES192`'s, `AES256`'s | `Main.cry`: `AES128.Encrypt` and the others | | `Encrypt` or `Decrypt` at k | as above |
 
 `Rcon` is read by the W lemmas, and the `SBox` and `InvSBox` tables by
 `SubBytes` and `InvSubBytes` (every entry, for a symbolic block).
@@ -1036,14 +1040,6 @@ controls of the spec layer failing as they must. `aes_spec.saw` takes
 
 **Not proved by SAW**, and why:
 
-- `AES.Spec.Main.Join_Block`, and so `Encrypt`, `Decrypt` and the
-  `AES128`, `AES192` and `AES256` packages' functions, which call it:
-  `Join_Block`'s aggregate indexes its `Block_Bits` result, a constrained
-  array, by the 128-bit `Bit_Index` directly (`getelementptr [128 x i8],
-  ptr, i64 0, i128 %n`), and SAW 1.6's simulator rejects a getelementptr
-  index wider than 64 bits ("Invalid index value in GEP") when it
-  translates the function. This is SAW's limit, not the crate's, and needs
-  no change to the SPARK.
 - `SHA2.SHA256.Hash` at 120, 128 and 200 bytes (3 and 4 padded blocks)
   only with `SAW_LONG=1`: each `Word_Of` lemma, `First` symbolic, takes
   longer the longer the padded message (yices; z3 half again as long), and
@@ -1428,8 +1424,22 @@ adds:
   returned through a hidden first pointer. **SAW 1.6 cannot translate a
   `getelementptr` with an `i128` index**, which GNAT-LLVM emits where a
   constrained array of a 128-bit index type is indexed directly
-  (`Join_Block`'s aggregate over `Block_Bits'Range`); indexing through a
-  fat pointer goes through an `i64` offset and is fine.
+  (`Join_Block`'s aggregate over `Block_Bits'Range`; it is the only one in
+  the spec modules); indexing through a fat pointer goes through an `i64`
+  offset and is fine. `check-saw.sh` rewrites that one index (`gep64`):
+  `llvm-extract` takes `Join_Block` out of its unit's bitcode, LLVM's
+  `opt -passes=separate-const-offset-from-gep` (21.1.8, the pinned
+  release, as `llvm-link`) inserts `%idxprom = trunc i128 %n to i64` and
+  uses it as the index, and `llvm-link --override` puts the result in the
+  module. LangRef has a GEP index truncated to the pointer's index width
+  (64 bits) anyway, so the meaning is the same; the script checks that the
+  rewritten function, with each such `trunc` undone, is the function as
+  compiled, and that no `i128` index is left in the module. No GNAT
+  switch avoids the index (`-foptimize-ir` and every `-gnatd` debug flag
+  leave it), `instcombine` would also add `insertvalue ... poison` (which
+  SAW 1.6 rejects), and no SAW release accepts it (crucible-llvm's
+  `calcGEP_array`, at 2026-10-16, takes an index of exactly the pointer's
+  width or narrower).
 - **Unconstrained results** are on the secondary stack: `SS_Allocate`'s
   block holds the bounds record, then the data (`KeyExpansion`'s
   `Round_Keys`: `{ i32, i32 }` at 0, the blocks at 8; a `Bits`:
