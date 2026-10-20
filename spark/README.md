@@ -45,10 +45,13 @@ CI's proof gate alike. It runs, from `spark/`:
 alr -n exec -- gnatprove -P foundation_spark.gpr -j$PROVE_JOBS [-u FILE ...] [ARGS after --] $GNATPROVE_EXTRA
 ```
 
-`PROVE_JOBS` defaults to `nproc`; set it on a shared machine. The project
-`with`s `config/foundation_spark_config.gpr`, which Alire generates (it is
-gitignored) and keeps in step with `alire.toml`, hence `alr -n exec`: it
-synchronizes the workspace before running gnatprove. The log
+`PROVE_JOBS` defaults to `nproc`; set it on a shared machine. `alr -n exec`
+runs gnatprove in the crate's Alire environment (the toolchain Alire
+selected, on `PATH`). The project `with`s
+`config/foundation_spark_config.gpr`, which Alire generates from
+`alire.toml` (it is gitignored) on `alr -n build`, not on `alr -n exec`: in
+a fresh checkout or worktree, build once first, or gnatprove stops at once
+with "imported project file ... not found". The log
 (`obj/prove.log`, or `PROVE_LOG`) starts with the command line, `-j`
 included, the commit, and the allowance. The script
 
