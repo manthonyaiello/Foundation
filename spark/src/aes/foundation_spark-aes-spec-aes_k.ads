@@ -13,6 +13,8 @@
 --
 --  Everything without a {k} (Round, the S-boxes, GF(2^8), RotWord, SubWord,
 --  Rcon) stays in its non-generic unit and is proved once.
+--
+--  @formal K The key size in bits, the Cryptol's k: 128, 192 or 256.
 
 with Foundation_Spark.AES.Spec.Cipher;
 with Foundation_Spark.AES.Spec.KeyExpansion;
@@ -20,7 +22,6 @@ with Foundation_Spark.AES.Spec.Types;
 
 generic
    K : Types.Key_Size;
-   --  The key size in bits, the Cryptol's k: 128, 192 or 256.
 package Foundation_Spark.AES.Spec.AES_K with
   SPARK_Mode,
   Pure,
