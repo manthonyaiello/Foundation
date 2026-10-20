@@ -5,12 +5,12 @@
 Tony shut it down; updated again 2026-10-20 on `foundation` after Tony's
 review of E4's loose ends and the small items (no code changed; issues
 #67–#70 filed), and again after his side-by-side review of the AES spec
-layer against the Cryptol (no code changed; #72–#74 filed). The gnatprove board was re-counted on 2026-10-19 on
+layer against the Cryptol (no code changed; #72–#75 filed). The gnatprove board was re-counted on 2026-10-19 on
 `ec57e9e` on the IOD with FSF 16.1 (`check-proof.sh`, `-j8`, CI allowance:
 3554/3554, 786 s); PRs #57–#66 since changed no `spark/src`, `spark/cryptol`
 or FFI script. The SAW numbers are `spark/saw/results.txt` (default run) and
 `results-long.txt` (`SAW_LONG=1`) at `9d750d8`; the orchestrator re-ran the
-default at the head of each PR. **Open:** #67–#70, #72–#74 (below) and
+default at the head of each PR. **Open:** #67–#70, #72–#75 (below) and
 E5's #50, #51.
 **E0–E4 are closed** (epic #21 closed 2026-10-20); E5 remains.
 **The day's measurements** are in `.claude/campaign/measurements/2026-10-19-iod.md`.
@@ -161,6 +161,11 @@ Done on 2026-10-19, on the x86_64 IOD with Tony's GNAT Pro 27.0 install:
 6. **#74**: spike a generic AES spec over the key size, bridged to the
    flexible implementation by ghost dispatchers; a draft PR with
    measurements decides "AES key sizes" (below).
+7. **#75** (stretch; Tony: worthwhile, not essential): a ghost "Cryptol
+   prelude in SPARK" stating `foldl`, `split`/`join`, `@@`, `reverse`,
+   big-endian bit access and `pmult`/`pmod`/`pdiv` once, under Cryptol's
+   names, used by the AES, SHA-2 and HMAC spec bodies. After #74 and #68;
+   absorbs #73 item 2.
 
 Small items: none open. Settled on 2026-10-20 (Tony):
 * **Dropped:** Pro-27 proof repair (the crate stays on FSF 16.1; Pro 27's 4
