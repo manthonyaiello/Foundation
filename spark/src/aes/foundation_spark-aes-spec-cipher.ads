@@ -1,24 +1,20 @@
 --  The round transformations of algorithms/AES/Cipher.cry
 --  [FIPS-PUB-197 Sections 5.1 and 5.3]: SubBytes, ShiftRows,
 --  MixColumnsStep, MixColumns, AddRoundKey, their inverses, Round,
---  InvRound and InvRound', and the ciphers InvCipher and InvCipher'.
---  Cipher, the first {k} function, is in the generic AES_K (spike #74).
+--  InvRound and InvRound', the folds of the rounds, and reverse: everything
+--  of Cipher.cry that has no {k}, proved once. Its {k} functions, Cipher,
+--  InvCipher and InvCipher', are in the generic AES_K, one instance per
+--  key size (issue #80).
 --
 --  Cipher.cry's properties (M1.5) are not stated here. Ada has no primes
---  in names, so InvRound' is InvRound_Prime and InvCipher' is
---  InvCipher_Prime.
+--  in names, so InvRound' is InvRound_Prime.
 --
 --  Cipher.cry's foldl over the middle round keys is a recursive ghost
 --  fold per round function (Foldl_Round, Foldl_InvRound,
 --  Foldl_InvRound_Prime), each stated as the Cryptol prelude's foldl:
---  foldl f z [] = z and foldl f z ([x] # xs) = foldl f (f z x) xs.
---
---  Cipher.cry's argument pattern [w0] # ws # [wr] over the round keys
---  w : [Nr k + 1]Block is index arithmetic on a Round_Keys W with
---  Is_Round_Keys (K, W), so W'First = 0 and W'Last = Nr (K): w0 is W (0),
---  ws is the slice W (1 .. Nr (K) - 1), and wr is W (Nr (K)). Following
---  the campaign's decision on key sizes, the key size K is an explicit
---  parameter in the place of the Cryptol's type application `{k}.
+--  foldl f z [] = z and foldl f z ([x] # xs) = foldl f (f z x) xs. Their
+--  lists of round keys are Round_Keys of any length, as the prelude's foldl
+--  takes any [n].
 
 with Foundation_Spark.AES.Spec.GF28;
 with Foundation_Spark.AES.Spec.SBox;
@@ -202,49 +198,5 @@ is
    --  result has the bounds of Xs.
    --  @param Xs The round keys.
    --  @return Xs in reverse order.
-
-   function InvCipher
-     (K : Natural; W : Round_Keys; Input : Block) return Block
-   is (AddRoundKey (InvSubBytes (InvShiftRows
-                      (Foldl_InvRound (AddRoundKey (Input, W (Nr (K))),
-                                       Reverse_Keys (W (1 .. Nr (K) - 1))))),
-                    W (0)))
-   with Pre => Is_Round_Keys (K, W);
-   --  Cipher.cry: InvCipher : {k} (Key k) => [Nr k + 1]Block -> Block ->
-   --  Block, AES decryption [FIPS-PUB-197 Section 5.3]. NSA declares it
-   --  foreign, with Rust behind it. This mirrors its Cryptol body,
-   --  InvCipher ([w0] # ws # [wr]) in = state_final, where
-   --  state_initial = AddRoundKey in wr,
-   --  state_rounds = foldl InvRound state_initial (reverse ws), and
-   --  state_final = AddRoundKey (InvSubBytes (InvShiftRows state_rounds))
-   --  w0, with w0 = W (0), ws = W (1 .. Nr (K) - 1) and wr = W (Nr (K)).
-   --  The Cryptol's in is Input: in is an Ada reserved word. (Spike #74:
-   --  Cipher itself is in the generic AES_K; InvCipher stays here for
-   --  now.)
-   --  @param K The key size in bits, the Cryptol's k.
-   --  @param W The Nr (K) + 1 round keys, from KeyExpansion.
-   --  @param Input The ciphertext block.
-   --  @return The plaintext block.
-
-   function InvCipher_Prime
-     (K : Natural; W : Round_Keys; Input : Block) return Block
-   is (AddRoundKey
-         (Foldl_InvRound_Prime
-            (InvSubBytes (InvShiftRows (AddRoundKey (Input, W (Nr (K))))),
-             Reverse_Keys (W (1 .. Nr (K) - 1))),
-          W (0)))
-   with Pre => Is_Round_Keys (K, W);
-   --  Cipher.cry: InvCipher' : {k} (Key k) => [Nr k + 1]Block -> Block ->
-   --  Block, the alternate decryption that is more obviously the inverse
-   --  of Cipher [FIPS-PUB-197 Section 5.3]: InvCipher' ([w0] # ws # [wr])
-   --  in = state_final, where
-   --  state_initial = InvSubBytes (InvShiftRows (AddRoundKey in wr)),
-   --  state_rounds = foldl InvRound' state_initial (reverse ws), and
-   --  state_final = AddRoundKey state_rounds w0, with w0, ws and wr as in
-   --  Cipher.
-   --  @param K The key size in bits, the Cryptol's k.
-   --  @param W The Nr (K) + 1 round keys, from KeyExpansion.
-   --  @param Input The ciphertext block.
-   --  @return The plaintext block.
 
 end Foundation_Spark.AES.Spec.Cipher;

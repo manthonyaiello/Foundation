@@ -1,5 +1,4 @@
 with Foundation_Spark.AES.Main_Lemmas;
-with Foundation_Spark.AES.Spec.Cipher;
 with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Properties;
 
@@ -91,7 +90,7 @@ is
          Spec.Main.Split_Block (Spec.Main.Join_Block (Input)));
       pragma Assert
         (State
-         = Spec.Cipher.InvCipher
+         = Spec.Dispatch.InvCipher
              (K,
               Spec.Dispatch.KeyExpansion
                 (K, Spec.Main.Split_Key (K, Join_Key (Key))),

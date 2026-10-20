@@ -130,7 +130,9 @@ is
    procedure InvCipherEquivalence (K : Natural; Ws : Round_Keys; State : Block)
    with
      Pre  => Is_Round_Keys (K, Ws),
-     Post => InvCipher (K, Ws, State) = InvCipher_Prime (K, Ws, State);
+     Post =>
+       Dispatch.InvCipher (K, Ws, State)
+       = Dispatch.InvCipher_Prime (K, Ws, State);
    --  Cipher.cry: property InvCipherEquivalence ws state = InvCipher`{k}
    --  ws state == InvCipher'`{k} ws state, for {k} (Key k) and
    --  ws : [Nr k + 1]Block.
@@ -142,7 +144,9 @@ is
      (K : Natural; Ws : Round_Keys; State : Block)
    with
      Pre  => Is_Round_Keys (K, Ws),
-     Post => InvCipher_Prime (K, Ws, Dispatch.Cipher (K, Ws, State)) = State;
+     Post =>
+       Dispatch.InvCipher_Prime (K, Ws, Dispatch.Cipher (K, Ws, State))
+       = State;
    --  Cipher.cry: property CipherInverts' ws state = InvCipher'`{k} ws
    --  (Cipher`{k} ws state) == state, for {k} (Key k) and
    --  ws : [Nr k + 1]Block. CipherInverts is proved from it.
@@ -153,7 +157,8 @@ is
    procedure CipherInverts (K : Natural; Ws : Round_Keys; State : Block)
    with
      Pre  => Is_Round_Keys (K, Ws),
-     Post => InvCipher (K, Ws, Dispatch.Cipher (K, Ws, State)) = State;
+     Post =>
+       Dispatch.InvCipher (K, Ws, Dispatch.Cipher (K, Ws, State)) = State;
    --  Cipher.cry: property CipherInverts ws state = InvCipher`{k} ws
    --  (Cipher`{k} ws state) == state, for {k} (Key k) and
    --  ws : [Nr k + 1]Block.
@@ -388,7 +393,7 @@ is
    procedure Lemma_InvCipher_Eq (K : Natural; Ws : Round_Keys; A, B : Block)
    with
      Pre  => Is_Round_Keys (K, Ws) and then A = B,
-     Post => InvCipher (K, Ws, A) = InvCipher (K, Ws, B);
+     Post => Dispatch.InvCipher (K, Ws, A) = Dispatch.InvCipher (K, Ws, B);
    --  InvCipher maps equal blocks to equal blocks.
    --  @param K The key size in bits.
    --  @param Ws The round keys.

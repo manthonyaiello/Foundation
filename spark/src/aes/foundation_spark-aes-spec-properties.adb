@@ -495,10 +495,6 @@ is
       CipherInverts_Prime (K, Ws, State);
    end CipherInverts;
 
-   ------------------------
-   -- Lemma_InvCipher_Eq --
-   ------------------------
-
    ----------------------------
    -- Lemma_Split_Join_Block --
    ----------------------------
@@ -525,6 +521,10 @@ is
    begin
       pragma Assert (Main.Join_Block (Main.Split_Block (Bs)) = Bs);
    end Lemma_Join_Split_Block;
+
+   ------------------------
+   -- Lemma_InvCipher_Eq --
+   ------------------------
 
    procedure Lemma_InvCipher_Eq (K : Natural; Ws : Round_Keys; A, B : Block)
    is

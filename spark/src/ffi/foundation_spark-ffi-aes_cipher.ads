@@ -183,7 +183,7 @@ is
      External_Name => "spark_InvCipher",
      Pre           => Is_Key_Size (K),
      Post          =>
-       Output = Foundation_Spark.AES.Spec.Cipher.InvCipher
+       Output = Foundation_Spark.AES.Spec.Dispatch.InvCipher
                   (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    --  Cipher.cry's InvCipher`{k}, as the spec states it, for k = K.
    --  @param K The key size, Cryptol's {k}.
@@ -199,7 +199,7 @@ is
      External_Name => "spark_InvCipher_Prime",
      Pre           => Is_Key_Size (K),
      Post          =>
-       Output = Foundation_Spark.AES.Spec.Cipher.InvCipher_Prime
+       Output = Foundation_Spark.AES.Spec.Dispatch.InvCipher_Prime
                   (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    --  Cipher.cry's InvCipher'`{k}, as the spec states it (InvCipher_Prime),
    --  for k = K.

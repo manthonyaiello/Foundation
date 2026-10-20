@@ -114,7 +114,8 @@ is
      Pre  =>
        Is_Round_Keys (K, V) and then Is_Round_Keys (K, W)
        and then V = W and then A = B,
-     Post => InvCipher (K, V, A) = InvCipher (K, W, B);
+     Post =>
+       Spec.Dispatch.InvCipher (K, V, A) = Spec.Dispatch.InvCipher (K, W, B);
    --  InvCipher maps equal round keys and equal blocks to equal blocks.
    --  @param K The key size in bits.
    --  @param V Round keys.

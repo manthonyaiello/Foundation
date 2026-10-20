@@ -101,4 +101,39 @@ is
    --  @param Input The plaintext block.
    --  @return The ciphertext block.
 
+   function InvCipher (W : Round_Keys; Input : Block) return Block
+   is (AddRoundKey (InvSubBytes (InvShiftRows
+                      (Foldl_InvRound (AddRoundKey (Input, W (Nr)),
+                                       Reverse_Keys (W (1 .. Nr - 1))))),
+                    W (0)));
+   --  Cipher.cry: InvCipher : {k} (Key k) => [Nr k + 1]Block -> Block ->
+   --  Block, AES decryption [FIPS-PUB-197 Section 5.3]. NSA declares it
+   --  foreign, with Rust behind it. This mirrors its Cryptol body,
+   --  InvCipher ([w0] # ws # [wr]) in = state_final, where
+   --  state_initial = AddRoundKey in wr,
+   --  state_rounds = foldl InvRound state_initial (reverse ws), and
+   --  state_final = AddRoundKey (InvSubBytes (InvShiftRows state_rounds))
+   --  w0, with w0 = W (0), ws = W (1 .. Nr - 1) and wr = W (Nr).
+   --  @param W The Nr + 1 round keys, the Cryptol's [Nr k + 1]Block.
+   --  @param Input The ciphertext block.
+   --  @return The plaintext block.
+
+   function InvCipher_Prime (W : Round_Keys; Input : Block) return Block
+   is (AddRoundKey
+         (Foldl_InvRound_Prime
+            (InvSubBytes (InvShiftRows (AddRoundKey (Input, W (Nr)))),
+             Reverse_Keys (W (1 .. Nr - 1))),
+          W (0)));
+   --  Cipher.cry: InvCipher' : {k} (Key k) => [Nr k + 1]Block -> Block ->
+   --  Block, the alternate decryption that is more obviously the inverse
+   --  of Cipher [FIPS-PUB-197 Section 5.3]: InvCipher' ([w0] # ws # [wr])
+   --  in = state_final, where
+   --  state_initial = InvSubBytes (InvShiftRows (AddRoundKey in wr)),
+   --  state_rounds = foldl InvRound' state_initial (reverse ws), and
+   --  state_final = AddRoundKey state_rounds w0, with w0, ws and wr as in
+   --  Cipher. Ada has no primes in names.
+   --  @param W The Nr + 1 round keys, the Cryptol's [Nr k + 1]Block.
+   --  @param Input The ciphertext block.
+   --  @return The plaintext block.
+
 end Foundation_Spark.AES.Spec.AES_K;

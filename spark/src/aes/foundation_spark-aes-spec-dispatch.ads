@@ -118,4 +118,48 @@ is
    --  @param Input The plaintext block.
    --  @return The ciphertext block.
 
+   function InvCipher
+     (K : Key_Size; W : Round_Keys; Input : Block) return Block
+   is (case K is
+         when 128 => AES128.InvCipher (W, Input),
+         when 192 => AES192.InvCipher (W, Input),
+         when 256 => AES256.InvCipher (W, Input))
+   with
+     Pre  => Is_Round_Keys (K, W),
+     Post =>
+       InvCipher'Result
+       = AddRoundKey (InvSubBytes (InvShiftRows
+                        (Foldl_InvRound
+                           (AddRoundKey (Input, W (Nr (K))),
+                            Reverse_Keys (W (1 .. Nr (K) - 1))))),
+                      W (0));
+   --  Cipher.cry's InvCipher`{k} at k = K: the instance's InvCipher. The
+   --  postcondition is its body, uniformly in K.
+   --  @param K The key size in bits, the Cryptol's k.
+   --  @param W The Nr (K) + 1 round keys.
+   --  @param Input The ciphertext block.
+   --  @return The plaintext block.
+
+   function InvCipher_Prime
+     (K : Key_Size; W : Round_Keys; Input : Block) return Block
+   is (case K is
+         when 128 => AES128.InvCipher_Prime (W, Input),
+         when 192 => AES192.InvCipher_Prime (W, Input),
+         when 256 => AES256.InvCipher_Prime (W, Input))
+   with
+     Pre  => Is_Round_Keys (K, W),
+     Post =>
+       InvCipher_Prime'Result
+       = AddRoundKey
+           (Foldl_InvRound_Prime
+              (InvSubBytes (InvShiftRows (AddRoundKey (Input, W (Nr (K))))),
+               Reverse_Keys (W (1 .. Nr (K) - 1))),
+            W (0));
+   --  Cipher.cry's InvCipher'`{k} at k = K: the instance's
+   --  InvCipher_Prime. The postcondition is its body, uniformly in K.
+   --  @param K The key size in bits, the Cryptol's k.
+   --  @param W The Nr (K) + 1 round keys.
+   --  @param Input The ciphertext block.
+   --  @return The plaintext block.
+
 end Foundation_Spark.AES.Spec.Dispatch;

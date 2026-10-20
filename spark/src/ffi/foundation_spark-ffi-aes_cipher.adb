@@ -77,7 +77,7 @@ is
      (K : C_Size; W : All_Round_Keys; Input : Block; Output : out Block) is
    begin
       Output :=
-        Foundation_Spark.AES.Spec.Cipher.InvCipher
+        Foundation_Spark.AES.Spec.Dispatch.InvCipher
           (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    end InvCipher;
 
@@ -85,7 +85,7 @@ is
      (K : C_Size; W : All_Round_Keys; Input : Block; Output : out Block) is
    begin
       Output :=
-        Foundation_Spark.AES.Spec.Cipher.InvCipher_Prime
+        Foundation_Spark.AES.Spec.Dispatch.InvCipher_Prime
           (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    end InvCipher_Prime;
 

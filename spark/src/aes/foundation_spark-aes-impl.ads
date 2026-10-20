@@ -271,7 +271,7 @@ is
    procedure Decrypt_Block (K : Natural; W : Round_Keys; State : in out Block)
    with
      Pre  => Is_Round_Keys (K, W),
-     Post => State = Spec.Cipher.InvCipher (K, W, State'Old);
+     Post => State = Spec.Dispatch.InvCipher (K, W, State'Old);
    --  AES decryption of one block in place [FIPS-PUB-197 Section 5.3]:
    --  AddRoundKey by W (Nr (K)), Nr (K) - 1 inverse rounds by W (Nr (K) -
    --  1) down to W (1), and the final inverse round without InvMixColumns
@@ -284,7 +284,7 @@ is
      (K : Natural; W : Round_Keys; State : in out Block)
    with
      Pre  => Is_Round_Keys (K, W),
-     Post => State = Spec.Cipher.InvCipher_Prime (K, W, State'Old);
+     Post => State = Spec.Dispatch.InvCipher_Prime (K, W, State'Old);
    --  The alternate AES decryption InvCipher' of one block in place,
    --  the rounds of Encrypt_Block undone in reverse order.
    --  @param K The key size in bits: 128, 192 or 256.

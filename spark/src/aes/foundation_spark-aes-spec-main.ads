@@ -21,7 +21,6 @@
 --  still Spec.Cipher's. The full change would make Encrypt and Decrypt
 --  generic too, and the nested AES128 below an instance.
 
-with Foundation_Spark.AES.Spec.Cipher;
 with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Types;
 
@@ -140,7 +139,7 @@ is
    function Decrypt (K : Natural; Key : Bits; Input : Block_Bits)
      return Block_Bits
    is (Join_Block
-         (Cipher.InvCipher
+         (Dispatch.InvCipher
             (K, Dispatch.KeyExpansion (K, Split_Key (K, Key)),
              Split_Block (Input))))
    with Pre => Is_Key_Bits (K, Key);
