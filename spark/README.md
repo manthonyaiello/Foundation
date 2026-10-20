@@ -1028,15 +1028,15 @@ it text for text, the spec's `HMAC_init` is proved against the copy, and
 overrides, which ties the copy to `Main.cry` (as `Step` ties
 `SHA256Step.cry`).
 
-**Measured** (`results.txt`, the run at `2ae2b2a` on the x86_64 IOD):
-2162 proofs of the spec layer, 1064 of AES (768 of them the exhaustive
-`Pgcd`, `Inverse` and `Affine`, recorded as three `RESULTS 256` lines) and
-1098 of SHA-256 (266 in the module as loaded, 832 in its lax-arithmetic
-load: the compression function again, 7 `To_Bits` chains, 12 `Pad`, 66
-`Word_Of`, 5 `Foldl_Step`, 9 `Hash`, and their leaves), with 9 negative
-controls of the spec layer failing as they must. `aes_spec.saw` takes
-522 s, `sha256_spec.saw` 1363 s (most of it `Word_Of`), the whole
-`check-saw.sh` 2732 s; peak memory 2.5 GB.
+**Measured** (`results.txt`, the default run at `d874133` on the x86_64
+IOD): 2742 proofs of the spec layer, 1083 of AES (768 of them the
+exhaustive `Pgcd`, `Inverse` and `Affine`, recorded as three `RESULTS 256`
+lines) and 1659 of SHA-256 and HMAC (1393 of them in the lax-arithmetic
+load), with 11 negative controls of the spec layer failing as they must.
+`aes_spec.saw` takes 567 s, `sha256_spec.saw` 2362 s (most of it the
+`To_Bits` chains, 15 of them, and `Word_Of`), the whole `check-saw.sh`
+3785 s; peak memory 3.8 GB. `SAW_LONG=1` writes `results-long.txt`
+(below, "Running it").
 
 **Not proved by SAW**, and why:
 
@@ -1110,9 +1110,11 @@ at the spec layer, for every input at the sizes stated: `prop_SubBytes`,
 and block, at the property's key size); `prop_pad` (at the twelve
 lengths) and `prop_hash`, `prop_hash_bits` (at nine). `SBox.affine` and
 `GF2::inverse`, which have no FFI property and no executable counterpart,
-are proved for every byte. Not backed: `prop_parse` (executed within
-`Hash` only), `Main`'s `prop_Encrypt*`/`prop_Decrypt*`, `prop_Hash_Bytes`
-and the HMAC properties.
+are proved for every byte. Since #59's second PR, `Main`'s
+`prop_Encrypt*`/`prop_Decrypt*` too (every key and block at each key
+size), and HMAC's spec properties (`prop_HMAC_*`, `prop_HMAC_init`) at
+the (key, text) lengths proved, which overlap theirs only in part. Not
+backed: `prop_parse` (executed within `Hash` only) and `prop_Hash_Bytes`.
 
 ### Running it
 
@@ -1123,7 +1125,18 @@ the same module, and `check-saw.sh` refuses to run if a script under
 ```console
 $ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install LLVM_LINK_DIR=.../llvm-21.1.8 scripts/check-saw.sh
 $ scripts/check-saw.sh --print      # run, print the record, write nothing
+$ SAW_LONG=1 scripts/check-saw.sh   # also the long proofs; writes saw/results-long.txt
 ```
+
+**What the default run proves, and `SAW_LONG`.** The default run (about
+an hour on the x86_64 IOD) proves everything above but `Hash` at 120, 128
+and 200 bytes and HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and
+(100, 32) bytes; `SAW_LONG=1` adds those (`Word_Of`'s lemmas for 1536 and
+2048 bits, `Foldl_Step` at 3 and 4 blocks, and four more HMAC lengths
+with their hashes' lemmas at their stack bases) and records the run in
+`saw/results-long.txt`. Each record's `options` line says which it was.
+`LLVM_LINK_DIR` must hold `bin/opt` and `bin/llvm-extract` of the same
+release too (the spec layer's one GEP rewrite, "The bitcode ABI").
 
 **Local only, never CI** (Tony, 2026-10-19). The bitcode comes from
 **GNAT Pro 27's LLVM back end** (`$GNAT_LLVM_DIR/bin/llvm-gcc`), which CI
