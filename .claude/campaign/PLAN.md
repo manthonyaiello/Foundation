@@ -5,12 +5,12 @@
 Tony shut it down; updated again 2026-10-20 on `foundation` after Tony's
 review of E4's loose ends and the small items (no code changed; issues
 #67–#70 filed), and again after his side-by-side review of the AES spec
-layer against the Cryptol (no code changed; #72 and #73 filed). The gnatprove board was re-counted on 2026-10-19 on
+layer against the Cryptol (no code changed; #72–#74 filed). The gnatprove board was re-counted on 2026-10-19 on
 `ec57e9e` on the IOD with FSF 16.1 (`check-proof.sh`, `-j8`, CI allowance:
 3554/3554, 786 s); PRs #57–#66 since changed no `spark/src`, `spark/cryptol`
 or FFI script. The SAW numbers are `spark/saw/results.txt` (default run) and
 `results-long.txt` (`SAW_LONG=1`) at `9d750d8`; the orchestrator re-ran the
-default at the head of each PR. **Open:** #67–#70, #72, #73 (below) and
+default at the head of each PR. **Open:** #67–#70, #72–#74 (below) and
 E5's #50, #51.
 **E0–E4 are closed** (epic #21 closed 2026-10-20); E5 remains.
 **The day's measurements** are in `.claude/campaign/measurements/2026-10-19-iod.md`.
@@ -158,6 +158,9 @@ Done on 2026-10-19, on the x86_64 IOD with Tony's GNAT Pro 27.0 install:
    spec-layer review feedback, an umbrella he adds to: `Key k` as a
    `Key_Size` subtype with a predicate (decided); one `foldl` generic and the
    two unstated `SBox.cry` properties (open for Tony).
+6. **#74**: spike a generic AES spec over the key size, bridged to the
+   flexible implementation by ghost dispatchers; a draft PR with
+   measurements decides "AES key sizes" (below).
 
 Small items: none open. Settled on 2026-10-20 (Tony):
 * **Dropped:** Pro-27 proof repair (the crate stays on FSF 16.1; Pro 27's 4
@@ -240,17 +243,29 @@ Not yet, and not filed:
   samples on the executables proved equal to the spec (so faithfulness is
   checked transitively), a few direct tests per ghost spec export. A long run
   at large N is deferred to times Tony chooses.
-* **AES key sizes.** Unconstrained arrays with an explicit `K` and
-  `Is_Key_Words`/`Is_Round_Keys` preconditions. Held through M1.4; no generic.
-  Reviewed and kept (Tony, 2026-10-20). A generic over `K` mirrors Cryptol's
-  `{k}` more closely: the lengths `[Nk k]` and `[Nr k + 1]` go into the
-  subtypes, `Is_Key_Words`/`Is_Round_Keys` disappear, `Cipher` takes Cryptol's
-  two arguments, and `AES128` is an instance. But gnatprove proves a generic
-  only through its instances, so proof time triples, and the implementation
-  would either triple its executable footprint or need bridging proofs from
-  one flexible implementation to three generic specs. Neither is worth
-  removing this deviation. The implementation stays flexible in the key size.
-  `Key k` itself becomes a subtype predicate instead (#73).
+* **AES key sizes.** **Under reconsideration (Tony, 2026-10-20), pending
+  the spike #74.** Now: unconstrained arrays with an explicit `K` and
+  `Is_Key_Words`/`Is_Round_Keys` preconditions, held through M1.4, no
+  generic. This is the spec layer's largest deviation from the Cryptol, whose
+  `{k}` functions `AES128 = AES`{128}` instantiates.
+  * *First review, earlier the same day:* kept. A generic mirrors `{k}` more
+    closely (lengths in the subtypes, no `Is_*` preconditions, Cryptol's
+    arities, `AES128` an instance), but proof time triples and the
+    implementation would either triple its executable footprint or need
+    bridging proofs to three generic specs.
+  * *Why reopened:* that weighed the wrong alternatives. Only the `{k}`
+    functions need be generic (`KeyExpansion`, `Cipher`, `InvCipher`,
+    `InvCipher'`, `Encrypt`/`Decrypt`). `Round`, the S-boxes, GF(2^8) and
+    their lemmas stay non-generic and are proved once. The instances'
+    subtypes constrain the existing unconstrained types, so the
+    implementation stays flexible in `K` with no conversions. The bridge is
+    one ghost dispatcher per `{k}` function (`case K is when 128 =>
+    AES128.Cipher (W, S) …`), named by the implementation's postconditions.
+    Tripling is confined to the `k`-dependent parts. The unknown is the
+    lemmas the three-way split needs.
+  * *Decide on:* #74's proof times, lemma churn and reading of the generic
+    `Cipher` beside `Cipher.cry`. `Key k` becomes a `Key_Size` predicate
+    subtype either way (#73), the formal's subtype under the generic.
 * **SHA-2 generality.** A generic mirroring `SHA2::Main`, instantiated for
   SHA-256 only. Library-level instances need `pragma SPARK_Mode (On)`.
 * **Bit sequences.** Ghost Boolean arrays, length < 2**64. SHA-2's index is
