@@ -83,14 +83,14 @@ GF2::inverse (AES)            | Foundation_Spark.AES.Spec.GF2.Inverse           
 
 # AES (#9): KeyExpansion.cry. Rcon is a constant table, so its entity is the
 # KeyExpansion package.
-AES::KeyExpansion::KeyExpansion | Foundation_Spark.AES.Spec.KeyExpansion.KeyExpansion | Foundation_Spark.AES.Impl.Expand_Key
+AES::KeyExpansion::KeyExpansion | Foundation_Spark.AES.Spec.Dispatch.KeyExpansion    | Foundation_Spark.AES.Impl.Expand_Key
 AES::KeyExpansion::Rcon       | Foundation_Spark.AES.Spec.KeyExpansion              | Foundation_Spark.AES.Impl.Rcon
 AES::KeyExpansion::RotWord    | Foundation_Spark.AES.Spec.KeyExpansion.RotWord      | Foundation_Spark.AES.Impl.Rot_Word
 AES::KeyExpansion::SubWord    | Foundation_Spark.AES.Spec.KeyExpansion.SubWord      | Foundation_Spark.AES.Impl.Sub_Word
 
 # AES (#10): Cipher.cry's ciphers and Main.cry's Encrypt and Decrypt (the
 # k-parameterized forms; AES128/192/256 are their instances).
-AES::Cipher::Cipher           | Foundation_Spark.AES.Spec.Cipher.Cipher             | Foundation_Spark.AES.Impl.Encrypt_Block
+AES::Cipher::Cipher           | Foundation_Spark.AES.Spec.Dispatch.Cipher           | Foundation_Spark.AES.Impl.Encrypt_Block
 AES::Cipher::InvCipher        | Foundation_Spark.AES.Spec.Cipher.InvCipher          | Foundation_Spark.AES.Impl.Decrypt_Block
 AES::Cipher::InvCipher'       | Foundation_Spark.AES.Spec.Cipher.InvCipher_Prime    | Foundation_Spark.AES.Impl.Decrypt_Block_Prime
 AES::Main::Encrypt            | Foundation_Spark.AES.Spec.Main.Encrypt              | Foundation_Spark.AES.Impl.Main.Encrypt
