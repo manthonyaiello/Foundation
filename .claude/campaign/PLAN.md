@@ -281,6 +281,16 @@ Not yet, and not filed:
 * **Fixed-width words** (Tony, 2026-10-20): AES bytes are `Unsigned_8` with a
   Cryptol-order bit accessor (`Bit_Of`), not Boolean arrays; Boolean arrays
   are for arbitrary-length sequences only.
+* **Re-proved Cryptol properties are optional** (Tony, 2026-10-20). The
+  spec layer is proved equal to the Cryptol (SAW), so the Cryptol's
+  properties already hold of it. Re-proving them in SPARK is, in general, a
+  bad idea: it adds proof cost without adding a theorem. Every writeup of
+  this work says so. They stay for now, all of them, `SBoxCorrect` (the
+  26-minute `sbox_entries`) included, because SAW does not run in CI. Until
+  it does, they are the continuously checked cross-check that the SPARK spec
+  is right. The two not stated (`SBoxPolynomialIsIrreducible`,
+  `inverseCorrect`, #73 item 3) need not be added for this reason. Revisit
+  when SAW runs in CI.
 * **Spec and implementation need not be one-to-one** (Tony, 2026-10-20):
   `affine` and `GF2::inverse` (covered through `SBoxCorrect` and
   `Sub_Byte`'s postcondition), `pad` (through `hash`), and the "impl = spec"
