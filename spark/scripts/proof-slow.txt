@@ -25,11 +25,11 @@
 
 unit src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
   reason      SBoxCorrect by a generated case enumeration over the 256 bytes (7,700 lines, level 4). Cold: 1h40m47s in CI (#41 at 09475b8); 1102 s of gnatprove on the campaign machine at 46c5799 (6 tokens)
-  commit      24e9efd3f7cf006ddb4f3eac5cb06daf0e55b6ba
-  date        2026-10-19
+  commit      33db1c170b047e8c1a1c464ccf7d023f0905f256
+  date        2026-10-20
   level       4
   checks      2482/2482
-  fingerprint sha256:827ff31814413340af372d82984ba97878792674581dd9b208a57241bfac14f0
+  fingerprint sha256:659e3b8cb6e93a25a570a23895f50c5ae6375287e5d95e70461ffe99653a71d3
   input       ad09bcbb5ff17488 gpr: Proof_Switches ("Ada")
   input       97881b83f6e39847 gpr: Proof_Switches ("foundation_spark-aes-spec-gf2.ads")
   input       6b31396743fd59e2 gpr: Proof_Switches ("foundation_spark-aes-spec-properties-sbox_entries.adb")
@@ -41,7 +41,7 @@ unit src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
   input       2a8b5954e432b09b src/aes/foundation_spark-aes-spec-gf2.ads
   input       7344617b51cf7327 src/aes/foundation_spark-aes-spec-gf28.ads
   input       93af4f6592da175a src/aes/foundation_spark-aes-spec-keyexpansion.ads
-  input       ae76aeee86d1ede8 src/aes/foundation_spark-aes-spec-main.ads
+  input       6bc9c254310d8c65 src/aes/foundation_spark-aes-spec-main.ads
   input       4ae092a7cf3ea69a src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
   input       d7f70065b4109258 src/aes/foundation_spark-aes-spec-properties-sbox_entries.ads
   input       a479f854024d94b4 src/aes/foundation_spark-aes-spec-properties.adb
