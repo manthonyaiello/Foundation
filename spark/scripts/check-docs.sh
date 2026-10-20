@@ -54,20 +54,18 @@ EOF
   exit 2
 fi
 
-# Entities we do not author. gnatdoc walks the whole closure, SPARKlib
-# included; warning lines carry only a base name, so the filter is by unit:
-#   spark.ads, spark-*   SPARKlib
-#   *_config.ads         Alire-generated, gitignored crate config
-# Our own units all start with foundation_spark, so `spark[-.]` anchored at the
-# start of the name cannot catch one. Warnings on .gpr files are NOT filtered:
-# a project problem should fail the gate rather than hide.
-readonly NOT_OURS='^(spark[-.])|_config\.ads:'
+# Entities we do not author. The crate has no dependency (#72 removed the
+# unused SPARKlib), so the one unit in gnatdoc's closure that is not ours is
+# the crate config, foundation_spark_config.ads: Alire-generated and
+# gitignored. Warning lines carry only a base name, so the filter is by unit.
+# Warnings on .gpr files are NOT filtered: a project problem should fail the
+# gate rather than hide.
+readonly NOT_OURS='_config\.ads:'
 
 mkdir -p "$OUT_DIR"
 : > "$LOG"
 
-# The raw output goes to the log only: gnatdoc reports on SPARKlib too, which
-# is thousands of lines that are not ours. What is ours is printed below.
+# The raw output goes to the log, and what is ours is printed below.
 echo "== foundation_spark.gpr" >> "$LOG"
 echo ">> gnatdoc --style=gnat --generate=private --warnings -P foundation_spark.gpr (log: spark/docs/gnatdoc-run.txt)"
 set +e
@@ -97,12 +95,12 @@ findings="$(printf '%s\n' "$ours" | grep -vE ': internal error:' | sed '/^$/d' |
 # Output that is neither a diagnostic nor framing, so that a new output shape
 # cannot hide behind patterns written for the old one. 26.0.0 prints a bare AST
 # node for a package renaming, e.g.
-#   <PackageRenamingDecl ["EHT"] spark-containers-formal-unbounded_hashed_maps.ads:1059:4-1059:45>
-# (SPARKlib has four). Such a line names its file mid-line, so the same
-# not-ours filter is applied to the file it names.
-readonly NOT_OURS_NAMED='(^|[^A-Za-z0-9_])spark[-.][A-Za-z0-9_.-]*\.ad[sb]:|_config\.ads:'
+#   <PackageRenamingDecl ["EHT"] some_unit.ads:1059:4-1059:45>
+# (the crate has no package renaming; SPARKlib, a dependency until #72, had
+# four). Such a line names its file mid-line; the not-ours filter matches
+# there too.
 unaccounted="$(grep -vE '^(==|[A-Za-z0-9_.-]+:[0-9]+:[0-9]+:|Note:|Success:|error:|warning:)' "$LOG" \
-               | grep -vE "$NOT_OURS_NAMED" | sed '/^$/d' | sort -u || true)"
+               | grep -vE "$NOT_OURS" | sed '/^$/d' | sort -u || true)"
 
 if [ -n "$crashes" ]; then
   echo

@@ -6,8 +6,8 @@
 #
 # Every version is pinned in spark/scripts/toolchain-pins.env, which the
 # x86_64 bootstrap (spark/scripts/bootstrap-x86_64.sh) reads too, so CI and
-# the instance cannot drift apart: Alire 2.1.1, gnat_native 16.1.0 (sparklib
-# ^16.1.0 needs GNAT 16), gprbuild 26.0.1, gnatprove 16.1.0, gnatdoc_bin
+# the instance cannot drift apart: Alire 2.1.1, gnat_native 16.1.0 (it
+# matches gnatprove FSF 16.1.0), gprbuild 26.0.1, gnatprove 16.1.0, gnatdoc_bin
 # 26.0.0 (the generation that pairs with gnat_native 16.1.0), gnatcov 26.2.1
 # (the coverage job, #49), and Cryptol's and SAW's release assets with their
 # sha256. The set of proved checks and of doc warnings IS the gate, so an

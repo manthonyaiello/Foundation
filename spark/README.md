@@ -19,9 +19,12 @@ Foundation algorithms, proved against the Cryptol specifications in
 
 ## Toolchain
 
-Uses gnat_native 16.1.0 and SPARKlib 16.1.0 (for
-`SPARK.Higher_Order.Fold` and `SPARK.Big_Integers`). gnatprove 16.1.0
-must be on `PATH`; it was installed with `alr install gnatprove` into
+Uses gnat_native 16.1.0, the compiler that matches gnatprove FSF 16.1.0
+(versions pinned in `scripts/toolchain-pins.env`). The crate depends on no
+other crate: the spec layers state each Cryptol `foldl` as their own
+recursive ghost function, closer to the Cryptol than a library generic, so
+SPARKlib, once a dependency, was never used and was removed (#72).
+gnatprove 16.1.0 must be on `PATH`; it was installed with `alr install gnatprove` into
 `~/.alire/bin`.
 
 ```console
@@ -42,8 +45,10 @@ CI's proof gate alike. It runs, from `spark/`:
 alr -n exec -- gnatprove -P foundation_spark.gpr -j$PROVE_JOBS [-u FILE ...] [ARGS after --] $GNATPROVE_EXTRA
 ```
 
-`PROVE_JOBS` defaults to `nproc`; set it on a shared machine. A bare
-`gnatprove` does not find SPARKlib's project, hence `alr -n exec`. The log
+`PROVE_JOBS` defaults to `nproc`; set it on a shared machine. The project
+`with`s `config/foundation_spark_config.gpr`, which Alire generates (it is
+gitignored) and keeps in step with `alire.toml`, hence `alr -n exec`: it
+synchronizes the workspace before running gnatprove. The log
 (`obj/prove.log`, or `PROVE_LOG`) starts with the command line, `-j`
 included, the commit, and the allowance. The script
 
@@ -709,10 +714,9 @@ unit src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
   private ones too), their parents, and so on, through the spec and the body
   of each. A body is included because it can change what gnatprove assumes
   of its unit (generated `Global` contracts, a generic's instance), so the
-  closure errs towards staleness. Units outside `src/` (the runtime,
-  SPARKlib) are listed in the verbose output but not hashed. The toolchain
-  versions are inputs; SPARKlib's version is pinned by `alire.toml`, which
-  is not;
+  closure errs towards staleness. Units outside `src/` (the runtime) are
+  listed in the verbose output but not hashed. The toolchain versions are
+  inputs; `alire.toml` is not;
 - the GPR's proof switches for those files: the `Prove` package's level
   definitions, `Proof_Switches ("Ada")`, and each input file's own
   `Proof_Switches`;
@@ -1198,7 +1202,7 @@ do not read `saw/`: the trust and docs gates scan `src/`, and the bitcode
    `src/hmac/foundation_spark-hmac-sha256_impl.adb`. No run-time or
    validity checks (gnatprove proves them absent). No `-gnata`, so
    contracts, assertions and ghost code are ignored and none reaches the
-   bitcode. The units need no SPARKlib.
+   bitcode.
 2. `llvm-link` of each module's units into `saw/obj/aes.bc` and
    `saw/obj/sha256.bc`. `llvm-nm` checks each unit's bitcode and each
    linked module: no symbol of a ghost entity is defined or referenced —
