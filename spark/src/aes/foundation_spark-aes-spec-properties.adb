@@ -1,5 +1,4 @@
 with Foundation_Spark.AES.Lemmas;
-with Foundation_Spark.AES.Spec.KeyExpansion;
 with Foundation_Spark.AES.Spec.Properties.SBox_Entries;
 
 package body Foundation_Spark.AES.Spec.Properties with
@@ -491,7 +490,7 @@ is
       Mid : constant Round_Keys := Ws (1 .. Nr (K) - 1);
       F   : constant Block :=
         Foldl_Round (AddRoundKey (State, Ws (0)), Mid);
-      C   : constant Block := Cipher.Cipher (K, Ws, State);
+      C   : constant Block := Dispatch.Cipher (K, Ws, State);
       S1  : constant Block := ShiftRows (SubBytes (F));
    begin
       pragma Assert (C = AddRoundKey (S1, Ws (Nr (K))));
@@ -514,7 +513,7 @@ is
 
    procedure CipherInverts (K : Natural; Ws : Round_Keys; State : Block) is
    begin
-      InvCipherEquivalence (K, Ws, Cipher.Cipher (K, Ws, State));
+      InvCipherEquivalence (K, Ws, Dispatch.Cipher (K, Ws, State));
       CipherInverts_Prime (K, Ws, State);
    end CipherInverts;
 
@@ -557,9 +556,9 @@ is
      (K : Natural; Key : Main.Bits; Input : Main.Block_Bits)
    is
       W  : constant Round_Keys :=
-        KeyExpansion.KeyExpansion (K, Main.Split_Key (K, Key));
+        Dispatch.KeyExpansion (K, Main.Split_Key (K, Key));
       P  : constant Block := Main.Split_Block (Input);
-      C  : constant Block := Cipher.Cipher (K, W, P);
+      C  : constant Block := Dispatch.Cipher (K, W, P);
    begin
       Lemma_Split_Join_Block (C);
       Lemma_InvCipher_Eq (K, W, Main.Split_Block (Main.Join_Block (C)), C);

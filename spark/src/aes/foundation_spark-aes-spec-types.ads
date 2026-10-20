@@ -68,17 +68,32 @@ is
    --  @param K A key size in bits.
    --  @return Whether K is 128, 192 or 256.
 
-   function Nk (K : Natural) return Positive
+   subtype Key_Size is Natural
+   with Static_Predicate => Key_Size in 128 | 192 | 256;
+   --  Types.cry: type constraint Key k, as a subtype: the type of the
+   --  formal K of the generic AES_K, which stands for the Cryptol's
+   --  {k} (Key k) (issue #73 item 1). The values Key allows, listed:
+   --  Dispatch.Lemma_Key_Size proves the list equal to Key, clause for
+   --  clause. Spike #74: a Static_Predicate, not #73's Dynamic_Predicate
+   --  with Key's clauses (which a Static_Predicate cannot state: no mod,
+   --  RM 3.2.4), because only a static subtype makes the formal K static
+   --  in an instance, and a Pure instance needs static bounds for its
+   --  Key_Words and Round_Keys subtypes (RM 10.2.1). It also lets a case
+   --  over K be complete without others.
+
+   function Nk (K : Key_Size) return Positive
    is (K / 32)
-   with Pre => Key (K);
+   with Static;
    --  Types.cry: type Nk k = k / 32. The number of 32-bit words in the
-   --  key: 4, 6 or 8 [FIPS-PUB-197 Sections 2.3 and 5].
+   --  key: 4, 6 or 8 [FIPS-PUB-197 Sections 2.3 and 5]. Static (Ada 2022),
+   --  so that Nk (K) of a generic's formal K is a static bound; a static
+   --  function cannot have a Pre, so the constraint Key k is K's subtype.
    --  @param K The key size in bits.
    --  @return K / 32.
 
-   function Nr (K : Natural) return Positive
+   function Nr (K : Key_Size) return Positive
    is (Nk (K) + 6)
-   with Pre => Key (K);
+   with Static;
    --  Types.cry: type Nr k = Nk k + 6. The number of rounds: 10, 12 or 14
    --  [FIPS-PUB-197 Sections 2.3 and 5].
    --  @param K The key size in bits.

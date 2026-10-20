@@ -67,32 +67,33 @@ is
 
    begin
       for I in 0 .. 4 * (Nr (K) + 1) - 1 loop
+         Spec.Dispatch.Lemma_W (K, Key, I);
          if I < Nk_K then
             Temp := Key (I);
-            pragma Assert (Temp = Spec.KeyExpansion.W (K, Key, I));
+            pragma Assert (Temp = Spec.Dispatch.W (K, Key, I));
          else
-            pragma Assert (Ws (I - 1) = Spec.KeyExpansion.W (K, Key, I - 1));
+            pragma Assert (Ws (I - 1) = Spec.Dispatch.W (K, Key, I - 1));
             pragma Assert
-              (Ws (I - Nk_K) = Spec.KeyExpansion.W (K, Key, I - Nk_K));
+              (Ws (I - Nk_K) = Spec.Dispatch.W (K, Key, I - Nk_K));
             if I mod Nk_K = 0 then
                Temp :=
                  Xor_Word
                    (Xor_Word
                       (Ws (I - Nk_K), Sub_Word (Rot_Word (Ws (I - 1)))),
                     Rcon (I / Nk_K));
-               pragma Assert (Temp = Spec.KeyExpansion.W (K, Key, I));
+               pragma Assert (Temp = Spec.Dispatch.W (K, Key, I));
             elsif I mod Nk_K = 4 and then Nk_K > 6 then
                Temp := Xor_Word (Ws (I - Nk_K), Sub_Word (Ws (I - 1)));
-               pragma Assert (Temp = Spec.KeyExpansion.W (K, Key, I));
+               pragma Assert (Temp = Spec.Dispatch.W (K, Key, I));
             else
                Temp := Xor_Word (Ws (I - Nk_K), Ws (I - 1));
-               pragma Assert (Temp = Spec.KeyExpansion.W (K, Key, I));
+               pragma Assert (Temp = Spec.Dispatch.W (K, Key, I));
             end if;
          end if;
-         pragma Assert (Temp = Spec.KeyExpansion.W (K, Key, I));
+         pragma Assert (Temp = Spec.Dispatch.W (K, Key, I));
          Ws (I) := Temp;
          pragma Loop_Invariant
-           (for all J in 0 .. I => Ws (J) = Spec.KeyExpansion.W (K, Key, J));
+           (for all J in 0 .. I => Ws (J) = Spec.Dispatch.W (K, Key, J));
       end loop;
 
       W := [others => [others => 0]];
@@ -100,7 +101,7 @@ is
          W (R) := [for I in Block_Index => Ws (4 * R + I / 4) (I mod 4)];
          pragma Loop_Invariant
            (for all Q in W'First .. R =>
-              W (Q) = Spec.KeyExpansion.KeyExpansion (K, Key) (Q));
+              W (Q) = Spec.Dispatch.KeyExpansion (K, Key) (Q));
       end loop;
    end Expand_Key;
 

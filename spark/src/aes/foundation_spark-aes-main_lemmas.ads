@@ -15,6 +15,7 @@
 
 with Foundation_Spark.AES.Impl.Main;
 with Foundation_Spark.AES.Spec.Cipher;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.KeyExpansion;
 with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.Types;
@@ -53,7 +54,7 @@ is
        and then I < Spec.KeyExpansion.Words (K),
      Post               =>
        (for all J in 0 .. I =>
-          Spec.KeyExpansion.W (K, A, J) = Spec.KeyExpansion.W (K, B, J)),
+          Spec.Dispatch.W (K, A, J) = Spec.Dispatch.W (K, B, J)),
      Subprogram_Variant => (Decreases => I);
    --  KeyExpansion.cry's w of equal keys is equal, up to word I. By
    --  induction on I.
@@ -66,8 +67,8 @@ is
    with
      Pre  => Is_Key_Words (K, A) and then Is_Key_Words (K, B) and then A = B,
      Post =>
-       Spec.KeyExpansion.KeyExpansion (K, A)
-       = Spec.KeyExpansion.KeyExpansion (K, B);
+       Spec.Dispatch.KeyExpansion (K, A)
+       = Spec.Dispatch.KeyExpansion (K, B);
    --  KeyExpansion maps equal keys to equal round keys.
    --  @param K The key size in bits.
    --  @param A A key.
@@ -100,7 +101,7 @@ is
      Pre  =>
        Is_Round_Keys (K, V) and then Is_Round_Keys (K, W)
        and then V = W and then A = B,
-     Post => Spec.Cipher.Cipher (K, V, A) = Spec.Cipher.Cipher (K, W, B);
+     Post => Spec.Dispatch.Cipher (K, V, A) = Spec.Dispatch.Cipher (K, W, B);
    --  Cipher maps equal round keys and equal blocks to equal blocks.
    --  @param K The key size in bits.
    --  @param V Round keys.

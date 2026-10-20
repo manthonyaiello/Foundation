@@ -69,8 +69,8 @@ is
      (K : C_Size; W : All_Round_Keys; Input : Block; Output : out Block) is
    begin
       Output :=
-        Foundation_Spark.AES.Spec.Cipher.Cipher
-          (Key_Size (K), Round_Keys_Of (K, W), Input);
+        Foundation_Spark.AES.Spec.Dispatch.Cipher
+          (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    end Cipher;
 
    procedure InvCipher
@@ -78,7 +78,7 @@ is
    begin
       Output :=
         Foundation_Spark.AES.Spec.Cipher.InvCipher
-          (Key_Size (K), Round_Keys_Of (K, W), Input);
+          (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    end InvCipher;
 
    procedure InvCipher_Prime
@@ -86,7 +86,7 @@ is
    begin
       Output :=
         Foundation_Spark.AES.Spec.Cipher.InvCipher_Prime
-          (Key_Size (K), Round_Keys_Of (K, W), Input);
+          (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    end InvCipher_Prime;
 
 end Foundation_Spark.FFI.AES_Cipher;

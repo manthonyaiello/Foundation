@@ -14,9 +14,14 @@
 --  Encrypt (K, ...) with the key size K explicit, as for Cipher, and
 --  AES128.Encrypt is AES128.Encrypt, a nested package that fixes K.
 --  Main.cry's property EncryptInverts (M1.5) is not stated here.
+--
+--  Spike #74: KeyExpansion`{k} and Cipher`{k} are the generic AES_K's,
+--  named here through Spec.Dispatch with the explicit K; InvCipher`{k} is
+--  still Spec.Cipher's. The full change would make Encrypt and Decrypt
+--  generic too, and the nested AES128 below an instance.
 
 with Foundation_Spark.AES.Spec.Cipher;
-with Foundation_Spark.AES.Spec.KeyExpansion;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Types;
 
 package Foundation_Spark.AES.Spec.Main with
@@ -111,8 +116,8 @@ is
    function Encrypt (K : Natural; Key : Bits; Input : Block_Bits)
      return Block_Bits
    is (Join_Block
-         (Cipher.Cipher
-            (K, KeyExpansion.KeyExpansion (K, Split_Key (K, Key)),
+         (Dispatch.Cipher
+            (K, Dispatch.KeyExpansion (K, Split_Key (K, Key)),
              Split_Block (Input))))
    with Pre => Is_Key_Bits (K, Key);
    --  Main.cry: AES`{k}.Encrypt : [k] -> [128] -> [128], Encrypt key in =
@@ -128,7 +133,7 @@ is
      return Block_Bits
    is (Join_Block
          (Cipher.InvCipher
-            (K, KeyExpansion.KeyExpansion (K, Split_Key (K, Key)),
+            (K, Dispatch.KeyExpansion (K, Split_Key (K, Key)),
              Split_Block (Input))))
    with Pre => Is_Key_Bits (K, Key);
    --  Main.cry: AES`{k}.Decrypt : [k] -> [128] -> [128], Decrypt key in =

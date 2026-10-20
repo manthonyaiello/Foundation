@@ -1,6 +1,6 @@
 with Foundation_Spark.AES.Main_Lemmas;
 with Foundation_Spark.AES.Spec.Cipher;
-with Foundation_Spark.AES.Spec.KeyExpansion;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Properties;
 
 package body Foundation_Spark.AES.Impl.Main with
@@ -48,15 +48,15 @@ is
       AES.Main_Lemmas.Lemma_Cipher_Eq
         (K,
          W,
-         Spec.KeyExpansion.KeyExpansion
+         Spec.Dispatch.KeyExpansion
            (K, Spec.Main.Split_Key (K, Join_Key (Key))),
          Input,
          Spec.Main.Split_Block (Spec.Main.Join_Block (Input)));
       pragma Assert
         (State
-         = Spec.Cipher.Cipher
+         = Spec.Dispatch.Cipher
              (K,
-              Spec.KeyExpansion.KeyExpansion
+              Spec.Dispatch.KeyExpansion
                 (K, Spec.Main.Split_Key (K, Join_Key (Key))),
               Spec.Main.Split_Block (Spec.Main.Join_Block (Input))));
       return State;
@@ -85,7 +85,7 @@ is
       AES.Main_Lemmas.Lemma_InvCipher_Eq
         (K,
          W,
-         Spec.KeyExpansion.KeyExpansion
+         Spec.Dispatch.KeyExpansion
            (K, Spec.Main.Split_Key (K, Join_Key (Key))),
          Input,
          Spec.Main.Split_Block (Spec.Main.Join_Block (Input)));
@@ -93,7 +93,7 @@ is
         (State
          = Spec.Cipher.InvCipher
              (K,
-              Spec.KeyExpansion.KeyExpansion
+              Spec.Dispatch.KeyExpansion
                 (K, Spec.Main.Split_Key (K, Join_Key (Key))),
               Spec.Main.Split_Block (Spec.Main.Join_Block (Input))));
       return State;

@@ -6,6 +6,7 @@ package body Foundation_Spark.AES.Main_Lemmas with
 is
 
    use Spec.KeyExpansion;
+   use Spec.Dispatch;
 
    --------------------------
    -- Lemma_Split_Join_Key --
@@ -46,6 +47,8 @@ is
       if I > 0 then
          Lemma_W_Eq (K, A, B, I - 1);
       end if;
+      Lemma_W (K, A, I);
+      Lemma_W (K, B, I);
       if I < Nk (K) then
          pragma Assert (A (I) = B (I));
       else
