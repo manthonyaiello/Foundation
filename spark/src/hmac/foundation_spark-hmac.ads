@@ -7,10 +7,14 @@
 --
 --  This package holds what Main.cry takes from Cryptol's prelude at the
 --  types HMAC uses it: byte sequences `[k][8]`, their `join`, `repeat` and
---  `zero`. Messages, keys after `join` and digests are SHA2's bit sequences
---  (SHA2.Bits), the same type the hash functions take and return.
+--  `zero`, each an instance of the Cryptol prelude in SPARK
+--  (Foundation_Spark.Cryptol) at these types. Messages, keys after `join`
+--  and digests are SHA2's bit sequences (SHA2.Bits), the same type the
+--  hash functions take and return.
 
 with Interfaces;
+with Foundation_Spark.Cryptol.Join_Split;
+with Foundation_Spark.Cryptol.Sequences;
 with Foundation_Spark.SHA2;
 
 package Foundation_Spark.HMAC with
@@ -35,49 +39,65 @@ is
    --  A sequence of bytes, Cryptol's `[k][8]` (the type of HMAC's key
    --  `K`), indexed from 0 as Cryptol's `@` is.
 
+   package Byte_Words is new Cryptol.Join_Split
+     (Word        => Byte,
+      Width       => 8,
+      Shift_Right => Interfaces.Shift_Right,
+      Word_Index  => Byte_Index,
+      Words       => Bytes,
+      Bit_Index   => SHA2.Bit_Index,
+      Bits        => SHA2.Bits);
+   --  The prelude's `@` and `join` between bytes [8] and bits.
+
+   package Byte_Sequences is new Cryptol.Sequences
+     (Index => Byte_Index, Element => Byte, Seq => Bytes);
+   --  The prelude's `repeat` at byte sequences.
+
    function Byte_Bit (X : Byte; J : Natural) return Boolean is
-     ((Interfaces.Shift_Right (X, 7 - J) and 1) = 1)
+     (Byte_Words.Word_Bits.Bit (X, J))
    with
      Ghost,
      Pre => J < 8;
-   --  Bit J of a byte, Cryptol's `x @ j` on `[8]`: most significant bit
-   --  first, so bit J has weight 2 ** (7 - J).
+   --  Bit J of a byte, Cryptol's `x @ j` on `[8]`, as the prelude's
+   --  Words.Bit states it: most significant bit first, so bit J has
+   --  weight 2 ** (7 - J).
    --  @param X The byte.
    --  @param J The bit's position, below 8.
    --  @return Whether that bit is 1.
 
    function Join (K : Bytes) return SHA2.Bits is
-     ([for I in 0 .. 8 * SHA2.Bit_Index (K'Length) - 1 =>
-         Byte_Bit (K (K'First + Byte_Index (I / 8)), Natural (I mod 8))])
+     (Byte_Words.Join (K))
    with
      Ghost,
      Post => Join'Result'First = 0
              and then Join'Result'Length = 8 * SHA2.Bit_Index (K'Length);
    --  Cryptol's `join : [k][8] -> [k * 8]`, as Main.cry applies it to the
-   --  key (Main.cry:63 to :65) and to the pads (Main.cry:46 and :47):
-   --  each byte's bits in order, most significant first, so bit I is bit
-   --  I mod 8 of byte I / 8.
+   --  key (Main.cry:63 to :65) and to the pads (Main.cry:46 and :47), as
+   --  the prelude's Join_Split.Join states it: each byte's bits in order,
+   --  most significant first, so bit I is bit I mod 8 of byte I / 8.
    --  @param K The bytes.
    --  @return Their 8 * K'Length bits, indexed from 0.
 
    function Repeat (Count : Byte_Index; X : Byte) return Bytes is
-     ([for I in 0 .. Count - 1 => X])
+     (Byte_Sequences.Repeat (Count, X))
    with
      Ghost,
      Post => Repeat'Result'First = 0 and then Repeat'Result'Length = Count;
    --  Cryptol's `repeat`{Count} X` at `[Count][8]`, as Main.cry builds the
-   --  pads (Main.cry:46 and :47): Count copies of the byte X.
+   --  pads (Main.cry:46 and :47), as the prelude's Sequences.Repeat states
+   --  it: Count copies of the byte X.
    --  @param Count The number of bytes.
    --  @param X The byte repeated.
    --  @return Count copies of X, indexed from 0.
 
    function Zero (Count : SHA2.Bit_Index) return SHA2.Bits is
-     ([for I in 0 .. Count - 1 => False])
+     (SHA2.Sequences_Of_Bits.Zero (Count))
    with
      Ghost,
      Post => Zero'Result'First = 0 and then Zero'Result'Length = Count;
    --  Cryptol's `zero` at type `[Count]`, as HMAC_init pads the key with it
-   --  (Main.cry:64 and :65): Count zero bits.
+   --  (Main.cry:64 and :65), as the prelude's Bit_Sequences.Zero states
+   --  it: Count zero bits.
    --  @param Count The number of bits.
    --  @return Count bits, all 0, indexed from 0.
 

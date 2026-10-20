@@ -41,6 +41,9 @@
 --  @formal Small_Sigma_1 Cryptol's `sigma_1 : [w] -> [w]` (Main.cry:43),
 --  renamed because Ada identifiers are not case-sensitive.
 
+with Foundation_Spark.Cryptol.Enumeration_Folds;
+with Foundation_Spark.Cryptol.Folds;
+with Foundation_Spark.Cryptol.Join_Split;
 with Foundation_Spark.SHA2.Functions;
 
 generic
@@ -160,20 +163,27 @@ is
    --  @param T The round `t`, below Klen.
    --  @return The working variables after round T.
 
+   subtype Round is Natural range 0 .. Klen - 1;
+   --  The rounds `t`, the elements of `[0 .. 63]` at SHA-256 (Main.cry:74):
+   --  the indices of K and W, where Step3 is defined.
+
+   package Rounds is new Cryptol.Enumeration_Folds
+     (Env => Block, Acc => Hash_Value, Index => Round, F => Step3);
+   --  The prelude's `foldl` over an enumeration of rounds, with Step3,
+   --  which closes over the block M in the Cryptol, as its function.
+
    function Foldl_Step3
      (M : Block; H : Hash_Value; N : Natural) return Hash_Value
    is
-     (if N = 0 then H
-      else Step3 (M, Foldl_Step3 (M, H, N - 1), N - 1))
+     (Rounds.Foldl (M, H, 0, N))
    with
      Ghost,
-     Pre                => N <= Klen,
-     Subprogram_Variant => (Decreases => N);
+     Pre => N <= Klen;
    --  `foldl step3 H [0 ..< N]`, the left fold of Step3 over the first N
    --  rounds. At N = Klen it is `step`'s `H'` (Main.cry:74, Steps 2 and 3
-   --  of [FIPS-PUB-180-4 Sections 6.2.2 and 6.4.2]). By the definition of
-   --  `foldl`, folding over `[0 ..< N]` is folding over `[0 ..< N - 1]`
-   --  and then applying step3 at N - 1.
+   --  of [FIPS-PUB-180-4 Sections 6.2.2 and 6.4.2]), as the prelude's
+   --  Enumeration_Folds states `foldl`: folding over `[0 ..< N]` is
+   --  folding over `[0 ..< N - 1]` and then applying step3 at N - 1.
    --  @param M The message block, which Step3 needs for W.
    --  @param H The initial working variables, `step`'s `H`.
    --  @param N The number of rounds folded, at most Klen.
@@ -238,10 +248,11 @@ is
    --  @return `N`.
 
    function Zero (Count : Bit_Index) return Bits is
-     ([for I in 0 .. Count - 1 => False])
+     (Sequences_Of_Bits.Zero (Count))
    with Ghost;
    --  Cryptol's `zero` at type `[k]`, as `pad` uses it
-   --  (Preprocessing.cry:23): Count zero bits.
+   --  (Preprocessing.cry:23): Count zero bits, as the prelude's
+   --  Bit_Sequences.Zero states it.
    --  @param Count The number of bits, `k`.
    --  @return Count bits, all 0, indexed from 0.
 
@@ -261,23 +272,43 @@ is
    --  @param M The message, `[l]`, indexed from 0.
    --  @return The padded message, indexed from 0.
 
+   function Shift_Right (Value : Word; Amount : Natural) return Word is
+     (Value / 2 ** Amount)
+   with
+     Ghost,
+     Pre => Amount < Word_Size;
+   --  Cryptol's `x >> n` on a [w], for n below w: a division by 2 ** n,
+   --  as Notation's SHR states it at a fixed n. The prelude reads a word's
+   --  bits with it.
+   --  @param Value The word, Cryptol's `x`.
+   --  @param Amount The shift, Cryptol's `n`, below w.
+   --  @return Value shifted right by Amount bits, with zeros shifted in.
+
+   package Word_Sequences is new Cryptol.Join_Split
+     (Word        => Word,
+      Width       => Word_Size,
+      Shift_Right => Shift_Right,
+      Word_Index  => Natural,
+      Words       => Word_Vector,
+      Bit_Index   => Bit_Index,
+      Bits        => Bits);
+   --  The prelude's `@`, `join` and `split` between words [w] and bits.
+
    function Word_Of
      (P : Bits; First : Bit_Index; Count : Natural) return Word
    is
-     (if Count = 0 then 0
-      else 2 * Word_Of (P, First, Count - 1)
-           + (if P (First + Bit_Index (Count) - 1) then 1 else 0))
+     (Word_Sequences.Value (P, First, Count))
    with
      Ghost,
-     Pre                =>
+     Pre =>
        Count <= Word_Size
        and then First >= P'First
-       and then First + Bit_Index (Count) - 1 <= P'Last,
-     Subprogram_Variant => (Decreases => Count);
+       and then First + Bit_Index (Count) - 1 <= P'Last;
    --  The Count bits of P from First, read as a number most significant
-   --  bit first. At Count = w it is the word `[w]` that Cryptol's
-   --  `split`{N * 16, w}` cuts from P at First (Preprocessing.cry:51):
-   --  in Cryptol a word is its bits, so the conversion has no name there.
+   --  bit first, as the prelude's Join_Split.Value states it. At Count =
+   --  w it is the word `[w]` that Cryptol's `split`{N * 16, w}` cuts from
+   --  P at First (Preprocessing.cry:51): in Cryptol a word is its bits,
+   --  so the conversion has no name there.
    --  @param P The bits.
    --  @param First The position of the first (most significant) bit.
    --  @param Count The number of bits read, at most w.
@@ -285,8 +316,7 @@ is
 
    function Parse_Block (P : Bits; I : Bit_Index) return Block is
      ([for J in 0 .. 15 =>
-         Word_Of
-           (P, (16 * I + Bit_Index (J)) * Bit_Index (Word_Size), Word_Size)])
+         Word_Sequences.Split_At (P, 16 * I + Bit_Index (J))])
    with
      Ghost,
      Pre => P'First = 0
@@ -294,7 +324,8 @@ is
             and then (I + 1) * Block_Size <= P'Length;
    --  Block I of `parse`{w, N} P` (Preprocessing.cry:51): the 16 words of
    --  `split`{N * 16, w} P` from word 16 * I, which the outer
-   --  `split`{N, 16}` groups as block I. Word J is the w bits of P from
+   --  `split`{N, 16}` groups as block I. Word J is word 16 * I + J of the
+   --  inner split, the prelude's Join_Split.Split_At: the w bits of P from
    --  (16 * I + J) * w.
    --  @param P The padded message, indexed from 0.
    --  @param I The block's index, below N.
@@ -316,43 +347,49 @@ is
    --  @param N The number of blocks, Cryptol's `N`.
    --  @return The N blocks, indexed from 0.
 
+   package Blocks is new Cryptol.Folds
+     (Acc     => Hash_Value,
+      Index   => Bit_Index,
+      Element => Block,
+      Seq     => Block_Vector,
+      F       => Step);
+   --  The prelude's `foldl` over a sequence of blocks, with Step as its
+   --  function.
+
    function Foldl_Step
      (H : Hash_Value; Ms : Block_Vector; N : Bit_Index) return Hash_Value
    is
-     (if N = 0 then H
-      else Step (Foldl_Step (H, Ms, N - 1), Ms (N - 1)))
+     (Blocks.Foldl_Take (H, Ms, N))
    with
      Ghost,
-     Pre                => Ms'First = 0 and then N <= Ms'Last + 1,
-     Subprogram_Variant => (Decreases => N);
+     Pre => Ms'First = 0 and then N <= Ms'Last + 1;
    --  `foldl step H (take`{N} Ms)`, the left fold of Step over the first
-   --  N blocks. At N = Ms'Length it is `hash`'s `H = foldl step H0 M'`
-   --  (Main.cry:61, [FIPS-PUB-180-4 Sections 6.2 and 6.4]). As
-   --  Foldl_Step3 does for the rounds, it folds the first N - 1 blocks
-   --  and then applies step to block N - 1.
+   --  N blocks, as the prelude's Folds.Foldl_Take states it. At N =
+   --  Ms'Length it is `hash`'s `H = foldl step H0 M'` (Main.cry:61,
+   --  [FIPS-PUB-180-4 Sections 6.2 and 6.4]).
    --  @param H The initial hash value.
    --  @param Ms The message blocks, indexed from 0.
    --  @param N The number of blocks folded.
    --  @return The hash value after the first N blocks.
 
    function Bit (X : Word; J : Natural) return Boolean is
-     ((X / 2 ** (Word_Size - 1 - J)) mod 2 = 1)
+     (Word_Sequences.Word_Bits.Bit (X, J))
    with
      Ghost,
      Pre => J < Word_Size;
-   --  Bit J of a word, Cryptol's `x @ j` on `[w]`: most significant bit
-   --  first, so bit J has weight 2 ** (w - 1 - J).
+   --  Bit J of a word, Cryptol's `x @ j` on `[w]`, as the prelude's
+   --  Words.Bit states it: most significant bit first, so bit J has weight
+   --  2 ** (w - 1 - J).
    --  @param X The word.
    --  @param J The bit's position, below w.
    --  @return Whether that bit is 1.
 
    function Join (H : Hash_Value) return Bits is
-     ([for I in 0 .. 8 * Bit_Index (Word_Size) - 1 =>
-         Bit (H (Natural (I / Bit_Index (Word_Size))),
-              Natural (I mod Bit_Index (Word_Size)))])
+     (Word_Sequences.Join (H))
    with Ghost;
-   --  Cryptol's `join` on `[8][w]`, as `hash` applies it (Main.cry:56):
-   --  the 8 words' bits in order, so bit I is bit I mod w of word I / w.
+   --  Cryptol's `join` on `[8][w]`, as `hash` applies it (Main.cry:56),
+   --  as the prelude's Join_Split.Join states it: the 8 words' bits in
+   --  order, so bit I is bit I mod w of word I / w.
    --  @param H The hash value.
    --  @return Its 8 * w bits, indexed from 0.
 
