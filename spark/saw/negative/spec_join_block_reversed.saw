@@ -1,0 +1,28 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's Join_Block (obj/spec/aes_spec.bc, the function whose
+ * one i128 GEP index check-saw.sh rewrites to a trunc to i64, gep64)
+ * against Main.cry's join of the block's bytes reversed, with the
+ * overrides and tactic of aes_spec_main.saw's proof. The proof must fail
+ * with a counterexample block, which shows that the rewritten function is
+ * the one checked and that it is told from the wrong Cryptol.
+ */
+
+include "../aes_spec_common.saw";
+
+m_bit_of <- verify_spec "main__bit_of" []
+              (do {
+                 b <- llvm_fresh_var "b" byte_t;
+                 j <- llvm_fresh_var "j" (llvm_int 32);
+                 llvm_precond {{ j < 8 }};
+                 llvm_execute_func [llvm_term b, llvm_term j];
+                 llvm_return (llvm_term {{ if b @ j then 1 else 0 : [8] }});
+               }) z3 "z3" "\\b j -> b @ j, j < 8";
+verify_spec "main__join_block" [m_bit_of]
+  (do {
+     b <- llvm_fresh_var "b" block_t;
+     ret <- llvm_alloc (llvm_array 128 byte_t);
+     llvm_execute_func [ret, llvm_term b];
+     llvm_points_to ret (llvm_term {{ [ if x then 1 else 0 | x <- join (reverse b) ] : [128][8] }});
+   }) z3 "z3" "join (reverse b)";

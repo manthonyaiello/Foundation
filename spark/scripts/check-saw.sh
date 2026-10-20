@@ -38,7 +38,8 @@
 # and then:
 #   4. runs each saw/negative/*.saw, every one of which must FAIL with a
 #      counterexample (the negative controls);
-#   5. writes saw/results.txt (unless --print).
+#   5. writes saw/results.txt (unless --print), or saw/results-long.txt
+#      with SAW_LONG=1.
 #
 # Every saw run is in its own systemd scope capped at SAW_MEMORY_MAX (10G,
 # no swap) when systemd-run --user works, so that a proof that blows up is
@@ -65,7 +66,8 @@
 #   SAW_LONG       optional: 1 adds the long proofs to sha256_spec.saw (the
 #                  spec layer's Hash at 120, 128 and 200 bytes, 3 and 4
 #                  padded blocks); 0 (the default) leaves them out. The
-#                  record says which ran (line "options").
+#                  record says which ran (line "options"); a SAW_LONG=1
+#                  run writes saw/results-long.txt, not saw/results.txt.
 #   saw, cryptol and z3 must be on PATH (the x86_64 bootstrap's env.sh).
 #
 # Exit status: 0 when every proof passed and every negative control failed;
@@ -78,6 +80,7 @@ ROOT_DIR="$(cd "$SPARK_DIR/.." && pwd)"
 SAW_DIR="$SPARK_DIR/saw"
 OBJ_DIR="$SAW_DIR/obj"
 RESULTS="$SAW_DIR/results.txt"
+[ "${SAW_LONG:-0}" != 1 ] || RESULTS="$SAW_DIR/results-long.txt"
 
 die() { printf '!! %s\n' "$*" >&2; exit 1; }
 
@@ -294,11 +297,11 @@ OUR_CRYPTOL=(spark/saw/SHA256Main.cry spark/saw/SHA256Step.cry spark/saw/HMACIni
 T0="$(date +%s)"
 COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 if [ "$PRINT" -eq 0 ] \
-   && [ -n "$(git -C "$ROOT_DIR" status --porcelain -- spark algorithms shared ':!spark/saw/results.txt' ':!spark/saw/obj' ':!spark/obj' ':!spark/lib' ':!spark/alire' ':!spark/config' ':!spark/docs')" ]; then
+   && [ -n "$(git -C "$ROOT_DIR" status --porcelain -- spark algorithms shared ':!spark/saw/results.txt' ':!spark/saw/results-long.txt' ':!spark/saw/obj' ':!spark/obj' ':!spark/lib' ':!spark/alire' ':!spark/config' ':!spark/docs')" ]; then
   die "the tree has changes: commit them, or use --print (the record names HEAD as the commit checked)"
 fi
 DIRTY=""
-[ -z "$(git -C "$ROOT_DIR" status --porcelain -- spark/src spark/saw algorithms shared ':!spark/saw/results.txt' ':!spark/saw/obj')" ] \
+[ -z "$(git -C "$ROOT_DIR" status --porcelain -- spark/src spark/saw algorithms shared ':!spark/saw/results.txt' ':!spark/saw/results-long.txt' ':!spark/saw/obj')" ] \
   || DIRTY=" (with uncommitted changes: not a record)"
 
 # NSA's Cryptol is never modified here: it must be the commit's, even with
@@ -546,7 +549,7 @@ T_TOTAL=$(( $(date +%s) - T0 ))
 sha() { sha256sum "$1" | cut -d' ' -f1; }
 
 record() {
-  echo "# saw/results.txt -- written by scripts/check-saw.sh; do not edit."
+  echo "# saw/${RESULTS##*/} -- written by scripts/check-saw.sh; do not edit."
   echo "#"
   echo "# SAW llvm_verify of the SPARK AES, SHA-256 and HMAC-SHA-256"
   echo "# implementations' bitcode, and of the AES and SHA-256 spec layers'"

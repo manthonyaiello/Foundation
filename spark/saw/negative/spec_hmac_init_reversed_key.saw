@@ -1,0 +1,32 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's HMAC.SHA256.HMAC_init at a 32-byte key (from
+ * obj/spec/sha256_spec.bc, in its load with lax arithmetic, as
+ * sha256_spec_hmac.saw proves it) against saw/HMACInit.cry's HMAC_init of
+ * the key's bytes reversed, on an empty secondary stack, by z3. The proof
+ * must fail with a counterexample key, which shows that the HMAC proofs'
+ * bitcode is the HMAC units', and that the key's byte order is checked.
+ */
+
+include "../sha256_spec_common.saw";
+let verify_spec = verify_spec_lax;
+include "../sha256_spec_pad.saw";
+import "../HMACInit.cry" (HMAC_init);
+
+let k = 32;
+llvm_verify sha256_spec_lax "foundation_spark__hmac__sha256__hmac_init" [] false
+  (do {
+     stack <- secondary_stack;
+     key <- llvm_fresh_var "key" (llvm_array k (llvm_int 8));
+     kp <- llvm_alloc_readonly (llvm_array k (llvm_int 8));
+     llvm_points_to kp (llvm_term key);
+     kb <- llvm_alloc_readonly (llvm_alias "foundation_spark__hmac__bytes_BOUNDS");
+     llvm_points_to kb (llvm_struct_value [llvm_term {{ 0 : [64] }}, llvm_term {{ `k - 1 : [64] }}]);
+     llvm_execute_func [llvm_struct_value [kp, kb]];
+     let u = eval_int {{ 288 + 288 + 544 : [64] }};
+     ss_post stack u;
+     llvm_points_to_untyped (ss_at stack 576) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 511 : [128] }}]);
+     llvm_points_to_untyped (ss_at stack 608) (llvm_term {{ bytes_of (HMAC_init`{64, k, 32} hash (reverse key)) }});
+     llvm_return (llvm_struct_value [ss_at stack 608, ss_at stack 576]);
+   }) z3;

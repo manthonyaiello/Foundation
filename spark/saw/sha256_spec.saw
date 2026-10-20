@@ -3,7 +3,10 @@
  * Foundation_Spark.SHA2.SHA256, the SHA-256 instance of the generic
  * spark/src/sha2/foundation_spark-sha2-main.ads) against NSA's Cryptol:
  * M4.4 (#59): the compression function, the padding at the twelve message
- * lengths of M4.3's Hash proofs, and the hash at nine of them.
+ * lengths of M4.3's Hash proofs, and the hash at nine of them (all twelve
+ * with SAW_LONG=1); and the HMAC-SHA-256 spec layer, HMAC.SHA256's
+ * HMAC_init and HMAC, at M4.3's seven (key, text) lengths
+ * (sha256_spec_hmac.saw).
  * sha256_spec_common.saw has the shared parts; the lemmas are in
  * sha256_spec_step.saw (the compression function), sha256_spec_pad.saw
  * (Pad and what it calls) and sha256_spec_hash.saw (Hash and the
