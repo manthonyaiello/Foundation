@@ -143,33 +143,57 @@ Done on 2026-10-19, on the x86_64 IOD with Tony's GNAT Pro 27.0 install:
   (`.claude/campaign/runs/2026-10-19-iod/`), retrieved by Tony at shutdown;
   every number that matters is in the measurements file.
 
-1. **#67** (no GNAT Pro needed except item 3): board row kinds
-   (`spec-only`, `subsumed-by`, `impl = spec`; the board goes to 40/40),
-   the statements of where spec and implementation are not one-to-one and
-   why that is intended, SAW's standalone `Parse`, the documentation of what
-   SAW proves in place or leaves out and why, fixed sizes as NSA's own
-   practice, where SPARK's proof is stronger, `board.py`'s SAW column, and
-   `alire.toml` in the slow-proof fingerprint. Tony may batch more into it.
-2. **#68**: narrow AES's `Bit_Index` to what AES needs and retire `gep64`
-   (SAW re-run needs GNAT Pro).
-3. **E5**: **M5.2 (#50)** constant time (the AES table S-box leaks), then
+**Order** (Tony, 2026-10-20, after the AES spec review). Everything through
+step 6 runs on `foundation`, except the SAW parts, which wait for one IOD
+session (step 7). Each PR edits its own SAW contracts as best it can and says
+they are unverified until that session; `results.txt` is stale meanwhile.
+Steps 2–4 each make `sbox_entries` stale (its closure is almost the whole
+AES spec, as a child of `Properties`): re-prove it each time (about 26 min
+here, 1h40m cold in CI), or first do the cheap part of #70 (step 6).
+
+1. **#72**: remove the unused SPARKlib dependency (GPRs, `alire.toml`,
+   docs; no proof change expected). Then **#68**: narrow AES's `Bit_Index`
+   to what AES needs, and remove `gep64` and its machinery. SAW's
+   confirmation waits for step 7.
+2. **#74 spike**: a generic AES spec over the key size (`KeyExpansion` and
+   `Cipher` only), bridged to the flexible implementation by ghost
+   dispatchers. A draft PR, not merged, with cold proof times and lemma
+   churn. **Tony decides** "AES key sizes" (below) on it. It comes before
+   #73, because its outcome decides what #73's `Key_Size` change looks like.
+3. **#73 item 1**: `Key k` as a `Key_Size` predicate subtype. Under the
+   generic, it is the formal's subtype, done together with the full generic
+   change (a follow-up issue from #74). Otherwise it is the type of every
+   `K`. Rewrite `spec-types.ads`'s header to record the outcome. (#73 item 2
+   moved to #75; item 3 is resolved: the two unstated `SBox.cry` properties
+   are not added, see "Re-proved Cryptol properties are optional".)
+4. **#75** (stretch; Tony: worthwhile, not essential): a ghost "Cryptol
+   prelude in SPARK" stating `foldl`, `split`/`join`, `@@`, `reverse`,
+   big-endian bit access and `pmult`/`pmod`/`pdiv` once, under Cryptol's
+   names. Migrate AES, then SHA-2, then HMAC; only bodies change.
+5. **#67**, revisited in light of steps 1–4, then done except its SAW item
+   (item 3, `Parse`): board row kinds, the not-one-to-one statements, the
+   SAW-scope and NSA-practice documentation, where SPARK is stronger,
+   `board.py`'s SAW column, `alire.toml` in the slow-proof fingerprint, and
+   item 11 (re-proved properties are optional, and why they are kept).
+6. **#70**: a cheaper `SBoxCorrect`, after #75 has restated `Affine` and
+   `Inverse`. Its cheap part, moving `sbox_entries` out from under
+   `Properties` (e.g. to a child of `Spec.SBox`, closure `Types`, `SBox`,
+   `GF2`, `GF28`), may go early to stop steps 2–4 making it stale.
+7. **One IOD session (GNAT Pro 27)** for all SAW work:
+   * the full `check-saw.sh` (and `SAW_LONG=1` if time allows), confirming
+     #68's removal of `gep64`, and fixing whatever steps 1–4's contract
+     edits broke, PR by PR;
+   * #67 item 3 (`Parse`);
+   * **#69**: why SAW costs about 100 times more on the spec layer, measured
+     on the spec as steps 2–4 left it;
+   * commit `results.txt` (and `results-long.txt`).
+
+   A second, earlier session is worth it only if the full generic change
+   (step 3) turns out large.
+8. **E5**: **M5.2 (#50)** constant time (the AES table S-box leaks), then
    **M5.3 (#51)** binaries and performance (x86_64 numbers need an IOD; it
    adds gnatcov to the x86_64 bootstrap when it needs it). Neither needs
    GNAT Pro.
-4. **#69**: why SAW costs about 100 times more on the spec layer; **#70**: a
-   cheaper `SBoxCorrect` proof.
-5. **#72**: remove the unused SPARKlib dependency. **#73**: Tony's AES
-   spec-layer review feedback, an umbrella he adds to: `Key k` as a
-   `Key_Size` subtype with a predicate (decided); one `foldl` generic and the
-   two unstated `SBox.cry` properties (open for Tony).
-6. **#74**: spike a generic AES spec over the key size, bridged to the
-   flexible implementation by ghost dispatchers; a draft PR with
-   measurements decides "AES key sizes" (below).
-7. **#75** (stretch; Tony: worthwhile, not essential): a ghost "Cryptol
-   prelude in SPARK" stating `foldl`, `split`/`join`, `@@`, `reverse`,
-   big-endian bit access and `pmult`/`pmod`/`pdiv` once, under Cryptol's
-   names, used by the AES, SHA-2 and HMAC spec bodies. After #74 and #68;
-   absorbs #73 item 2.
 
 Small items: none open. Settled on 2026-10-20 (Tony):
 * **Dropped:** Pro-27 proof repair (the crate stays on FSF 16.1; Pro 27's 4
