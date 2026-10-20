@@ -1035,8 +1035,9 @@ lines) and 1659 of SHA-256 and HMAC (1393 of them in the lax-arithmetic
 load), with 11 negative controls of the spec layer failing as they must.
 `aes_spec.saw` takes 567 s, `sha256_spec.saw` 2362 s (most of it the
 `To_Bits` chains, 15 of them, and `Word_Of`), the whole `check-saw.sh`
-3785 s; peak memory 3.8 GB. `SAW_LONG=1` writes `results-long.txt`
-(below, "Running it").
+3785 s; peak memory 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at
+`c31472e`): 3522 proofs of the spec layer, `sha256_spec.saw` 6363 s, the
+whole 7784 s, peak 7.2 GB (below, "Running it").
 
 **Not proved by SAW**, and why:
 
