@@ -394,6 +394,13 @@ is
    --  @param Z The initial state of foldl Round.
    --  @param Xs The round keys.
 
+   procedure Lemma_Join_Split_Block (Bs : Main.Block_Bits)
+   with Post => Main.Join_Block (Main.Split_Block (Bs)) = Bs;
+   --  Cryptol's join at [16][8] -> [128] undoes its split at [128] ->
+   --  [16][8]. Spike #74: stated apart from EncryptInverts, whose context
+   --  now holds the dispatchers' contracts and timed out on it.
+   --  @param Bs The block as 128 bits.
+
    procedure Lemma_Split_Join_Block (B : Block)
    with Post => Main.Split_Block (Main.Join_Block (B)) = B;
    --  Cryptol's split at [128] -> [16][8] undoes its join at [16][8] ->

@@ -539,6 +539,15 @@ is
       end loop;
    end Lemma_Split_Join_Block;
 
+   ----------------------------
+   -- Lemma_Join_Split_Block --
+   ----------------------------
+
+   procedure Lemma_Join_Split_Block (Bs : Main.Block_Bits) is
+   begin
+      pragma Assert (Main.Join_Block (Main.Split_Block (Bs)) = Bs);
+   end Lemma_Join_Split_Block;
+
    procedure Lemma_InvCipher_Eq (K : Natural; Ws : Round_Keys; A, B : Block)
    is
       Rev : constant Round_Keys := Reverse_Keys (Ws (1 .. Nr (K) - 1));
@@ -563,6 +572,7 @@ is
       Lemma_Split_Join_Block (C);
       Lemma_InvCipher_Eq (K, W, Main.Split_Block (Main.Join_Block (C)), C);
       CipherInverts (K, W, P);
+      Lemma_Join_Split_Block (Input);
       pragma Assert (Main.Join_Block (P) = Input);
    end EncryptInverts;
 
