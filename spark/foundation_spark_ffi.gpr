@@ -16,7 +16,6 @@
 --  Not a proof project: gnatprove reads foundation_spark.gpr.
 
 with "config/foundation_spark_config.gpr";
-with "sparklib";
 
 project Foundation_Spark_FFI is
 
