@@ -136,3 +136,29 @@ SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked          | HMAC::Main::HMAC (SH
 SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked_long     | HMAC::Main::HMAC (SHA-256)           | check   | 3
 SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked_RFC4231  | HMAC::Main::HMAC (SHA-256)           | check   | 100
 SPARK/HMAC/SHA256.cry        | prop_Init_Key              | HMAC::Main::HMAC_init (SHA-256)      | check   | 100
+# The Cryptol prelude in SPARK (#75): each generic of Foundation_Spark.Cryptol
+# against the Cryptol built-in it states, through the instances the spec
+# layers use or AES's types. Not board rows: the board counts the NSA
+# declarations, and these are the built-ins they are written in.
+SPARK/Prelude.cry | prop_foldl               | Cryptol::foldl          | check   | 10000
+SPARK/Prelude.cry | prop_foldl_enumeration   | Cryptol::foldl          | exhaust | 65536
+SPARK/Prelude.cry | prop_bit_8               | Cryptol::(@)            | exhaust | 2048
+SPARK/Prelude.cry | prop_head_8              | Cryptol::head           | exhaust | 256
+SPARK/Prelude.cry | prop_bit_32              | Cryptol::(@)            | check   | 10000
+SPARK/Prelude.cry | prop_bit_15              | Cryptol::(@)            | check   | 10000
+SPARK/Prelude.cry | prop_join_bytes          | Cryptol::join           | check   | 10000
+SPARK/Prelude.cry | prop_split_word          | Cryptol::split          | check   | 10000
+SPARK/Prelude.cry | prop_join_words          | Cryptol::join           | check   | 10000
+SPARK/Prelude.cry | prop_zero_64             | Cryptol::zero           | exhaust | 1
+SPARK/Prelude.cry | prop_literal_64          | Cryptol::number         | check   | 10000
+SPARK/Prelude.cry | prop_repeat_4            | Cryptol::repeat         | exhaust | 256
+SPARK/Prelude.cry | prop_reverse_6           | Cryptol::reverse        | check   | 10000
+SPARK/Prelude.cry | prop_bulk_index_block    | Cryptol::(@@)           | check   | 10000
+SPARK/Prelude.cry | prop_bulk_index_table    | Cryptol::(@@)           | check   | 1000
+SPARK/Prelude.cry | prop_ceil                | Cryptol::(/^), (%^)     | exhaust | 1
+SPARK/Prelude.cry | prop_pmult_8             | Cryptol::pmult          | exhaust | 65536
+SPARK/Prelude.cry | prop_pmult_9             | Cryptol::pmult          | check   | 10000
+SPARK/Prelude.cry | prop_pmod_15             | Cryptol::pmod           | check   | 10000
+SPARK/Prelude.cry | prop_pmod_15_aes         | Cryptol::pmod           | exhaust | 32768
+SPARK/Prelude.cry | prop_pdiv_8              | Cryptol::pdiv           | exhaust | 65536
+SPARK/Prelude.cry | prop_pdiv_9              | Cryptol::pdiv           | check   | 10000

@@ -100,7 +100,9 @@ project Foundation_Spark_FFI is
       "Foundation_Spark.HMAC.SHA256_Impl",
       "Foundation_Spark.FFI.HMAC_SHA256",
       "Foundation_Spark.FFI.HMAC_SHA256_Exports",
-      "Foundation_Spark.FFI.HMAC_SHA256_Impl");
+      "Foundation_Spark.FFI.HMAC_SHA256_Impl",
+      "Foundation_Spark.FFI.Prelude",
+      "Foundation_Spark.FFI.Prelude_Exports");
 
    case Build is
       when "ffi" =>

@@ -1,0 +1,303 @@
+/*
+ * The Cryptol prelude in SPARK (spark/src/cryptol/, #75), checked against
+ * Cryptol's own built-ins through Cryptol's FFI: each property states that
+ * an instance of a Foundation_Spark.Cryptol generic computes what the
+ * built-in it states computes.
+ *
+ * The foreign functions are the C exports of the SPARK crate's FFI library,
+ * which spark/scripts/check-ffi.sh links here as Prelude.so. They have no
+ * Cryptol body on purpose (see SPARK/AES/GF28.cry).
+ *
+ * Generics are checked through instances. Where a spec layer instantiates
+ * a generic, the property calls that instance (SHA-2's Sequences_Of_Bits,
+ * Lengths, the SHA-256 Word_Sequences, HMAC's Byte_Words and
+ * Byte_Sequences); elsewhere the shim instantiates it at the types AES
+ * uses the built-in at (pmult at [8] x [8], pmod at [15] mod [9], @@ on a
+ * block). A fold takes a function, which C cannot pass, so the shim folds a
+ * fixed one, f z x = 3 * z + x on bytes (with e * x for the closure), whose
+ * result depends on the order of the elements, and the property folds the
+ * same one in Cryptol.
+ *
+ * Cryptol's C calling convention passes a [k] with k <= 64 as the smallest
+ * uintN_t that holds it, a Bit as a uint8_t (0 or 1), a sequence of words
+ * as a pointer to its elements, and a numeric type parameter as a size_t.
+ */
+module SPARK::Prelude where
+
+/** The function the fold properties fold: order matters. */
+f : [8] -> [8] -> [8]
+f z x = 3 * z + x
+
+/** The function the enumeration fold closes over e. */
+fe : [8] -> [8] -> [8] -> [8]
+fe e z x = 3 * z + e * x
+
+/**
+ * Foundation_Spark.FFI.Prelude.Foldl: the prelude's Folds.Foldl at bytes,
+ * folding f, over the first n of a buffer of 16 bytes.
+ */
+foreign spark_foldl : {n} (fin n, n <= 16) => [8] -> [n][8] -> [8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Foldl_Enumeration: the prelude's
+ * Enumeration_Folds.Foldl at bytes, folding fe e over [from ..< to].
+ */
+foreign spark_foldl_enumeration :
+  {from, to} (fin from, fin to, to <= 256) => [8] -> [8] -> [8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Bit_8: the prelude's Words.Bit at [8] (the
+ * instance HMAC's Byte_Words reads bytes with): x @ j, as 0 or 1.
+ */
+foreign spark_bit_8 : [8] -> [3] -> [8]
+
+/** Foundation_Spark.FFI.Prelude.Head_8: the prelude's Words.Head at [8]. */
+foreign spark_head_8 : [8] -> [8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Bit_32: the prelude's Words.Bit at [32] (the
+ * instance the SHA-256 Word_Sequences reads words with).
+ */
+foreign spark_bit_32 : [32] -> [5] -> [8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Bit_15: the prelude's Words.Bit at a [15]
+ * held in a 16-bit word, as AES's pmult product is.
+ */
+foreign spark_bit_15 : [15] -> [4] -> [8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Join_Bytes: HMAC's Byte_Words.Join of four
+ * bytes, read back as a [32] by the SHA-256 Word_Sequences.Value.
+ */
+foreign spark_join_bytes : [4][8] -> [32]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Split_Word: the SHA-256 Word_Sequences'
+ * Split_At of a [64] (its bits, by Word_Sequences.Word_Bits.Bit), at each
+ * of its two words.
+ */
+foreign spark_split_word : [64] -> [2][32]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Join_Words: the SHA-256 Word_Sequences.Join
+ * of two words, read back as bytes by HMAC's Byte_Words.Split_At.
+ */
+foreign spark_join_words : [2][32] -> [8][8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Zero_64: SHA-2's Sequences_Of_Bits.Zero at
+ * [64], read back as a [64].
+ */
+foreign spark_zero_64 : () -> [64]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Literal_64: SHA-2's
+ * Sequences_Of_Bits.Literal of x at [64], read back as a [64].
+ */
+foreign spark_literal_64 : [64] -> [64]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Repeat_4: HMAC's Byte_Sequences.Repeat at
+ * [4][8].
+ */
+foreign spark_repeat_4 : [8] -> [4][8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Reverse_6: HMAC's
+ * Byte_Sequences.Reverse_Of at [6][8].
+ */
+foreign spark_reverse_6 : [6][8] -> [6][8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Bulk_Index_Block: the prelude's
+ * Bulk_Indexing.Bulk_Index at [16][8] and [16][4], as ShiftRows uses @@.
+ */
+foreign spark_bulk_index_block : [16][8] -> [16][4] -> [16][8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Bulk_Index_Table: the prelude's
+ * Bulk_Indexing.Bulk_Index at [256][8] and [16][8], as SubBytes uses @@.
+ */
+foreign spark_bulk_index_table : [256][8] -> [16][8] -> [16][8]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Ceil_Div and Ceil_Mod: SHA-2's Lengths at
+ * the values of the type parameters m and n.
+ */
+foreign spark_ceil_div : {m, n} (fin m, fin n, n >= 1) => () -> [64]
+foreign spark_ceil_mod : {m, n} (fin m, fin n, n >= 1) => () -> [64]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Pmult_8: the prelude's
+ * Polynomial_Products.Pmult at {u, v} = {7, 7}, [8] -> [8] -> [15], as
+ * GF28.cry's (•) uses it.
+ */
+foreign spark_pmult_8 : [8] -> [8] -> [16]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Pmult_9: the prelude's Pmult at {8, 8},
+ * [9] -> [9] -> [17], as GF2.cry's inverse uses it in SBox.cry.
+ */
+foreign spark_pmult_9 : [9] -> [9] -> [32]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Pmod_15: the prelude's
+ * Polynomial_Remainders.Pmod at {u, v} = {15, 8}, [15] -> [9] -> [8], as
+ * GF28.cry's (•) uses it. The modulus must not be zero.
+ */
+foreign spark_pmod_15 : [15] -> [9] -> [16]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Pdiv_8: the prelude's
+ * Polynomial_Quotients.Pdiv at {u, v} = {8, 8}. The divisor must not be
+ * zero.
+ */
+foreign spark_pdiv_8 : [8] -> [8] -> [16]
+
+/**
+ * Foundation_Spark.FFI.Prelude.Pdiv_9: the prelude's Pdiv at {9, 9}, as
+ * GF2.cry's pgcd uses it in SBox.cry.
+ */
+foreign spark_pdiv_9 : [9] -> [9] -> [16]
+
+/** foldl at n elements of xs. */
+foldlAt : {n} (fin n, n <= 16) => [8] -> [16][8] -> Bit
+foldlAt z xs = spark_foldl`{n} z (take xs) == foldl f z (take`{n} xs)
+
+/**
+ * The SPARK foldl is Cryptol's foldl at 0, 1, 2, 3 and 16 elements, on
+ * random bytes.
+ */
+prop_foldl : [8] -> [16][8] -> Bit
+property prop_foldl z xs =
+     foldlAt`{0} z xs
+  /\ foldlAt`{1} z xs
+  /\ foldlAt`{2} z xs
+  /\ foldlAt`{3} z xs
+  /\ foldlAt`{16} z xs
+
+/** foldl over [from ..< to] at one enumeration. */
+foldlEnumAt : {from, to} (fin from, fin to, to <= 256, from <= to) =>
+  [8] -> [8] -> Bit
+foldlEnumAt e z =
+  spark_foldl_enumeration`{from, to} e z
+  == foldl (fe e) z ([from ..< to] : [to - from][8])
+
+/**
+ * The SPARK enumeration fold is Cryptol's foldl over [from ..< to], for the
+ * empty enumeration, one element, [0 ..< 64] (SHA-256's rounds) and a
+ * range that does not start at 0, at every pair (e, z) (65,536 tests).
+ */
+prop_foldl_enumeration : [8] -> [8] -> Bit
+property prop_foldl_enumeration e z =
+     foldlEnumAt`{0, 0} e z
+  /\ foldlEnumAt`{5, 5} e z
+  /\ foldlEnumAt`{0, 1} e z
+  /\ foldlEnumAt`{0, 64} e z
+  /\ foldlEnumAt`{3, 11} e z
+
+/** A Bit as the C side returns it. */
+bitByte : Bit -> [8]
+bitByte b = if b then 1 else 0
+
+/** The SPARK Bit at [8] is x @ j, for every x and j (2,048 tests). */
+prop_bit_8 : [8] -> [3] -> Bit
+property prop_bit_8 x j = spark_bit_8 x j == bitByte (x @ j)
+
+/** The SPARK Head at [8] is head x, for every x (256 tests). */
+prop_head_8 : [8] -> Bit
+property prop_head_8 x = spark_head_8 x == bitByte (head x)
+
+/** The SPARK Bit at [32] is x @ j, on random words, every j. */
+prop_bit_32 : [32] -> [5] -> Bit
+property prop_bit_32 x j = spark_bit_32 x j == bitByte (x @ j)
+
+/** The SPARK Bit at [15] is x @ j, for every x and j < 15 (2^19 tests). */
+prop_bit_15 : [15] -> [4] -> Bit
+property prop_bit_15 x j = j == 15 \/ spark_bit_15 x j == bitByte (x @ j)
+
+/** The SPARK join of four bytes is Cryptol's join. */
+prop_join_bytes : [4][8] -> Bit
+property prop_join_bytes xs = spark_join_bytes xs == join xs
+
+/** The SPARK split of a [64] into two [32] is Cryptol's split. */
+prop_split_word : [64] -> Bit
+property prop_split_word x = spark_split_word x == split x
+
+/** The SPARK join of two [32] is Cryptol's join, seen as bytes. */
+prop_join_words : [2][32] -> Bit
+property prop_join_words ws = spark_join_words ws == split (join ws)
+
+/** The SPARK zero at [64] is Cryptol's zero (a closed Bit: one test). */
+prop_zero_64 : Bit
+property prop_zero_64 = spark_zero_64 () == (zero : [64])
+
+/**
+ * The SPARK literal at [64] is the [64] Cryptol's literal of the same
+ * value is: its bits, most significant first.
+ */
+prop_literal_64 : [64] -> Bit
+property prop_literal_64 x =
+  spark_literal_64 x == (fromInteger (toInteger x) : [64])
+
+/** The SPARK repeat at [4][8] is repeat`{4}, for every byte (256 tests). */
+prop_repeat_4 : [8] -> Bit
+property prop_repeat_4 x = spark_repeat_4 x == repeat`{4} x
+
+/** The SPARK reverse at [6][8] is Cryptol's reverse. */
+prop_reverse_6 : [6][8] -> Bit
+property prop_reverse_6 xs = spark_reverse_6 xs == reverse xs
+
+/** The SPARK @@ on a block is Cryptol's @@. */
+prop_bulk_index_block : [16][8] -> [16][4] -> Bit
+property prop_bulk_index_block xs is = spark_bulk_index_block xs is == xs @@ is
+
+/** The SPARK @@ on a table indexed by bytes is Cryptol's @@. */
+prop_bulk_index_table : [256][8] -> [16][8] -> Bit
+property prop_bulk_index_table t bs = spark_bulk_index_table t bs == t @@ bs
+
+/** /^ and %^ at one pair of type parameters. */
+ceilAt : {m, n} (fin m, fin n, n >= 1, 64 >= width m, 64 >= width (m /^ n),
+                 64 >= width (m %^ n)) => Bit
+ceilAt = spark_ceil_div`{m, n} () == `(m /^ n)
+      /\ spark_ceil_mod`{m, n} () == `(m %^ n)
+
+/**
+ * The SPARK /^ and %^ are Cryptol's at the lengths SHA-256 meets (a
+ * message of l bits padded to blocks of 512, l + 65 with l = 0, 447, 448,
+ * 512) and around small divisors (a closed Bit: one test).
+ */
+prop_ceil : Bit
+property prop_ceil =
+     ceilAt`{0, 1} /\ ceilAt`{0, 7} /\ ceilAt`{1, 1} /\ ceilAt`{6, 3}
+  /\ ceilAt`{7, 3} /\ ceilAt`{8, 3} /\ ceilAt`{65, 512}
+  /\ ceilAt`{512, 512} /\ ceilAt`{513, 512} /\ ceilAt`{577, 512}
+  /\ ceilAt`{1000000007, 64}
+
+/** The SPARK pmult at [8] x [8] is Cryptol's, everywhere (65,536 tests). */
+prop_pmult_8 : [8] -> [8] -> Bit
+property prop_pmult_8 x y = spark_pmult_8 x y == zext (pmult x y)
+
+/** The SPARK pmult at [9] x [9] is Cryptol's, on random pairs. */
+prop_pmult_9 : [9] -> [9] -> Bit
+property prop_pmult_9 x y = spark_pmult_9 x y == zext (pmult x y)
+
+/** The SPARK pmod at [15] mod [9] is Cryptol's, on random nonzero moduli. */
+prop_pmod_15 : [15] -> [9] -> Bit
+property prop_pmod_15 x m = m == 0 \/ spark_pmod_15 x m == zext (pmod x m)
+
+/**
+ * The SPARK pmod at [15] mod GF28.cry's m = 0x11b is Cryptol's, for every
+ * [15] (32,768 tests): every product (•) reduces.
+ */
+prop_pmod_15_aes : [15] -> Bit
+property prop_pmod_15_aes x = spark_pmod_15 x 283 == zext (pmod x (283 : [9]))
+
+/** The SPARK pdiv at [8] / [8] is Cryptol's, everywhere (65,536 tests). */
+prop_pdiv_8 : [8] -> [8] -> Bit
+property prop_pdiv_8 x y = y == 0 \/ spark_pdiv_8 x y == zext (pdiv x y)
+
+/** The SPARK pdiv at [9] / [9] is Cryptol's, on random pairs. */
+prop_pdiv_9 : [9] -> [9] -> Bit
+property prop_pdiv_9 x y = y == 0 \/ spark_pdiv_9 x y == zext (pdiv x y)
