@@ -7,9 +7,11 @@ Foundation algorithms, proved against the Cryptol specifications in
 ## Layout
 
 - `src/common/` – types shared across algorithms (bit sequences, words)
-- `src/aes/`, `src/sha2/` – per algorithm: a top spec layer that stays
-  semantically close to the Cryptol, plus refinement layers proved
-  against it
+- `src/cryptol/` – the Cryptol prelude in SPARK: Cryptol's built-ins,
+  stated once as ghost generics, see "The Cryptol prelude"
+- `src/aes/`, `src/sha2/`, `src/hmac/` – per algorithm: a top spec layer
+  that stays semantically close to the Cryptol, plus refinement layers
+  proved against it
 - `src/ffi/` – the FFI export shims, see "The FFI harness"
 - `cryptol/` – our Cryptol: the modules that call the SPARK exports by
   `foreign` and state the properties, and `properties.txt`
@@ -22,9 +24,10 @@ Foundation algorithms, proved against the Cryptol specifications in
 
 Uses gnat_native 16.1.0, the compiler that matches gnatprove FSF 16.1.0
 (versions pinned in `scripts/toolchain-pins.env`). The crate depends on no
-other crate: the spec layers state each Cryptol `foldl` as their own
-recursive ghost function, closer to the Cryptol than a library generic, so
-SPARKlib, once a dependency, was never used and was removed (#72).
+other crate: the spec layers state Cryptol's `foldl` as a recursive ghost
+function, their own (AES) or the crate's Cryptol prelude's (SHA-2, #75),
+closer to the Cryptol than a library generic, so SPARKlib, once a
+dependency, was never used and was removed (#72).
 gnatprove 16.1.0 must be on `PATH`; it was installed with `alr install gnatprove` into
 `~/.alire/bin`.
 
@@ -524,6 +527,74 @@ All are compared with `algorithms::SHA2::SHA256::HMAC`, that is
 arm64 Linux release. It installs the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers`
 release, checked against its sha256 (the release without solvers does not
 start: Cryptol's type checker needs z3), and the same Alire toolchain.
+
+## The Cryptol prelude
+
+`src/cryptol/` (`Foundation_Spark.Cryptol`, #75) states, once and under
+their Cryptol names, the Cryptol built-ins the spec layers are written in.
+A spec unit instantiates a generic at its own types and calls the instance
+where the Cryptol calls the built-in, so a reviewer checks each
+translation from Cryptol to SPARK here, once, and the spec bodies are left
+with the algorithm. Every unit is ghost, `Pure` and generic over the index,
+element and array types it works on: AES's narrow bit index and SHA-2's
+128-bit one both instantiate it, and AES's bytes stay `Unsigned_8`.
+
+| generic | Cryptol | stated from |
+|---|---|---|
+| `Folds` (`Foldl`, `Foldl_Take`) | `foldl f z xs`, ``foldl f z (take`{N} xs)`` | Cryptol.cry:1146 (a primitive) and its example `((0 + 1) + 2) + 3` |
+| `Enumeration_Folds` | `foldl f z [From ..< To]`, f closing over a value | the same, and RefMan BasicTypes.rst:169 |
+| `Words` (`Bit`, `Head`) | `x @ j`, `head x` on a word `[w]` | Cryptol.cry:900 (a primitive), :796 (bit order), :855 (head's body) |
+| `Join_Split` (`Join`, `Split_At`, `Value`) | `join`, `split` between `[n][w]` and `[n * w]` | Cryptol.cry:815 and :822 (primitives, documented as inverses) |
+| `Bit_Sequences` (`Zero`, `Literal`) | `zero : [n]`, `` `v : [n] `` | Cryptol.cry:304 (a primitive), RefMan BasicSyntax.rst:349 |
+| `Sequences` (`Reverse_Of`, `Repeat`) | `reverse`, `repeat` | Cryptol.cry:828 (a primitive), :1215 (repeat's body) |
+| `Bulk_Indexing` (`Bulk_Index`) | `xs @@ is` | Cryptol.cry:906 (its body) |
+| `Numeric` (`Ceil_Div`, `Ceil_Mod`) | the type operators `/^`, `%^` | Cryptol.cry:135 and :141 (primitives) |
+| `Polynomial_Products` (`Pmult`) | `pmult` | Cryptol.cry:1005 (a primitive); RefMan BasicSyntax.rst:352 (a word as a polynomial) |
+| `Polynomial_Remainders` (`Pmod`) | `pmod` | Cryptol.cry:1015 (a primitive) |
+| `Polynomial_Quotients` (`Pdiv`) | `pdiv` | Cryptol.cry:1010 (a primitive) |
+
+Line numbers are those of Cryptol 3.6.0's `lib/Cryptol.cry`. Most of these
+are primitives, with a type and a comment but no Cryptol body, so they are
+stated from their documented meaning. Three choices a reviewer should
+know:
+
+- **Folds recurse from the last element.** Cryptol does not define
+  `foldl` by equations; its documented example, `foldl (+) 0 [1,2,3] =
+  ((0 + 1) + 2) + 3`, applies the function last to the last element, and
+  that is the recursion here: ``foldl f z (take`{N} xs) = f (foldl f z
+  (take`{N - 1} xs)) (xs @ (N - 1))``. It is also the shape of the
+  implementation's loops, whose invariant after N steps is the fold of the
+  first N, so the step is the definition. A version recursing from the
+  head, with this equation as a postcondition, did not prove at level 2,
+  and where it was assumed, SHA-2's lemmas lost proofs: a postcondition
+  gives array `=`, where a definition gives the provers' logical equality.
+- **Closures are explicit.** A Cryptol fold's function may mention local
+  values (SHA-2's `step3` mentions the block). Ada's generic formal
+  functions are not closures, so `Enumeration_Folds` passes the value as
+  the function's first argument.
+- **Words are numbers.** In Cryptol a word is its bits; here a fixed-width
+  word is a modular number (the campaign's fixed-width-word decision), so
+  `Words.Bit` reads bit `j` as the bit of weight `2 ** (w - 1 - j)`, and
+  `Join_Split.Value` is the conversion from bits to a word that Cryptol
+  needs no name for. The polynomial generics read a word as a polynomial
+  the same way, bit of weight `2 ** i` the coefficient of `x ^^ i`.
+
+**Who uses it.** SHA-2 (`foldl` twice, `@`, `join`, `split`, `zero`, the
+literal of `pad`, `/^` and `%^`) and HMAC (`@`, `join`, `repeat`, `zero`)
+since #75. AES (`foldl`, `split`/`join`, `@@`, `reverse`, `@`, `pmult`,
+`pmod`, `pdiv`) is migrated after its key-size rewrite (#80); its types
+are checked here already (`Bulk_Indexing` on a block and on a byte table,
+`pmult` at `[8] x [8]`, `pmod` at `[15]` mod `[9]`).
+
+**How it is checked.** gnatprove proves each instance where it is
+instantiated. `spark/cryptol/SPARK/Prelude.cry` checks each generic
+against Cryptol's built-in through the FFI (`FFI.Prelude`), through the
+spec layers' own instances where there are some: 22 properties, `:exhaust`
+where the domain allows. A fold takes a function, which C cannot pass, so
+the shims fold fixed ones whose result depends on the order of the
+elements. SAW does not prove the prelude on its own; the spec-layer SAW
+proofs of SHA-2 and HMAC go through its instances (their lemmas now name
+the instances' recursions).
 
 ## Coverage
 
@@ -1107,20 +1178,25 @@ SHA-256 and HMAC-SHA-256 (`sha256_spec.saw`, with `sha256_spec_step.saw`,
 shared parts in `sha256_spec_common.saw`; the HMAC units are linked into
 `sha256_spec.bc`). Message lengths are M4.3's: 0, 1, 55, 56, 63, 64, 65,
 100, 119, 120, 128 and 200 bytes; HMAC's (key, text) lengths M4.3's too.
+Since #75 the SHA-2 and HMAC spec bodies call the Cryptol prelude's
+instances, and the scripts name the instances' recursions (the rows
+marked #75); those edits, and the secondary-stack bases they may move,
+are unverified until the next SAW session, so `results.txt` records the
+scripts as they were before #75.
 
 | Ada (`SHA2.SHA256.` unless named) | Cryptol | sizes, lemmas | overrides | tactic |
 |---|---|---|---|---|
 | `SHA2.Functions.SIGMA_256_0/1`, `Small_Sigma_256_0/1`; `Logical.Ch`, `.Maj` | `Functions.cry` | | | rme |
 | `W` | `Ws m @ t` (`SHA256Step.cry`: `step`'s `W@t`) | T = 0 .. 63 | the lemmas below T (SAW applies those at T - 2, T - 7, T - 15, T - 16), the sigmas | z3, the four sigmas uninterpreted |
 | `T1`, `T2`, `Step3` | `SHA256Step.cry`: `step3`'s `T1`, `T2`, and `step3` | each T: 64, 1, 64 | `W` at T, the sigmas, `Ch`, `Maj`; `T1` at T, `T2` | z3, sigmas uninterpreted |
-| `Foldl_Step3` | `foldl (step3 m) h [0 ..< N]` | N = 0 .. 64 | N - 1, `Step3` at N - 1 | z3, sigmas uninterpreted |
+| `Rounds.Foldl` (#75: `Foldl_Step3`'s recursion), then `Foldl_Step3` at 64 | `foldl (step3 m) h [0 ..< N]` | N = 0 .. 64 | N - 1, `Step3` at N - 1; `Rounds.Foldl` at 64 | z3, sigmas uninterpreted |
 | `"+"`, `Step` | `+` on `[8][32]`; **`Main.cry`: `step`** | | `Foldl_Step3` at 64, `"+"` | z3, sigmas uninterpreted |
 | `Small_K` | `hash`'s `type k = (l + 1 + 2 * w) %^ m` | each length | | z3 |
 | `Zero` | `zero : [k]` | each k (7 values) | | z3 |
-| `SHA2.To_Bits` | ``drop`{128 - W} v``, `pad`'s ``(`l : [64])`` | W = 0 .. 64, for each k | W - 1 | z3 |
+| `SHA2.Sequences_Of_Bits.Literal` (#75: `SHA2.To_Bits`'s recursion) | ``drop`{128 - W} v``, `pad`'s ``(`l : [64])`` | W = 0 .. 64, for each k | W - 1 | z3 |
 | **`Pad`** | `Preprocessing.cry`: ``pad`{512, 32, l, k}`` | all twelve lengths | `Small_K`, `Zero`, `To_Bits` at 64 | z3 |
-| `Word_Of` | ``zext (take`{Count} (p << first))`` (a word of `parse`) | Count = 0 .. 32, P of 512 and 1024 bits | Count - 1 | yices |
-| `Foldl_Step` | ``foldl step h (take`{N} ms)`` | N = 0 .. 1 of 1 block, 0 .. 2 of 2 | N - 1, `Step` | z3, `step` uninterpreted |
+| `Word_Sequences.Value` (#75: `Word_Of`'s recursion) | ``zext (take`{Count} (p << first))`` (a word of `parse`) | Count = 0 .. 32, P of 512 and 1024 bits | Count - 1 | yices |
+| `Blocks.Foldl_Take` (#75: `Foldl_Step`'s recursion) | ``foldl step h (take`{N} ms)`` | N = 0 .. 1 of 1 block, 0 .. 2 of 2 | N - 1, `Step` | z3, `step` uninterpreted |
 | **`Hash`** | `Main.cry`: ``hash`{l}`` | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes; with `SAW_LONG=1` also 120, 128, 200 | `Pad`, `Word_Of` at 32, `Foldl_Step` (`Parse`, `Parse_Block`, `Join`, `Bit` executed) | z3, `step` uninterpreted |
 | `Hash` (for HMAC), with its `Pad`, `Zero`, `To_Bits` chain | as above | at each base of the secondary stack where HMAC calls it (below) | as above | as above |
 | `HMAC.SHA256.HMAC_init` | `saw/HMACInit.cry` (ours: a copy of `HMAC/Main.cry`'s private `HMAC_init`): ``HMAC_init`{64, k, 32} hash`` | each key length HMAC is proved at, at the two stack bases HMAC calls it at | for k > 64, `Hash` at 8k bits, its message on the secondary stack | z3 (k > 64: `step` uninterpreted) |

@@ -170,6 +170,16 @@ let verify_zero (k : Int) = verify_zero_at 0 0 0 k;
  * To_Bits (V / 2, W - 1) first, which leaves its own result and every
  * shorter one on the stack (to_bits_used), and then allocates its
  * result.
+ *
+ * Since #75 the recursion is the prelude's: To_Bits calls SHA2's
+ * Sequences_Of_Bits.Literal (Cryptol.Bit_Sequences) with the same
+ * arguments, so these lemmas are Literal's, and Pad reaches the one at 64
+ * through To_Bits, which SAW executes; likewise Zero now calls
+ * Sequences_Of_Bits.Zero. Unverified until the next SAW session (PLAN
+ * step 7), and the secondary-stack accounting is the part to check
+ * first: if GNAT copies a wrapper's unconstrained result on the
+ * secondary stack, rather than passing the callee's through, the byte
+ * counts here and in Pad's contract move.
  */
 let to_bits_used (w : Int) = eval_int {{ sum [ ((32 + j + 15) / 16) * 16 | j <- [0 .. w] ] : [64] }};
 /*
@@ -199,7 +209,7 @@ let to_bits_contract_at (used : Int) (o1 : Int) (n1 : Int) (o2 : Int) (n2 : Int)
   llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
 };
 rec to_bits_lemmas_at (used : Int) (o1 : Int) (n1 : Int) (o2 : Int) (n2 : Int) (w : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "to_bits" prev (to_bits_contract_at used o1 n1 o2 n2 w) z3 "z3"
+  lemma <- verify_spec "sequences_of_bits__literal" prev (to_bits_contract_at used o1 n1 o2 n2 w) z3 "z3"
              (str_concat (str_concat (str_concat (str_concat "W = " (show w)) ", the secondary stack at ") (show used))
                 " bytes: drop`{128 - W} (v : [128]) ((`l : [2 * w]) in Preprocessing.cry's pad)");
   if eval_bool {{ `w == (64 : Integer) }} then return lemma
