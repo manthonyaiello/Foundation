@@ -115,12 +115,6 @@ LLVM_NM="$GNAT_LLVM_DIR/bin/llvm-nm"
    bootstrap's gnat-llvm phase installs it, README \"SAW\")."
 LLVM_LINK="$LLVM_LINK_DIR/bin/llvm-link"
 [ -x "$LLVM_LINK" ] || die "LLVM_LINK_DIR=$LLVM_LINK_DIR has no bin/llvm-link"
-# opt and llvm-extract, of the same release, for the spec layer's one GEP
-# rewrite (gep64 below); the bootstrap extracts them with llvm-link.
-LLVM_OPT="$LLVM_LINK_DIR/bin/opt"
-LLVM_EXTRACT="$LLVM_LINK_DIR/bin/llvm-extract"
-[ -x "$LLVM_OPT" ] && [ -x "$LLVM_EXTRACT" ] || die "LLVM_LINK_DIR=$LLVM_LINK_DIR has no bin/opt or bin/llvm-extract:
-   extract them from the same pinned release tarball (the bootstrap's gnat-llvm phase does)"
 for t in saw cryptol z3; do
   command -v "$t" >/dev/null 2>&1 || die "$t is not on PATH (source the bootstrap's env.sh)"
 done
@@ -130,10 +124,6 @@ first_line() { local out; out="$("$@" 2>&1)" || true; printf '%s\n' "${out%%$'\n
 V_LLVM_GCC="$(first_line "$LLVM_GCC" --version)"
 V_LLVM="$("$LLVM_NM" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
 V_LLVM_LINK="$("$LLVM_LINK" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
-V_LLVM_OPT="$("$LLVM_OPT" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
-V_LLVM_EXTRACT="$("$LLVM_EXTRACT" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
-[ "$V_LLVM_OPT" = "$V_LLVM_LINK" ] && [ "$V_LLVM_EXTRACT" = "$V_LLVM_LINK" ] \
-  || die "opt (${V_LLVM_OPT:-?}) and llvm-extract (${V_LLVM_EXTRACT:-?}) must be llvm-link's LLVM ($V_LLVM_LINK)"
 # The pinned release: llvm-link must be it, and it must be GNAT-LLVM's own
 # LLVM, so that the linker reads and writes the bitcode llvm-gcc makes.
 # shellcheck source=toolchain-pins.env
@@ -225,13 +215,6 @@ UNITS_sha256_spec=(
   hmac/foundation_spark-hmac.ads
   hmac/foundation_spark-hmac-sha256.ads
 )
-
-# The functions of a spec module whose getelementptr indices are i128
-# (unit:function), rewritten to i64 before linking (gep64, below):
-# AES.Spec.Main.Join_Block's aggregate over Block_Bits'Range indexes its
-# [128 x i8] temporary by the 128-bit Bit_Index (#59).
-GEP64_aes_spec=(foundation_spark-aes-spec-main:foundation_spark__aes__spec__main__join_block)
-GEP64_sha256_spec=()
 
 # The spec layer's switches: the implementation's, plus
 # -fno-inline: GNAT-LLVM marks every expression function alwaysinline, and
@@ -378,37 +361,6 @@ for u in "${HARNESS_UNITS[@]}"; do
 done
 BITCODE+=("${SS_BC[@]}")
 
-# gep64 UNIT_BC FUNCTION OUT_BC: FUNCTION, extracted from UNIT_BC, with
-# its getelementptr indices wider than 64 bits truncated to i64 by LLVM's
-# separate-const-offset-from-gep pass, into OUT_BC, for llvm-link
-# --override. Dies unless the only change is that: each `trunc i128 %x to
-# i64` the pass inserts, used in place of %x as a GEP index (LangRef:
-# a GEP index is truncated to the pointer's index width, 64 bits, so the
-# meaning is the same; SAW 1.6 rejects the wider index, README "SAW").
-gep64() {
-  local unit_bc="$1" fn="$2" out="$3" before after
-  echo ">> llvm-extract --func=$fn ${unit_bc##*/}; opt -passes=separate-const-offset-from-gep"
-  "$LLVM_EXTRACT" "--func=$fn" "$unit_bc" -o "$out.orig.bc"
-  "$LLVM_OPT" -passes=separate-const-offset-from-gep "$out.orig.bc" -o "$out"
-  before="$("$LLVM_OPT" -S "$out.orig.bc" -o -)"
-  after="$("$LLVM_OPT" -S "$out" -o -)"
-  [ "$(printf '%s\n' "$before" | grep -c 'getelementptr.*, i128 ' || true)" -gt 0 ] \
-    || die "$fn in ${unit_bc##*/} has no i128 getelementptr index: the rewrite is not needed"
-  [ "$(printf '%s\n' "$after" | grep -c 'getelementptr.*, i128 ' || true)" -eq 0 ] \
-    || die "$fn: an i128 getelementptr index is left after the rewrite"
-  # Undo the rewrite textually (drop each trunc, use its operand again):
-  # the result must be the function as compiled.
-  printf '%s\n' "$after" | awk '
-    /^; ModuleID = / { next }
-    $2 == "=" && $3 == "trunc" && $4 == "i128" && $6 == "to" && $7 == "i64" && NF == 7 { sub_of[$1] = $5; next }
-    { for (v in sub_of) { gsub("i64 " v ",", "i128 " sub_of[v] ","); gsub("i64 " v "$", "i128 " sub_of[v]) } print }
-  ' > "$out.undone.ll"
-  printf '%s\n' "$before" | grep -v '^; ModuleID = ' > "$out.orig.ll"
-  diff -q "$out.orig.ll" "$out.undone.ll" >/dev/null \
-    || { diff "$out.orig.ll" "$out.undone.ll" >&2; die "$fn: the rewrite changed more than the width of GEP indices"; }
-  echo ">> $fn: $(printf '%s\n' "$after" | grep -c '= trunc i128 .* to i64$') GEP index(es) truncated to i64, nothing else changed"
-}
-
 # The spec layer: ghost code compiled, so its symbols are expected.
 for mod in "${SPEC_MODULES[@]}"; do
   declare -n units="UNITS_$mod"
@@ -422,19 +374,14 @@ for mod in "${SPEC_MODULES[@]}"; do
     ALL_ALIS+=("${bc%.bc}.ali")
   done
   unset -n units
-  declare -n rewrites="GEP64_$mod"
-  overrides=()
-  for f in "${rewrites[@]}"; do
-    unit_bc="$SPEC_OBJ_DIR/${f%%:*}.bc"
-    fn="${f#*:}"
-    gep64 "$unit_bc" "$fn" "$SPEC_OBJ_DIR/$fn.gep64.bc"
-    overrides+=("--override=$SPEC_OBJ_DIR/$fn.gep64.bc")
-    BITCODE+=("$SPEC_OBJ_DIR/$fn.gep64.bc")
-  done
-  unset -n rewrites
-  echo ">> llvm-link ${mod_bc[*]##*/} ${SS_BC[*]##*/} ${overrides[*]##*/} -o spec/$mod.bc"
-  "$LLVM_LINK" "${mod_bc[@]}" "${SS_BC[@]}" "${overrides[@]}" -o "$SPEC_OBJ_DIR/$mod.bc"
-  wide="$("$LLVM_OPT" -S "$SPEC_OBJ_DIR/$mod.bc" -o - | grep -c 'getelementptr.*, i128 ' || true)"
+  echo ">> llvm-link ${mod_bc[*]##*/} ${SS_BC[*]##*/} -o spec/$mod.bc"
+  "$LLVM_LINK" "${mod_bc[@]}" "${SS_BC[@]}" -o "$SPEC_OBJ_DIR/$mod.bc"
+  # SAW 1.6 rejects a getelementptr index wider than 64 bits ("Invalid
+  # index value in GEP"; README "The bitcode ABI"). GNAT-LLVM emits one
+  # where an array whose index type is 128-bit is indexed directly, as
+  # AES's Join_Block did until #68 narrowed AES.Spec.Main.Bit_Index. Say so
+  # here, by name, rather than deep in a proof. (llvm-link -S disassembles.)
+  wide="$("$LLVM_LINK" -S "$SPEC_OBJ_DIR/$mod.bc" -o - | grep -c 'getelementptr.*, i128 ' || true)"
   [ "$wide" -eq 0 ] || die "spec/$mod.bc has $wide getelementptr with an i128 index, which SAW 1.6 rejects"
   has_ghost "$SPEC_OBJ_DIR/$mod.bc"
   BITCODE+=("${mod_bc[@]}" "$SPEC_OBJ_DIR/$mod.bc")
@@ -564,8 +511,7 @@ record() {
   echo "host        $(uname -m), $(nproc) CPUs"
   echo "llvm-gcc    $V_LLVM_GCC"
   echo "llvm        $V_LLVM"
-  echo "llvm-link   $V_LLVM_LINK ($LLVM_LINK_TARBALL, sha256 $LLVM_LINK_SHA256); opt and llvm-extract of the same"
-  echo "gep64       spec layer: ${GEP64_aes_spec[*]#*:} extracted, opt -passes=separate-const-offset-from-gep (i128 GEP index -> trunc to i64; checked: nothing else changed), linked with --override"
+  echo "llvm-link   $V_LLVM_LINK ($LLVM_LINK_TARBALL, sha256 $LLVM_LINK_SHA256)"
   echo "saw         $V_SAW"
   echo "cryptol     $V_CRYPTOL"
   echo "solvers     rme (SAW's built-in); z3 on PATH: $V_Z3 (each proof's below)"

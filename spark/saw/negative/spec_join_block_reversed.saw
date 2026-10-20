@@ -2,11 +2,12 @@
  * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
  *
  * The spec layer's Join_Block (obj/spec/aes_spec.bc, the function whose
- * one i128 GEP index check-saw.sh rewrites to a trunc to i64, gep64)
- * against Main.cry's join of the block's bytes reversed, with the
- * overrides and tactic of aes_spec_main.saw's proof. The proof must fail
- * with a counterexample block, which shows that the rewritten function is
- * the one checked and that it is told from the wrong Cryptol.
+ * GEP index was an i128 until #68 narrowed AES's Bit_Index, and which
+ * check-saw.sh rewrote until then, gep64) against Main.cry's join of the
+ * block's bytes reversed, with the overrides and tactic of
+ * aes_spec_main.saw's proof. The proof must fail with a counterexample
+ * block, which shows that the function as compiled, now with no rewrite,
+ * is the one checked and that it is told from the wrong Cryptol.
  */
 
 include "../aes_spec_common.saw";

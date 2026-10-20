@@ -963,7 +963,7 @@ AES (`aes_spec.saw`, with `aes_spec_gf.saw`, `aes_spec_cipher.saw`,
 | `KeyExpansion.W` | `w @ i` = `(groupBy`{4} (join (KeyExpansion`{k} key))) @ i` | each I at each k: 44, 52, 60 | the lemmas below I (SAW applies those at I - 1 and I - Nk), the leaves | z3, `SubWord` uninterpreted |
 | `KeyExpansion.KeyExpansion` | ``KeyExpansion`{k}`` | 128, 192, 256 | the W lemmas, `Nr`, `Join` | z3, `SubWord` uninterpreted |
 | `Main.Bit_Of`, `.Byte_At`, `.Split_Block`, `.Split_Key` | `Main.cry`'s `split`s: `b @ j`, ``take`{8} (bs << from)``, `split in`, `split (split key)` | `Byte_At` at 128, 192, 256 bits; `Split_Key` at each k | `Byte_At` | z3 |
-| `Main.Join_Block` | `Main.cry`'s `join : Block -> [128]` | | `Bit_Of` | z3 (its one `i128` GEP index rewritten, "The bitcode ABI") |
+| `Main.Join_Block` | `Main.cry`'s `join : Block -> [128]` | | `Bit_Of` | z3 (no GEP rewrite since #68; unverified until the next SAW run) |
 | `KeyExpansion.KeyExpansion`, `Cipher.InvCipher` (as `Main` calls them) | as above | 128, 192, 256, their argument on the secondary stack (Split_Key's key words; KeyExpansion's round keys) | as above | as above |
 | **`Main.Encrypt`, `.Decrypt`** | **`Main.cry`: ``AES`{k}.Encrypt``, ``.Decrypt``** | 128, 192, 256 | `Split_Key`, `KeyExpansion`, `Split_Block`, `Cipher` or `InvCipher`, `Join_Block` | z3, `Cipher`, `InvCipher`, `KeyExpansion` uninterpreted |
 | `Main.AES128.Encrypt`, `.Decrypt`, and `AES192`'s, `AES256`'s | `Main.cry`: `AES128.Encrypt` and the others | | `Encrypt` or `Decrypt` at k | as above |
@@ -1136,8 +1136,6 @@ and 200 bytes and HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and
 2048 bits, `Foldl_Step` at 3 and 4 blocks, and four more HMAC lengths
 with their hashes' lemmas at their stack bases) and records the run in
 `saw/results-long.txt`. Each record's `options` line says which it was.
-`LLVM_LINK_DIR` must hold `bin/opt` and `bin/llvm-extract` of the same
-release too (the spec layer's one GEP rewrite, "The bitcode ABI").
 
 **Local only, never CI** (Tony, 2026-10-19). The bitcode comes from
 **GNAT Pro 27's LLVM back end** (`$GNAT_LLVM_DIR/bin/llvm-gcc`), which CI
@@ -1431,36 +1429,33 @@ adds:
   inlines those even at `-O0`; with `-fno-inline` they are `noinline`.
 - **`Boolean` is `i8`**, 0 or 1, as an argument, a result and an array
   element.
-- **Bit sequences** (`AES.Spec.Main.Bits`, `SHA2.Bits`, index a 128-bit
-  integer type) are arrays of `i8`, one per bit, 0 or 1, the Cryptol's
-  first bit first. Unconstrained, they are fat pointers `{ ptr, ptr }`
-  whose bounds record is `{ i128, i128 }` (`..._bits_BOUNDS`): `Byte_At
-  (Bs, From)` is `i8 ({ ptr, ptr } %bs, i128 %from)`. The contracts take
+- **Bit sequences** (`AES.Spec.Main.Bits`, `SHA2.Bits`) are arrays of
+  `i8`, one per bit, 0 or 1, the Cryptol's first bit first. SHA-2's index
+  is a 128-bit integer type (its domain needs it); AES's, since #68, is
+  `range 0 .. 256` (`Object_Size` 16). Unconstrained, they are fat
+  pointers `{ ptr, ptr }` whose bounds record is two of the index type
+  (`..._bits_BOUNDS`): SHA-2's `{ i128, i128 }`, AES's `{ i16, i16 }`, so
+  AES's `Byte_At (Bs, From)` is `i8 ({ ptr, ptr } %bs, i16 %from)` (the
+  AES widths are unverified until the next GNAT-LLVM session: they are
+  `Bit_Index`'s `Object_Size`, not read from the IR). The contracts take
   n bytes under the precondition that each is 0 or 1 (an Ada Boolean's
   validity) and read them as Cryptol bits (`[ b == 1 | b <- bs ]`).
   `Block_Bits` (`Bits (0 .. 127)`, constrained) is passed by reference and
   returned through a hidden first pointer. **SAW 1.6 cannot translate a
-  `getelementptr` with an `i128` index**, which GNAT-LLVM emits where a
-  constrained array of a 128-bit index type is indexed directly
-  (`Join_Block`'s aggregate over `Block_Bits'Range`; it is the only one in
-  the spec modules); indexing through a fat pointer goes through an `i64`
-  offset and is fine. `check-saw.sh` rewrites that one index (`gep64`):
-  `llvm-extract` takes `Join_Block` out of its unit's bitcode, LLVM's
-  `opt -passes=separate-const-offset-from-gep` (21.1.8, the pinned
-  release, as `llvm-link`) inserts `%idxprom = trunc i128 %n to i64` and
-  uses it as the index, and `llvm-link --override` puts the result in the
-  module. LangRef has a GEP index truncated to the pointer's index width
-  (64 bits) anyway, so the meaning is the same; the script checks that the
-  rewritten function, with each such `trunc` undone, is the function as
-  compiled, and that no `i128` index is left in the module. No GNAT
-  switch avoids the index (`-foptimize-ir` and every `-gnatd` debug flag
-  leave it), `instcombine` would also add `insertvalue ... poison` (which
-  SAW 1.6 rejects), and no SAW release accepts it (crucible-llvm's
+  `getelementptr` with an index wider than 64 bits** (crucible-llvm's
   `calcGEP_array`, at 2026-10-16, takes an index of exactly the pointer's
-  width or narrower).
+  width or narrower, and no GNAT switch avoids the wide one). GNAT-LLVM
+  emits one where a constrained array of a 128-bit index type is indexed
+  directly; indexing through a fat pointer goes through an `i64` offset
+  and is fine. Until #68 there was one, in AES's `Join_Block` (its
+  aggregate over `Block_Bits'Range`), and `check-saw.sh` rewrote it to a
+  `trunc` to `i64` (`gep64`, with `opt` and `llvm-extract`). #68 narrowed
+  AES's `Bit_Index` instead, which removes the index, the rewrite and the
+  two tools; `check-saw.sh` still refuses a linked spec module with an
+  `i128` GEP index, by name, before SAW would.
 - **Unconstrained results** are on the secondary stack: `SS_Allocate`'s
   block holds the bounds record, then the data (`KeyExpansion`'s
-  `Round_Keys`: `{ i32, i32 }` at 0, the blocks at 8; a `Bits`:
+  `Round_Keys`: `{ i32, i32 }` at 0, the blocks at 8; a `SHA2.Bits`:
   `{ i128, i128 }` at 0, the bits at 32), and the function returns the fat
   pointer `{ data, bounds }`. Sizes are rounded up to 16 bytes. An empty
   `Bits` aggregate (`To_Bits (V, 0)`) is the bounds `{0, -1}` alone. A
