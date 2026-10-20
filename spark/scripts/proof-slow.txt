@@ -23,7 +23,7 @@
 #     input       <sha256, 16 hex> <name>     one per input, computed by
 #                                             scripts/slow_proofs.py
 
-unit src/aes/foundation_spark-aes-spec-properties-sbox_entries.adb
+unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
   reason      SBoxCorrect by a generated case enumeration over the 256 bytes (7,700 lines, level 4). Cold: 1h40m47s in CI (#41 at 09475b8); 1102 s of gnatprove on the campaign machine at 46c5799 (6 tokens)
   commit      33db1c170b047e8c1a1c464ccf7d023f0905f256
   date        2026-10-20

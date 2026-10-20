@@ -1,6 +1,6 @@
 with Foundation_Spark.AES.Lemmas;
 with Foundation_Spark.AES.Spec.KeyExpansion;
-with Foundation_Spark.AES.Spec.Properties.SBox_Entries;
+with Foundation_Spark.AES.Spec.SBox.SBox_Entries;
 
 package body Foundation_Spark.AES.Spec.Properties with
   SPARK_Mode
@@ -56,7 +56,7 @@ is
    procedure SBoxCorrect is
    begin
       for B in Types.Byte loop
-         SBox_Entries.Lemma_SBox_Entry (B);
+         SBox.SBox_Entries.Lemma_SBox_Entry (B);
          pragma Loop_Invariant
            (for all X in 0 .. B => SBox.Affine (X) = SBox.SBox (X));
       end loop;
@@ -343,28 +343,6 @@ is
       Lemma_xTimes_Xor (xTimes (X), xTimes (xTimes (X)));
       Lemma_xTimes_Xor (xTimes (xTimes (X)), xTimes (xTimes (xTimes (X))));
    end Lemma_Coefficients;
-
-   --------------------
-   -- Lemma_Inner_Eq --
-   --------------------
-
-   procedure Lemma_Inner_Eq (A, B : GF2.Poly_State) is
-   begin
-      if A (3) /= 0 then
-         pragma Assert (GF2.Inner_Step (A) = GF2.Inner_Step (B));
-         Lemma_Inner_Eq (GF2.Inner_Step (A), GF2.Inner_Step (B));
-      end if;
-   end Lemma_Inner_Eq;
-
-   ----------------
-   -- Lemma_Step --
-   ----------------
-
-   procedure Lemma_Step (S, T, F : GF2.Poly_State) is
-   begin
-      Lemma_Inner_Eq (GF2.Inner_Step (S), T);
-      pragma Assert (GF2.Inner (GF2.Inner_Step (S)) = F);
-   end Lemma_Step;
 
    ---------------------------
    -- Lemma_InvRound_Key_Eq --

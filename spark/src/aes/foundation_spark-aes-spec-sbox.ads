@@ -3,8 +3,8 @@
 --
 --  The tables are SBox.cry's, entry for entry. SBoxPolynomial and the
 --  affine construction (affine) are SBox.cry's too: its property
---  SBoxCorrect, stated and proved in Foundation_Spark.AES.Spec.Properties,
---  checks the table against affine.
+--  SBoxCorrect, stated and proved in Foundation_Spark.AES.Spec.Properties
+--  from the child SBox_Entries, checks the table against affine.
 
 with Foundation_Spark.AES.Spec.GF2;
 with Foundation_Spark.AES.Spec.GF28;
