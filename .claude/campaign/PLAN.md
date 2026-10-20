@@ -14,6 +14,10 @@ default at the head of each PR. **Open:** #67–#70, #72–#75 (below) and
 E5's #50, #51.
 **E0–E4 are closed** (epic #21 closed 2026-10-20); E5 remains.
 **The day's measurements** are in `.claude/campaign/measurements/2026-10-19-iod.md`.
+**The AES spec crosswalk** (Cryptol and SPARK side by side, Tony's review of
+2026-10-20) is `.claude/campaign/walkthroughs/aes-spec-crosswalk-2026-10-20.html`,
+the "before" of #68 and #72–#75. Publish the "after" as a new dated copy and
+a new artifact (`walkthroughs/README.md`).
 
 **A fresh session starts at "Next".**
 
