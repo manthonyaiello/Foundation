@@ -11,6 +11,3 @@ project-files = ["foundation_spark.gpr"]
 
 [build-switches]
 "*".ada_version = "Ada2022"
-
-[[depends-on]]
-sparklib = "^16.1.0"

@@ -80,8 +80,8 @@ esac
 [ -f "$UNITS" ] || die "missing $UNITS"
 [ -f "$EXPLAINED" ] || die "missing $EXPLAINED"
 
-# The Alire environment (GPR_PROJECT_PATH for sparklib and the config GPR),
-# plus the gnatcov runtime's project.
+# The Alire environment (the toolchain on PATH, and GPR_PROJECT_PATH), plus
+# the gnatcov runtime's project.
 eval "$("$ALR" -n printenv)"
 export GPR_PROJECT_PATH="$ROOT/$RTS/share/gpr:$GPR_PROJECT_PATH"
 

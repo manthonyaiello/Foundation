@@ -260,7 +260,8 @@ Not yet, and not filed:
 ## Decisions taken — do not re-ask
 
 * **Crate.** One Alire crate at `spark/` (`foundation_spark`). gnat_native
-  16.1.0, SPARKlib 16.1.0, gnatprove FSF 16.1.0. Pins live in
+  16.1.0 (it matches gnatprove), gnatprove FSF 16.1.0, no crate
+  dependencies (SPARKlib was never used and was removed, #72). Pins live in
   `spark/scripts/toolchain-pins.env` (with PR #46).
 * **Faithfulness.** The spec layer stays semantically close to the Cryptol.
   Representation changes go in separately proved layers. Renamings forced by
@@ -396,8 +397,12 @@ Not yet, and not filed:
   `python3 [spark/]scripts/board.py`. Start commands with those prefixes.
   The classifier refuses to let the orchestrator edit settings itself.
 * **A fresh worktree has no Alire workspace**: `alr -n build` in its
-  `spark/` before any proof, or gnatprove fails at once on sparklib's lib
-  dir.
+  `spark/` before any proof, or gnatprove fails at once with "imported
+  project file config/foundation_spark_config.gpr not found" (`alr -n
+  exec` does not generate it; re-checked after #72). On `foundation`, `alr`
+  is `~/Software/alr/bin/alr` and the toolchain comes from
+  `~/Software/null_crate`'s `alr printenv`; neither is on a tick's `PATH`
+  by default.
 * **A hand re-run replays cached proofs** (about 2 s); `prove.sh` refuses
   `-f`. CI's run is the cold one.
 * **gnatdoc 26 crashes** on: `declare` expressions; a line break right after

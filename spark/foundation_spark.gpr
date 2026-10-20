@@ -1,5 +1,4 @@
 with "config/foundation_spark_config.gpr";
-with "sparklib";
 
 project Foundation_Spark is
 

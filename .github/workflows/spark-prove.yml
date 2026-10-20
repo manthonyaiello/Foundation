@@ -89,7 +89,7 @@ jobs:
           echo "prefix=spark-gnatprove-${{ runner.os }}-${{ runner.arch }}-gp${gp}-why3-${why3}-${hash}-" >> "$GITHUB_OUTPUT"
           rm gnatprove-version.txt
 
-      # gnatprove needs the Alire workspace (config GPRs, sparklib sources);
+      # gnatprove needs the Alire workspace (the generated config GPR);
       # building the crate provides it and checks that the crate compiles.
       - name: Build
         working-directory: spark

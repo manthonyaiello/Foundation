@@ -90,7 +90,7 @@ jobs:
         with:
           gnatdoc: 'true'
 
-      # gnatdoc needs the Alire workspace (config GPRs, sparklib) and the
+      # gnatdoc needs the Alire workspace (the generated config GPR) and the
       # object directories; building the crate provides both, and checks that
       # it compiles.
       - name: Build
@@ -151,7 +151,7 @@ jobs:
       - name: Cryptol version
         run: cryptol --version
 
-      # check-ffi.sh needs the Alire workspace (config GPRs, sparklib).
+      # check-ffi.sh needs the Alire workspace (the generated config GPR).
       - name: Build
         working-directory: spark
         run: alr -n build
