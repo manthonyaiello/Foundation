@@ -22,6 +22,7 @@
 
 with Interfaces;
 with Foundation_Spark.AES.Spec.Cipher;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.GF28;
 with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.SBox;
@@ -141,7 +142,7 @@ is
      (K : Natural; Ws : Round_Keys; State : Block)
    with
      Pre  => Is_Round_Keys (K, Ws),
-     Post => InvCipher_Prime (K, Ws, Cipher.Cipher (K, Ws, State)) = State;
+     Post => InvCipher_Prime (K, Ws, Dispatch.Cipher (K, Ws, State)) = State;
    --  Cipher.cry: property CipherInverts' ws state = InvCipher'`{k} ws
    --  (Cipher`{k} ws state) == state, for {k} (Key k) and
    --  ws : [Nr k + 1]Block. CipherInverts is proved from it.
@@ -152,7 +153,7 @@ is
    procedure CipherInverts (K : Natural; Ws : Round_Keys; State : Block)
    with
      Pre  => Is_Round_Keys (K, Ws),
-     Post => InvCipher (K, Ws, Cipher.Cipher (K, Ws, State)) = State;
+     Post => InvCipher (K, Ws, Dispatch.Cipher (K, Ws, State)) = State;
    --  Cipher.cry: property CipherInverts ws state = InvCipher`{k} ws
    --  (Cipher`{k} ws state) == state, for {k} (Key k) and
    --  ws : [Nr k + 1]Block.

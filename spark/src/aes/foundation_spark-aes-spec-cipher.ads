@@ -1,8 +1,8 @@
 --  The round transformations of algorithms/AES/Cipher.cry
 --  [FIPS-PUB-197 Sections 5.1 and 5.3]: SubBytes, ShiftRows,
 --  MixColumnsStep, MixColumns, AddRoundKey, their inverses, Round,
---  InvRound and InvRound', and the ciphers Cipher, InvCipher and
---  InvCipher'.
+--  InvRound and InvRound', and the ciphers InvCipher and InvCipher'.
+--  Cipher, the first {k} function, is in the generic AES_K (spike #74).
 --
 --  Cipher.cry's properties (M1.5) are not stated here. Ada has no primes
 --  in names, so InvRound' is InvRound_Prime and InvCipher' is
@@ -203,26 +203,6 @@ is
    --  @param Xs The round keys.
    --  @return Xs in reverse order.
 
-   function Cipher (K : Natural; W : Round_Keys; Input : Block) return Block
-   is (AddRoundKey (ShiftRows (SubBytes
-                      (Foldl_Round (AddRoundKey (Input, W (0)),
-                                    W (1 .. Nr (K) - 1)))),
-                    W (Nr (K))))
-   with Pre => Is_Round_Keys (K, W);
-   --  Cipher.cry: Cipher : {k} (Key k) => [Nr k + 1]Block -> Block ->
-   --  Block, AES encryption [FIPS-PUB-197 Section 5.1]. NSA declares it
-   --  foreign, with Rust behind it. This mirrors its Cryptol body,
-   --  Cipher ([w0] # ws # [wr]) in = state_final, where
-   --  state_initial = AddRoundKey in w0,
-   --  state_rounds = foldl Round state_initial ws, and
-   --  state_final = AddRoundKey (ShiftRows (SubBytes state_rounds)) wr,
-   --  with w0 = W (0), ws = W (1 .. Nr (K) - 1) and wr = W (Nr (K)). The
-   --  Cryptol's in is Input: in is an Ada reserved word.
-   --  @param K The key size in bits, the Cryptol's k.
-   --  @param W The Nr (K) + 1 round keys, from KeyExpansion.
-   --  @param Input The plaintext block.
-   --  @return The ciphertext block.
-
    function InvCipher
      (K : Natural; W : Round_Keys; Input : Block) return Block
    is (AddRoundKey (InvSubBytes (InvShiftRows
@@ -237,7 +217,10 @@ is
    --  state_initial = AddRoundKey in wr,
    --  state_rounds = foldl InvRound state_initial (reverse ws), and
    --  state_final = AddRoundKey (InvSubBytes (InvShiftRows state_rounds))
-   --  w0, with w0, ws and wr as in Cipher.
+   --  w0, with w0 = W (0), ws = W (1 .. Nr (K) - 1) and wr = W (Nr (K)).
+   --  The Cryptol's in is Input: in is an Ada reserved word. (Spike #74:
+   --  Cipher itself is in the generic AES_K; InvCipher stays here for
+   --  now.)
    --  @param K The key size in bits, the Cryptol's k.
    --  @param W The Nr (K) + 1 round keys, from KeyExpansion.
    --  @param Input The ciphertext block.

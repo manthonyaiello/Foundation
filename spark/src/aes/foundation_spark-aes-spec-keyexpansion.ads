@@ -1,14 +1,7 @@
---  The key schedule, mirroring algorithms/AES/KeyExpansion.cry
---  [FIPS-PUB-197 Section 5.2]: Rcon, RotWord, SubWord and KeyExpansion.
---
---  KeyExpansion.cry defines the expanded key w as a self-referential
---  sequence: w @ i is defined from w @ (i - Nk) and w @ (i - 1). Here w
---  is the recursive function W (K, Key, I), whose Subprogram_Variant is
---  I. Following the campaign's decision on key sizes, one unconstrained
---  definition covers k = 128, 192 and 256: the key size K is an explicit
---  parameter in the place of the Cryptol's type application `{k}, and
---  Types.Is_Key_Words (K, Key) states the typing key : [Nk k]AESWord under
---  Key k.
+--  The key schedule's helpers, mirroring algorithms/AES/KeyExpansion.cry
+--  [FIPS-PUB-197 Section 5.2]: Rcon, RotWord and SubWord, which have no
+--  {k}. KeyExpansion itself, KeyExpansion : {k} (Key k) => ..., is in the
+--  generic AES_K (spike #74), one instance per key size.
 
 with Foundation_Spark.AES.Spec.SBox;
 with Foundation_Spark.AES.Spec.Types;
@@ -79,45 +72,5 @@ is
    --  52 or 60.
    --  @param K The key size in bits.
    --  @return 4 * (Nr (K) + 1).
-
-   function W (K : Natural; Key : Key_Words; I : Natural) return AESWord
-   is (if I < Nk (K) then Key (I)
-       elsif I mod Nk (K) = 0
-       then W (K, Key, I - Nk (K))
-            xor SubWord (RotWord (W (K, Key, I - 1)))
-            xor Rcon (I / Nk (K))
-       elsif I mod Nk (K) = 4 and then Nk (K) > 6
-       then W (K, Key, I - Nk (K)) xor SubWord (W (K, Key, I - 1))
-       else W (K, Key, I - Nk (K)) xor W (K, Key, I - 1))
-   with
-     Pre                => Is_Key_Words (K, Key) and then I < Words (K),
-     Subprogram_Variant => (Decreases => I);
-   --  KeyExpansion.cry: the element w @ i of the expanded key in
-   --  KeyExpansion's where clause, case for case: key @ i for i < Nk;
-   --  w @ (i - Nk) ^ SubWord (RotWord (w @ (i - 1))) ^ Rcon @ (i / Nk) when
-   --  i % Nk == 0; w @ (i - Nk) ^ SubWord (w @ (i - 1)) when i % Nk == 4
-   --  and Nk > 6; and w @ (i - Nk) ^ w @ (i - 1) otherwise [FIPS-PUB-197
-   --  Section 5.2, Figure 11]. The variant is I: each case reads w at
-   --  smaller indices only.
-   --  @param K The key size in bits, the Cryptol's k.
-   --  @param Key The cipher key, the Cryptol's key : [Nk k]AESWord.
-   --  @param I The index of the word, below 4 * (Nr (K) + 1).
-   --  @return w @ I.
-
-   function KeyExpansion (K : Natural; Key : Key_Words) return Round_Keys
-   is [for R in 0 .. Nr (K) => Join ([for J in AESWord_Index =>
-                                        W (K, Key, 4 * R + J)])]
-   with
-     Pre  => Is_Key_Words (K, Key),
-     Post => Is_Round_Keys (K, KeyExpansion'Result);
-   --  KeyExpansion.cry: KeyExpansion : {k} (Key k) => [Nk k]AESWord ->
-   --  [Nr k + 1]Block, KeyExpansion key = split (split (join (join w)))
-   --  [FIPS-PUB-197 Section 5.2]. The split and join regroup the
-   --  4 * (Nr k + 1) words of w into Nr k + 1 blocks of four consecutive
-   --  words: round key R is Join of w @ (4 * R) to w @ (4 * R + 3), in
-   --  order.
-   --  @param K The key size in bits, the Cryptol's k.
-   --  @param Key The cipher key as Nk (K) words.
-   --  @return The Nr (K) + 1 round keys.
 
 end Foundation_Spark.AES.Spec.KeyExpansion;

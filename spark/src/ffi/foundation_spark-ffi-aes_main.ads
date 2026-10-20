@@ -64,7 +64,7 @@ is
        else Join_Key_256 (Key))
    with
      Pre  => Is_Key_Size (K),
-     Post => Is_Key_Bits (Key_Size (K), Join_Key'Result);
+     Post => Is_Key_Bits (Key_Size_Of (K), Join_Key'Result);
    --  Cryptol's join at type [k / 8][8] -> [k], for k = K, on the first
    --  K / 8 bytes of Key.
    --  @param K The key size, Cryptol's {k}.
@@ -81,7 +81,7 @@ is
      Post          =>
        Output = Split_Block
                   (Foundation_Spark.AES.Spec.Main.Encrypt
-                     (Key_Size (K), Join_Key (K, Key), Join_Block (Input)));
+                     (Key_Size_Of (K), Join_Key (K, Key), Join_Block (Input)));
    --  Main.cry's AES`{k}.Encrypt, as the spec states it, for k = K, over
    --  bytes.
    --  @param K The key size, Cryptol's {k}.
@@ -100,7 +100,7 @@ is
      Post          =>
        Output = Split_Block
                   (Foundation_Spark.AES.Spec.Main.Decrypt
-                     (Key_Size (K), Join_Key (K, Key), Join_Block (Input)));
+                     (Key_Size_Of (K), Join_Key (K, Key), Join_Block (Input)));
    --  Main.cry's AES`{k}.Decrypt, as the spec states it, for k = K, over
    --  bytes.
    --  @param K The key size, Cryptol's {k}.

@@ -14,6 +14,7 @@
 --  Ghost, because the spec layer is; AES_KeyExpansion_Exports gives each
 --  the name Cryptol looks up (see Foundation_Spark.FFI).
 
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.KeyExpansion;
 with Foundation_Spark.AES.Spec.Types;
 with Foundation_Spark.FFI.AES_Types;
@@ -69,11 +70,11 @@ is
      External_Name => "spark_KeyExpansion",
      Pre           => Is_Key_Size (K),
      Post          =>
-       Output (0 .. Nr (Key_Size (K))) =
-         Foundation_Spark.AES.Spec.KeyExpansion.KeyExpansion
-           (Key_Size (K), Key_Words_Of (K, Key))
-       and then Output (Nr (Key_Size (K)) + 1 .. Max_Nr) =
-                Output'Old (Nr (Key_Size (K)) + 1 .. Max_Nr);
+       Output (0 .. Nr (Key_Size_Of (K))) =
+         Foundation_Spark.AES.Spec.Dispatch.KeyExpansion
+           (Key_Size_Of (K), Key_Words_Of (K, Key))
+       and then Output (Nr (Key_Size_Of (K)) + 1 .. Max_Nr) =
+                Output'Old (Nr (Key_Size_Of (K)) + 1 .. Max_Nr);
    --  KeyExpansion.cry's KeyExpansion`{k}, as the spec states it, for
    --  k = K.
    --  @param K The key size, Cryptol's {k}.

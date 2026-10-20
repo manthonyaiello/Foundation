@@ -7,8 +7,10 @@
 --  Key sizes. Following the campaign's decision, one unconstrained
 --  implementation serves k = 128, 192 and 256, with the key size K as an
 --  explicit parameter and Is_Key_Words or the bounds of a Round_Keys as
---  the precondition, as in the spec layer. No generic per key size is
---  needed.
+--  the precondition. No generic per key size is needed. Spike #74: the
+--  spec's KeyExpansion and Cipher are generic in the key size (AES_K), and
+--  Expand_Key and Encrypt_Block name them through the ghost dispatchers
+--  Spec.Dispatch.KeyExpansion and Spec.Dispatch.Cipher.
 --
 --  Every subprogram's postcondition states equality with the spec-layer
 --  function it implements. The arithmetic of MixColumns and InvMixColumns
@@ -18,6 +20,7 @@
 
 with Interfaces;
 with Foundation_Spark.AES.Spec.Cipher;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.GF28;
 with Foundation_Spark.AES.Spec.KeyExpansion;
 with Foundation_Spark.AES.Spec.SBox;
@@ -177,7 +180,7 @@ is
    with
      Pre  => Is_Key_Words (K, Key)
              and then W'First = 0 and then W'Length = Nr (K) + 1,
-     Post => W = Spec.KeyExpansion.KeyExpansion (K, Key);
+     Post => W = Spec.Dispatch.KeyExpansion (K, Key);
    --  The key schedule [FIPS-PUB-197 Section 5.2]: the 4 * (Nr (K) + 1)
    --  words of the expanded key, computed in one loop, each from the word
    --  Nk (K) before it and the word just before it, then regrouped into
@@ -257,7 +260,7 @@ is
    procedure Encrypt_Block (K : Natural; W : Round_Keys; State : in out Block)
    with
      Pre  => Is_Round_Keys (K, W),
-     Post => State = Spec.Cipher.Cipher (K, W, State'Old);
+     Post => State = Spec.Dispatch.Cipher (K, W, State'Old);
    --  AES encryption of one block in place [FIPS-PUB-197 Section 5.1]:
    --  AddRoundKey by W (0), Nr (K) - 1 rounds by W (1) to W (Nr (K) - 1),
    --  and the final round without MixColumns by W (Nr (K)).
