@@ -29,7 +29,8 @@ unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
   date        2026-10-20
   level       4
   checks      2501/2501
-  fingerprint sha256:22486b017f340abb73e7307f3f4e523fcf5e85dd936f4afd219550cb5f54e6b4
+  fingerprint sha256:d094a562b0321ae79f9ab1de33290051cce0bc4e3ceec57d02ad87f8158d7ba6
+  input       5030e19415af080b alire.toml
   input       ad09bcbb5ff17488 gpr: Proof_Switches ("Ada")
   input       97881b83f6e39847 gpr: Proof_Switches ("foundation_spark-aes-spec-gf2.ads")
   input       aa059e55e489211e gpr: Proof_Switches ("foundation_spark-aes-spec-sbox-sbox_entries.adb")

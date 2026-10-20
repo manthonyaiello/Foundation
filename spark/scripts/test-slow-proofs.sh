@@ -9,7 +9,10 @@
 #     marked but not listed, listed but not marked or not existing, or its
 #     fingerprint was edited by hand;
 #   * the check names the input that changed: a file in the unit's closure,
-#     the GPR's proof switches, a tool version;
+#     the GPR's proof switches, alire.toml, a tool version;
+#   * `refresh` keeps a recorded proof when the only change is a new input
+#     unchanged since the recorded commit (alire.toml joining the
+#     fingerprint, #67), and refuses otherwise;
 #   * check-proof.sh, gating a synthetic gnatprove.out (CHECK_PROOF_OUT),
 #     exempts the listed unit, and ONLY it, from the "tracked unit absent"
 #     and "entity skipped" rules: an unlisted unit still fails both.
@@ -25,7 +28,7 @@ OTHER_UNIT="${OTHER_TEST_UNIT:-foundation_spark-aes-spec-types}"  # in its closu
 T="$(mktemp -d "${TMPDIR:-/tmp}/slow-proofs-test.XXXXXX")"
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/crate"
-cp -R "$ROOT/src" "$ROOT/scripts" "$ROOT/foundation_spark.gpr" "$T/crate/"
+cp -R "$ROOT/src" "$ROOT/scripts" "$ROOT/foundation_spark.gpr" "$ROOT/alire.toml" "$T/crate/"
 C="$T/crate"
 # Start from no slow unit: the tree's own markers (and manifest) go.
 grep -rlE '^[[:space:]]*--[[:space:]]+Slow proof:' "$C/src" 2>/dev/null | while IFS= read -r f; do
@@ -96,6 +99,11 @@ sed -i.sed 's/use Level_2 & ("--counterexamples=on");/use Level_3 \& ("--counter
 expect "the default proof switches changed: stale, named" 1 'gpr: Proof_Switches \("Ada"\) \(changed\)' -- "${SP[@]}" check
 cp "$T/gpr.bak" "$C/foundation_spark.gpr"
 
+cp "$C/alire.toml" "$T/alire.bak"
+printf '\n# a comment\n' >> "$C/alire.toml"
+expect "alire.toml changed: stale, named" 1 "alire.toml \(changed\)" -- "${SP[@]}" check
+cp "$T/alire.bak" "$C/alire.toml"
+
 cp "$T/versions" "$T/versions.bak"
 sed -i.sed 's/4.15.4/4.15.5/' "$T/versions"
 expect "a prover version changed: stale, named" 1 "tool: z3 \(changed\)" -- "${SP[@]}" check
@@ -115,6 +123,56 @@ cp "$C/$SLOW_FILE" "$T/slow.bak"
 grep -v 'Slow proof:' "$T/slow.bak" > "$C/$SLOW_FILE"
 expect "listed but not marked: fails" 2 "but no file of unit $SLOW_UNIT carries" -- "${SP[@]}" check
 cp "$T/slow.bak" "$C/$SLOW_FILE"
+
+# --- refresh: an input-only change ------------------------------------------------
+
+# refresh compares a new input with its content at the recorded commit, so
+# the entry needs a real one.
+git -C "$C" add -A src alire.toml
+git -C "$C" -c user.name=test -c user.email=test@invalid -c commit.gpgsign=false \
+  commit -qm "the tree proved"
+PROVED="$(git -C "$C" rev-parse HEAD)"
+expect "record at a real commit" 0 "recorded" -- "${SP[@]}" record "$SLOW_FILE" \
+  --commit "$PROVED" --date 2026-01-01 --checks 7/7
+
+# drop_input NAME: make the entry one recorded before NAME was an input.
+drop_input() {
+  python3 -c '
+import sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1] + "/scripts")
+import slow_proofs as sp
+root, rel, name = sys.argv[1:4]
+path = sp.manifest_path(root)
+e = dict(sp.read_manifest(path))[rel]
+del e["inputs"][name]
+e["fingerprint"] = sp.fingerprint(e["inputs"])
+sp.write_entry(path, rel, e)
+' "$C" "$SLOW_FILE" "$1"
+}
+
+drop_input alire.toml
+expect "an entry from before alire.toml was an input: stale, refresh offered" 1 \
+  "slow_proofs.py refresh $SLOW_FILE" -- "${SP[@]}" check
+expect "refresh: the new input is unchanged since the commit: refreshed" 0 \
+  "refreshed .* new inputs, unchanged since: alire.toml" -- "${SP[@]}" refresh "$SLOW_FILE"
+expect "refreshed: check passes, the proof's commit kept" 0 "proved at $PROVED" -- "${SP[@]}" check
+
+drop_input alire.toml
+printf '\n# a comment\n' >> "$C/alire.toml"
+expect "refresh: the new input changed since the commit: refused" 1 \
+  "alire.toml \(new, and changed since the recorded commit" -- "${SP[@]}" refresh "$SLOW_FILE"
+cp "$T/alire.bak" "$C/alire.toml"
+
+printf '\n--  a comment\n' >> "$C/$OTHER_FILE"
+expect "refresh: a recorded input changed: refused" 1 "$OTHER_FILE \(changed\)" -- \
+  "${SP[@]}" refresh "$SLOW_FILE"
+cp "$T/other.bak" "$C/$OTHER_FILE"
+
+drop_input "tool: z3"
+expect "refresh: a new input that is not a file: refused" 1 "tool: z3 \(new, and not a file" -- \
+  "${SP[@]}" refresh "$SLOW_FILE"
+cp "$T/manifest.good" "$C/scripts/proof-slow.txt"
 
 # --- the gate's exemptions (check-proof.sh on a synthetic gnatprove.out) -----------
 

@@ -718,8 +718,10 @@ unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
   of each. A body is included because it can change what gnatprove assumes
   of its unit (generated `Global` contracts, a generic's instance), so the
   closure errs towards staleness. Units outside `src/` (the runtime) are
-  listed in the verbose output but not hashed. The toolchain versions are
-  inputs; `alire.toml` is not;
+  listed in the verbose output but not hashed;
+- `alire.toml`, the crate's manifest: it pins the crate's dependencies and
+  its build switches (`ada_version`), which gnatprove reads too (#67, a
+  follow-up of PR #44);
 - the GPR's proof switches for those files: the `Prove` package's level
   definitions, `Proof_Switches ("Ada")`, and each input file's own
   `Proof_Switches`;
@@ -769,6 +771,17 @@ tree, since the entry records HEAD. In CI, the `SPARK prove slow units`
 workflow (`spark-prove-slow.yml`, `workflow_dispatch`, up to 180 minutes) runs
 `prove-slow.sh --print`: it uploads gnatprove's output and prints the entries
 in its summary. It cannot push, so the entries are committed by hand.
+
+**When the fingerprint gains an input.** Adding an input to what
+`slow_proofs.py` hashes (as `alire.toml` was, #67) makes every entry stale
+although nothing its proof read has changed. `scripts/slow_proofs.py refresh
+FILE` rewrites the entry's inputs and fingerprint and keeps its commit, date,
+level and checks, but only when every difference is a new input that is a
+file whose content is the same as at the entry's recorded commit (`git
+show`). A changed or removed input, a new input that is not a file, or a new
+file that differs from the recorded commit's is refused, and the unit is
+proved again. The gate's STALE message offers `refresh` when every change is
+a new input.
 
 The board shows a row whose spec (or impl) entity is in a slow unit as
 `slow: proved at <sha> (on demand)`, or **STALE** when the fingerprint no
