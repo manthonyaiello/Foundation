@@ -21,6 +21,7 @@
 --  only in contracts, and the proof's lemmas (AES.Main_Lemmas) only in
 --  ghost statements.
 
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.Types;
 
@@ -82,7 +83,8 @@ is
      Pre  => Is_Key_Bytes (K, Key),
      Post =>
        Spec.Main.Join_Block (Encrypt'Result)
-       = Spec.Main.Encrypt (K, Join_Key (Key), Spec.Main.Join_Block (Input));
+       = Spec.Dispatch.Encrypt
+           (K, Join_Key (Key), Spec.Main.Join_Block (Input));
    --  AES encryption of one block [FIPS-PUB-197 Section 5.1]: Expand_Key
    --  of the key's words, then Encrypt_Block. Proved equal, on the bits,
    --  to Main.cry's AES`{k}.Encrypt.
@@ -97,7 +99,8 @@ is
      Pre  => Is_Key_Bytes (K, Key),
      Post =>
        Spec.Main.Join_Block (Decrypt'Result)
-       = Spec.Main.Decrypt (K, Join_Key (Key), Spec.Main.Join_Block (Input));
+       = Spec.Dispatch.Decrypt
+           (K, Join_Key (Key), Spec.Main.Join_Block (Input));
    --  AES decryption of one block [FIPS-PUB-197 Section 5.3]: Expand_Key
    --  of the key's words, then Decrypt_Block. Proved equal, on the bits,
    --  to Main.cry's AES`{k}.Decrypt.

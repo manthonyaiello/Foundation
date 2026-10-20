@@ -1,23 +1,28 @@
 --  The {k} functions of algorithms/AES, generic in the key size as the
---  Cryptol is polymorphic in it: {k} (Key k) => ... Spike #74 makes two of
---  them generic, KeyExpansion (KeyExpansion.cry) and Cipher (Cipher.cry);
---  InvCipher and InvCipher' stay in Spec.Cipher with an explicit K.
+--  Cryptol is polymorphic in it: {k} (Key k) => ... They are
+--  KeyExpansion (KeyExpansion.cry), Cipher, InvCipher and InvCipher'
+--  (Cipher.cry), and Main.cry's AES`{k}, the record of Encrypt and
+--  Decrypt (issue #80, from spike #74).
 --
 --  The formal K is the Cryptol's k, and its subtype Types.Key_Size is the
---  constraint Key k. The Cryptol's [Nk k]AESWord and [Nr k + 1]Block are
---  the subtypes Key_Words and Round_Keys below: the lengths are in the
---  types, so KeyExpansion and Cipher take the Cryptol's arguments and no
---  precondition. The instances AES128, AES192 and AES256 are the Cryptol's
---  type applications `{128}, `{192} and `{256}; Spec.Dispatch selects one
---  by a run-time K, for the implementation, which stays flexible in K.
+--  constraint Key k. The Cryptol's [Nk k]AESWord, [Nr k + 1]Block and [k]
+--  are the subtypes Key_Words, Round_Keys and Key_Bits below: the lengths
+--  are in the types, so each function takes the Cryptol's arguments and
+--  has no precondition. The instances AES128, AES192 and AES256 are the
+--  Cryptol's type applications `{128}, `{192} and `{256}, and Main.cry's
+--  AES128 = AES`{128} is the instance AES128: AES128.Encrypt is
+--  Main.cry's AES128.Encrypt. Spec.Dispatch selects an instance by a
+--  run-time K, for the implementation, which stays flexible in K.
 --
 --  Everything without a {k} (Round, the S-boxes, GF(2^8), RotWord, SubWord,
---  Rcon) stays in its non-generic unit and is proved once.
+--  Rcon, the folds, Main.cry's split and join of a block) stays in its
+--  non-generic unit and is proved once.
 --
 --  @formal K The key size in bits, the Cryptol's k: 128, 192 or 256.
 
 with Foundation_Spark.AES.Spec.Cipher;
 with Foundation_Spark.AES.Spec.KeyExpansion;
+with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.Types;
 
 generic
@@ -31,6 +36,7 @@ is
    use Types;
    use KeyExpansion;
    use Spec.Cipher;
+   use Main;
 
    Nk : constant Positive := Types.Nk (K);
    --  KeyExpansion.cry: Nk = `(Nk k), the number of words in the key.
@@ -135,5 +141,38 @@ is
    --  @param W The Nr + 1 round keys, the Cryptol's [Nr k + 1]Block.
    --  @param Input The ciphertext block.
    --  @return The plaintext block.
+
+   subtype Key_Bits is Bits (0 .. Bit_Index (K - 1));
+   --  Main.cry's [k] at this k: the key of Encrypt and Decrypt, as bits.
+
+   function Split_Key (Key : Key_Bits) return Key_Words
+   is [for J in 0 .. Nk - 1 => [for I in AESWord_Index => Byte_At
+                                  (Key, Bit_Index (32 * J + 8 * I))]];
+   --  Main.cry: split (split key), Cryptol's split twice at [k] ->
+   --  [Nk k][32] -> [Nk k][4][8] = [Nk k]AESWord. Byte I of word J is
+   --  bits 32 * J + 8 * I .. 32 * J + 8 * I + 7.
+   --  @param Key The key as K bits.
+   --  @return The key as Nk words.
+
+   function Encrypt (Key : Key_Bits; Input : Block_Bits) return Block_Bits
+   is (Join_Block (Cipher (KeyExpansion (Split_Key (Key)),
+                           Split_Block (Input))));
+   --  Main.cry: AES`{k}.Encrypt : [k] -> [128] -> [128], Encrypt key in =
+   --  join (Cipher`{k} (KeyExpansion`{k} (split (split key))) (split in))
+   --  [FIPS-PUB-197 Section 5]. The Cryptol's in is Input: in is an Ada
+   --  reserved word.
+   --  @param Key The key as K bits.
+   --  @param Input The plaintext block as 128 bits.
+   --  @return The ciphertext block as 128 bits.
+
+   function Decrypt (Key : Key_Bits; Input : Block_Bits) return Block_Bits
+   is (Join_Block (InvCipher (KeyExpansion (Split_Key (Key)),
+                              Split_Block (Input))));
+   --  Main.cry: AES`{k}.Decrypt : [k] -> [128] -> [128], Decrypt key in =
+   --  join (InvCipher`{k} (KeyExpansion`{k} (split (split key))) (split
+   --  in)) [FIPS-PUB-197 Section 5].
+   --  @param Key The key as K bits.
+   --  @param Input The ciphertext block as 128 bits.
+   --  @return The plaintext block as 128 bits.
 
 end Foundation_Spark.AES.Spec.AES_K;

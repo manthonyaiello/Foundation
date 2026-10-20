@@ -1,7 +1,9 @@
 --  The bridge from the generic {k} functions (AES_K, instantiated as
 --  AES128, AES192 and AES256) to an implementation that is flexible in the
 --  key size: one ghost dispatcher per {k} function, which selects the
---  instance by a run-time K. Spike #74.
+--  instance by a run-time K (issue #80, from spike #74). Main.cry's
+--  split (split key), which depends on k, has one too (Split_Key), so that
+--  Encrypt's and Decrypt's postconditions state their bodies.
 --
 --  These are not in the Cryptol. Cryptol resolves {k} at the type level;
 --  Ada has no type-level numbers, so the implementation, which serves all
@@ -17,6 +19,7 @@ with Foundation_Spark.AES.Spec.AES192;
 with Foundation_Spark.AES.Spec.AES256;
 with Foundation_Spark.AES.Spec.Cipher;
 with Foundation_Spark.AES.Spec.KeyExpansion;
+with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.Types;
 
 package Foundation_Spark.AES.Spec.Dispatch with
@@ -28,6 +31,9 @@ is
    use Types;
    use Spec.KeyExpansion;
    use Spec.Cipher;
+
+   use type Types.Byte;
+   use type Main.Bits;
 
    procedure Lemma_Key_Size (K : Natural)
    with Post => Key (K) = (K in Key_Size);
@@ -161,5 +167,67 @@ is
    --  @param W The Nr (K) + 1 round keys.
    --  @param Input The ciphertext block.
    --  @return The plaintext block.
+
+   function Split_Key (K : Key_Size; Key : Main.Bits) return Key_Words
+   is (case K is
+         when 128 => AES128.Split_Key (Key),
+         when 192 => AES192.Split_Key (Key),
+         when 256 => AES256.Split_Key (Key))
+   with
+     Pre  => Main.Is_Key_Bits (K, Key),
+     Post =>
+       Is_Key_Words (K, Split_Key'Result)
+       and then
+         (for all J in 0 .. Nk (K) - 1 =>
+            (for all I in AESWord_Index =>
+               Split_Key'Result (J) (I)
+               = Main.Byte_At (Key, Main.Bit_Index (32 * J + 8 * I))));
+   --  Main.cry's split (split key) at k = K: the instance's Split_Key. The
+   --  postcondition is its body, uniformly in K.
+   --  @param K The key size in bits, the Cryptol's k.
+   --  @param Key The key as K bits.
+   --  @return The key as Nk (K) words.
+
+   function Encrypt
+     (K : Key_Size; Key : Main.Bits; Input : Main.Block_Bits)
+      return Main.Block_Bits
+   is (case K is
+         when 128 => AES128.Encrypt (Key, Input),
+         when 192 => AES192.Encrypt (Key, Input),
+         when 256 => AES256.Encrypt (Key, Input))
+   with
+     Pre  => Main.Is_Key_Bits (K, Key),
+     Post =>
+       Encrypt'Result
+       = Main.Join_Block
+           (Cipher (K, KeyExpansion (K, Split_Key (K, Key)),
+                    Main.Split_Block (Input)));
+   --  Main.cry's AES`{k}.Encrypt at k = K: the instance's Encrypt. The
+   --  postcondition is its body, uniformly in K.
+   --  @param K The key size in bits, the Cryptol's k.
+   --  @param Key The key as K bits.
+   --  @param Input The plaintext block as 128 bits.
+   --  @return The ciphertext block as 128 bits.
+
+   function Decrypt
+     (K : Key_Size; Key : Main.Bits; Input : Main.Block_Bits)
+      return Main.Block_Bits
+   is (case K is
+         when 128 => AES128.Decrypt (Key, Input),
+         when 192 => AES192.Decrypt (Key, Input),
+         when 256 => AES256.Decrypt (Key, Input))
+   with
+     Pre  => Main.Is_Key_Bits (K, Key),
+     Post =>
+       Decrypt'Result
+       = Main.Join_Block
+           (InvCipher (K, KeyExpansion (K, Split_Key (K, Key)),
+                       Main.Split_Block (Input)));
+   --  Main.cry's AES`{k}.Decrypt at k = K: the instance's Decrypt. The
+   --  postcondition is its body, uniformly in K.
+   --  @param K The key size in bits, the Cryptol's k.
+   --  @param Key The key as K bits.
+   --  @param Input The ciphertext block as 128 bits.
+   --  @return The plaintext block as 128 bits.
 
 end Foundation_Spark.AES.Spec.Dispatch;

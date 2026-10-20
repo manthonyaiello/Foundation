@@ -39,7 +39,7 @@ is
        and then
          (for all J in 0 .. Nk (K) - 1 =>
             (for all I in AESWord_Index =>
-               Spec.Main.Split_Key (K, Impl.Main.Join_Key (Key)) (J) (I)
+               Spec.Dispatch.Split_Key (K, Impl.Main.Join_Key (Key)) (J) (I)
                = Key (4 * J + I)));
    --  Main.cry's split (split key) of the key's bits is the key's bytes,
    --  four to a word: Cryptol's split at [k] -> [Nk k][4][8] undoes its

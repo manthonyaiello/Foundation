@@ -29,12 +29,12 @@ is
                = Key (4 * J + I));
             pragma Loop_Invariant
               (for all I2 in 0 .. I =>
-                 Spec.Main.Split_Key (K, Bs) (J) (I2) = Key (4 * J + I2));
+                 Spec.Dispatch.Split_Key (K, Bs) (J) (I2) = Key (4 * J + I2));
          end loop;
          pragma Loop_Invariant
            (for all J2 in 0 .. J =>
               (for all I in AESWord_Index =>
-                 Spec.Main.Split_Key (K, Bs) (J2) (I) = Key (4 * J2 + I)));
+                 Spec.Dispatch.Split_Key (K, Bs) (J2) (I) = Key (4 * J2 + I)));
       end loop;
    end Lemma_Split_Join_Key;
 

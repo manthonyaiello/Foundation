@@ -174,7 +174,8 @@ is
      (K : Natural; Key : Main.Bits; Input : Main.Block_Bits)
    with
      Pre  => Main.Is_Key_Bits (K, Key),
-     Post => Main.Decrypt (K, Key, Main.Encrypt (K, Key, Input)) = Input;
+     Post =>
+       Dispatch.Decrypt (K, Key, Dispatch.Encrypt (K, Key, Input)) = Input;
    --  Main.cry: property EncryptInverts key in = AES`{k}.Decrypt key
    --  (AES`{k}.Encrypt key in) == in, for {k} (Key k) and key : [k]. The
    --  Cryptol's in is Input: in is an Ada reserved word.

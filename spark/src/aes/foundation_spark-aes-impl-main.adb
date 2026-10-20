@@ -1,5 +1,4 @@
 with Foundation_Spark.AES.Main_Lemmas;
-with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Properties;
 
 package body Foundation_Spark.AES.Impl.Main with
@@ -40,15 +39,15 @@ is
       --  The spec's Encrypt applies KeyExpansion to split (split key) and
       --  Cipher to split in: equal to Ws and Input, but other objects.
       AES.Main_Lemmas.Lemma_Split_Join_Key (K, Key);
-      pragma Assert (Ws = Spec.Main.Split_Key (K, Join_Key (Key)));
+      pragma Assert (Ws = Spec.Dispatch.Split_Key (K, Join_Key (Key)));
       AES.Main_Lemmas.Lemma_KeyExpansion_Eq
-        (K, Ws, Spec.Main.Split_Key (K, Join_Key (Key)));
+        (K, Ws, Spec.Dispatch.Split_Key (K, Join_Key (Key)));
       Spec.Properties.Lemma_Split_Join_Block (Input);
       AES.Main_Lemmas.Lemma_Cipher_Eq
         (K,
          W,
          Spec.Dispatch.KeyExpansion
-           (K, Spec.Main.Split_Key (K, Join_Key (Key))),
+           (K, Spec.Dispatch.Split_Key (K, Join_Key (Key))),
          Input,
          Spec.Main.Split_Block (Spec.Main.Join_Block (Input)));
       pragma Assert
@@ -56,7 +55,7 @@ is
          = Spec.Dispatch.Cipher
              (K,
               Spec.Dispatch.KeyExpansion
-                (K, Spec.Main.Split_Key (K, Join_Key (Key))),
+                (K, Spec.Dispatch.Split_Key (K, Join_Key (Key))),
               Spec.Main.Split_Block (Spec.Main.Join_Block (Input))));
       return State;
    end Encrypt;
@@ -77,15 +76,15 @@ is
 
       --  As in Encrypt, with InvCipher.
       AES.Main_Lemmas.Lemma_Split_Join_Key (K, Key);
-      pragma Assert (Ws = Spec.Main.Split_Key (K, Join_Key (Key)));
+      pragma Assert (Ws = Spec.Dispatch.Split_Key (K, Join_Key (Key)));
       AES.Main_Lemmas.Lemma_KeyExpansion_Eq
-        (K, Ws, Spec.Main.Split_Key (K, Join_Key (Key)));
+        (K, Ws, Spec.Dispatch.Split_Key (K, Join_Key (Key)));
       Spec.Properties.Lemma_Split_Join_Block (Input);
       AES.Main_Lemmas.Lemma_InvCipher_Eq
         (K,
          W,
          Spec.Dispatch.KeyExpansion
-           (K, Spec.Main.Split_Key (K, Join_Key (Key))),
+           (K, Spec.Dispatch.Split_Key (K, Join_Key (Key))),
          Input,
          Spec.Main.Split_Block (Spec.Main.Join_Block (Input)));
       pragma Assert
@@ -93,7 +92,7 @@ is
          = Spec.Dispatch.InvCipher
              (K,
               Spec.Dispatch.KeyExpansion
-                (K, Spec.Main.Split_Key (K, Join_Key (Key))),
+                (K, Spec.Dispatch.Split_Key (K, Join_Key (Key))),
               Spec.Main.Split_Block (Spec.Main.Join_Block (Input))));
       return State;
    end Decrypt;

@@ -543,7 +543,7 @@ is
      (K : Natural; Key : Main.Bits; Input : Main.Block_Bits)
    is
       W  : constant Round_Keys :=
-        Dispatch.KeyExpansion (K, Main.Split_Key (K, Key));
+        Dispatch.KeyExpansion (K, Dispatch.Split_Key (K, Key));
       P  : constant Block := Main.Split_Block (Input);
       C  : constant Block := Dispatch.Cipher (K, W, P);
    begin

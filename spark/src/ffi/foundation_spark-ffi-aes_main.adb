@@ -10,7 +10,7 @@ is
    begin
       Output :=
         Split_Block
-          (Foundation_Spark.AES.Spec.Main.Encrypt
+          (Foundation_Spark.AES.Spec.Dispatch.Encrypt
              (Key_Size_Of (K), Join_Key (K, Key), Join_Block (Input)));
    end Encrypt;
 
@@ -19,7 +19,7 @@ is
    begin
       Output :=
         Split_Block
-          (Foundation_Spark.AES.Spec.Main.Decrypt
+          (Foundation_Spark.AES.Spec.Dispatch.Decrypt
              (Key_Size_Of (K), Join_Key (K, Key), Join_Block (Input)));
    end Decrypt;
 
