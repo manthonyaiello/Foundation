@@ -1463,19 +1463,22 @@ it text for text, the spec's `HMAC_init` is proved against the copy, and
 overrides, which ties the copy to `Main.cry` (as `Step` ties
 `SHA256Step.cry`).
 
-**Measured** (`results.txt`, the default run at `65ee4c2` on the x86_64
-IOD, 2026-10-21): 2798 proofs of the spec layer, 1137 of AES (768 of them
+**Measured** (`results.txt`, the default run at `937e485` on the x86_64
+IOD, 2026-10-21): 2800 proofs of the spec layer, 1137 of AES (768 of them
 the exhaustive `Pgcd`, `Inverse` and `Affine`, recorded as three
 `RESULTS 256` lines; 108 the fold lemmas, `Foldl_Take` at N = 0 .. M for
-M = 9, 11, 13 and each of the three rounds) and 1661 of SHA-256 and HMAC
-(1394 of them in the lax-arithmetic load), with 11 negative controls of
-the spec layer failing as they must. `aes_spec.saw` takes 418 s,
-`sha256_spec.saw` 2632 s (most of it the `To_Bits` chains, 15 of them,
-and `Word_Of`), the whole `check-saw.sh` 3707 s. Before #75 and #80 (at
+M = 9, 11, 13 and each of the three rounds) and 1663 of SHA-256 and HMAC
+(1396 of them in the lax-arithmetic load; `Parse` at 1 and 2 blocks, 4 s
+and 15 s, are the two added by #67), with 12 negative controls of the
+spec layer failing as they must. `aes_spec.saw` takes 393 s,
+`sha256_spec.saw` 2337 s (most of it the `To_Bits` chains, 15 of them,
+and `Word_Of`), the whole `check-saw.sh` 3516 s. At `65ee4c2`, before
+#67's `Parse`: 2798, 3707 s. Before #75 and #80 (at
 `d874133`): 2742, of which AES 1083 and SHA-256 and HMAC 1659; peak
 memory then 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at `a4ea138`): 3578
-proofs of the spec layer, `sha256_spec.saw` 6785 s, the whole 7857 s
-(before #75, at `c31472e`: 3522, 7784 s, peak 7.2 GB; below, "Running
+proofs of the spec layer, `sha256_spec.saw` 6785 s, the whole 7857 s;
+not re-run since #67 added `Parse` (4 more results with `SAW_LONG=1`, at
+1 to 4 blocks), so `board.py` reports it stale (before #75, at `c31472e`: 3522, 7784 s, peak 7.2 GB; below, "Running
 it").
 
 **Not proved by SAW**, and why:
@@ -1669,7 +1672,8 @@ what SPARK adds:
   default run, 24 implementation-layer results (the 4 top-level ones:
   `Hash` at 0, 64 and 128 bytes and `HMAC_SHA256` at (0, 0); and the 19
   leaves and `Compress` re-proved in that module as their overrides) and
-  1393 spec-layer results (2173 under `SAW_LONG=1`) are proved in the
+  1396 spec-layer results (2174 under `SAW_LONG=1` at `a4ea138`, before
+  #67's `Parse`) are proved in the
   module loaded with lax arithmetic. There, absence of overflow rests on
   gnatprove (AoRTE), not on SAW.
 - **The subprograms SAW leaves out** (above): gnatprove covers them.
