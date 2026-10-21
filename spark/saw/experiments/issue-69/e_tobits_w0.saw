@@ -1,0 +1,39 @@
+/*
+ * #69, experiment "tobits_w0": where a To_Bits lemma's fixed half second
+ * goes. The lemma at W = 0 (an empty result: no recursion, no bits) is
+ * proved in four settings, each timed, admit (no solver) throughout:
+ *  - as recorded (stack at 48 bytes, 39 kept);
+ *  - on an empty stack, nothing kept;
+ *  - Zero's lemma at k = 0 and Small_K's, for comparison (Zero
+ *    allocates on the stack; Small_K does not);
+ * and once with crucible's profiler on.
+ */
+include "sha256_spec_common.saw";
+let verify_spec = verify_spec_lax;
+include "sha256_spec_pad.saw";
+
+let sym = spec_symbol "sequences_of_bits__literal";
+let adm = admit "symbolic execution only";
+print "== W = 0, stack at 48, 39 kept (recorded)";
+time (llvm_verify sha256_spec_lax sym [] false (to_bits_contract_at 48 0 39 0 0 0) adm);
+print "== W = 0, stack at 48, 39 kept (recorded), again";
+time (llvm_verify sha256_spec_lax sym [] false (to_bits_contract_at 48 0 39 0 0 0) adm);
+print "== W = 0, empty stack, none kept";
+time (llvm_verify sha256_spec_lax sym [] false (to_bits_contract_at 0 0 0 0 0 0) adm);
+print "== Zero, k = 7, empty stack";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__zero") [] false
+  (do {
+     stack <- secondary_stack_used 0;
+     llvm_execute_func [llvm_term {{ 7 : [128] }}];
+     ss_post stack 48;
+     llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 6 : [128] }}]);
+     llvm_points_to_untyped (ss_at stack 32) (llvm_term {{ bytes_of (zero : [7]) }});
+     llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+   }) adm);
+print "== Small_K, l = 8 (no stack)";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__small_k") [] false
+  (do { llvm_execute_func [llvm_term {{ 8 : [128] }}]; llvm_return (llvm_term {{ 439 : [128] }}); }) adm);
+enable_crucible_profiling "profile";
+print "== W = 0, stack at 48, 39 kept, profiled";
+time (llvm_verify sha256_spec_lax sym [] false (to_bits_contract_at 48 0 39 0 0 0) adm);
+print "== done";

@@ -1,0 +1,61 @@
+/*
+ * #69, experiment "tobits_w0b": the To_Bits lemma at W = 0 on an empty
+ * stack, its contract cut down one piece at a time, admit throughout
+ * (no solver), each run twice. Which piece of a stack contract costs the
+ * half second the simulation itself (2 ms, crucible's profile) does not?
+ */
+include "sha256_spec_common.saw";
+let verify_spec = verify_spec_lax;
+include "sha256_spec_pad.saw";
+
+let sym = spec_symbol "sequences_of_bits__literal";
+let adm = admit "symbolic execution only";
+
+let c_full = do {
+  stack <- secondary_stack_used 0;
+  v <- llvm_fresh_var "v" (llvm_int 128);
+  llvm_precond {{ v <= 2 ^^ 126 }};
+  llvm_execute_func [llvm_term v, llvm_term {{ 0 : [128] }}];
+  ss_post stack 32;
+  llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ -1 : [128] }}]);
+  llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+};
+let c_no_post = do {
+  stack <- secondary_stack_used 0;
+  v <- llvm_fresh_var "v" (llvm_int 128);
+  llvm_precond {{ v <= 2 ^^ 126 }};
+  llvm_execute_func [llvm_term v, llvm_term {{ 0 : [128] }}];
+  llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+};
+let c_concrete_v = do {
+  stack <- secondary_stack_used 0;
+  llvm_execute_func [llvm_term {{ 5 : [128] }}, llvm_term {{ 0 : [128] }}];
+  llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+};
+let c_stack_only_post = do {
+  stack <- secondary_stack_used 0;
+  llvm_execute_func [llvm_term {{ 5 : [128] }}, llvm_term {{ 0 : [128] }}];
+  ss_post stack 32;
+  llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+};
+let c_bounds_only_post = do {
+  stack <- secondary_stack_used 0;
+  llvm_execute_func [llvm_term {{ 5 : [128] }}, llvm_term {{ 0 : [128] }}];
+  llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ -1 : [128] }}]);
+  llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+};
+let run_one (name : String) c = do {
+  print (str_concat "== " name);
+  time (llvm_verify sha256_spec_lax sym [] false c adm);
+  print (str_concat "== " (str_concat name ", again"));
+  time (llvm_verify sha256_spec_lax sym [] false c adm);
+  return ();
+};
+run_one "full contract" c_full;
+run_one "no postcondition" c_no_post;
+run_one "v concrete, no postcondition" c_concrete_v;
+run_one "v concrete, ss_post only" c_stack_only_post;
+run_one "v concrete, bounds points-to only" c_bounds_only_post;
+print "== non-lax module, full contract";
+time (llvm_verify sha256_spec sym [] false c_full adm);
+print "== done";

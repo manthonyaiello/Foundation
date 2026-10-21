@@ -1,0 +1,188 @@
+/*
+ * #69, experiment "probes" (run.sh -p probes): the probe units
+ * (probes/probe_bits.ads, instantiated at a 128-bit and a 64-bit index),
+ * one function written several ways, each one change from the spec
+ * layer's. Every proof uses the recorded proofs' contract shapes
+ * (secondary_stack.saw), z3 for To_Bits and yices for Word_Of as
+ * recorded. Sections:
+ *
+ *  N. null ranges: Literal (the prelude's To_Bits, word for word) at
+ *     W = 1 in a load without lax arithmetic must fail (poison); then
+ *     Literal_No_Null's chain W = 0 .. 64 proves there, and Literal's in
+ *     the lax load, both timed.
+ *  R. recursion: Literal's chain (65 lemmas) against Literal_Agg (an
+ *     iterated aggregate, no recursion) at W = 64, one proof, and Literal
+ *     unfolded at W = 64.
+ *  S. the secondary stack: at the 64-bit index (a constrained array of a
+ *     128-bit index makes the i128 GEP SAW 1.6 rejects), Literal_Agg at
+ *     W = 64 on the secondary stack against Literal_64, the same
+ *     aggregate with a constrained result (sret).
+ *  B. bit sequences: Value (Word_Of's recursion, one Boolean byte per
+ *     bit) against Value_Packed (eight bits a byte), Count = 0 .. 32, at
+ *     P of 512, 1024 and 2048 bits, First symbolic; Value's lemma at 32
+ *     with First concrete; and Value at the 64-bit index.
+ */
+enable_experimental;
+include "secondary_stack.saw";
+
+probes <- llvm_load_module "probes_obj/probes.bc";
+enable_lax_arithmetic;
+probes_lax <- llvm_load_module "probes_obj/probes.bc";
+
+let bits_of = {{ \bs -> [ b == (1 : [8]) | b <- bs ] }};
+let bytes_of = {{ \x -> [ if b then (1 : [8]) else 0 | b <- x ] }};
+
+/* Index width iw (128 or 64): its bounds record is 2 * iw / 8 bytes. */
+let sym (iw : Int) (name : String) = str_concat (str_concat (str_concat "probe_bits_" (show iw)) "__p__") name;
+let bsz (iw : Int) = eval_int {{ (2 * `iw) / 8 : [64] }};
+let alloc (iw : Int) (n : Int) = ss_size (bsz iw) n;
+/* Literal (V, W) leaves its whole chain on the stack: one result per width 0 .. W. */
+let lit_used (iw : Int) (w : Int) = let b = bsz iw in eval_int {{ sum [ ((`b + j + 15) / 16) * 16 | j <- [0 .. w] ] : [64] }};
+/* Literal_No_Null: widths 1 .. W (W > 0), or 0 alone. */
+let nn_used (iw : Int) (w : Int) =
+  if eval_bool {{ `w == (0 : Integer) }} then alloc iw 0
+  else let b = bsz iw in eval_int {{ sum [ ((`b + j + 15) / 16) * 16 | j <- [1 .. w] ] : [64] }};
+
+let idx (iw : Int) (x : Int) =
+  if eval_bool {{ `iw == (128 : Integer) }} then llvm_term {{ `x : [128] }} else llvm_term {{ `x : [64] }};
+let bounds_v (iw : Int) (lo : Int) (hi : Int) =
+  if eval_bool {{ `iw == (128 : Integer) }} then llvm_struct_value [llvm_term {{ `lo : [128] }}, llvm_term {{ `hi : [128] }}]
+  else llvm_struct_value [llvm_term {{ `lo : [64] }}, llvm_term {{ `hi : [64] }}];
+
+/*
+ * A Literal-shaped function at width w on an empty stack: before is what
+ * its calls left below its result, total the stack's use after.
+ */
+let literal_contract (iw : Int) (before : Int) (total : Int) (w : Int) = do {
+  let at = before;
+  let b = bsz iw;
+  let data = eval_int {{ `at + `b : [64] }};
+  stack <- secondary_stack;
+  if eval_bool {{ `iw == (128 : Integer) }} then do {
+    v <- llvm_fresh_var "v" (llvm_int 128);
+    llvm_precond {{ v <= 2 ^^ 126 }};
+    llvm_execute_func [llvm_term v, idx iw w];
+    ss_post stack total;
+    llvm_points_to_untyped (ss_at stack at) (bounds_v iw 0 (eval_int {{ `w - 1 : [128] }}));
+    if eval_bool {{ `w == (0 : Integer) }} then return ()
+    else llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (drop`{128 - w} v) }});
+  } else do {
+    v <- llvm_fresh_var "v" (llvm_int 64);
+    llvm_precond {{ v <= 2 ^^ 62 }};
+    llvm_execute_func [llvm_term v, idx iw w];
+    ss_post stack total;
+    llvm_points_to_untyped (ss_at stack at) (llvm_struct_value [llvm_term {{ 0 : [64] }}, llvm_term {{ `w - 1 : [64] }}]);
+    if eval_bool {{ `w == (0 : Integer) }} then return ()
+    else llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (drop`{64 - w} v) }});
+  };
+  llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
+};
+let lit_c (iw : Int) (w : Int) =
+  literal_contract iw (if eval_bool {{ `w == (0 : Integer) }} then 0 else lit_used iw (eval_int {{ `w - 1 : [64] }})) (lit_used iw w) w;
+let nn_c (iw : Int) (w : Int) =
+  literal_contract iw (if eval_bool {{ `w < (2 : Integer) }} then 0 else nn_used iw (eval_int {{ `w - 1 : [64] }})) (nn_used iw w) w;
+let agg_c (iw : Int) (w : Int) = literal_contract iw 0 (alloc iw w) w;
+
+let label (s : String) = print (str_concat "== " s);
+rec chain (m : LLVMModule) (name : String) (c : Int -> LLVMSetup ()) (tac : ProofScript ()) (w : Int) (last : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  print (str_concat (str_concat "-- " name) (str_concat " W = " (show w)));
+  lemma <- time (llvm_verify m name prev false (c w) tac);
+  if eval_bool {{ `w == `last }} then return lemma
+  else chain m name c tac (eval_int {{ `w + 1 : [32] }}) last [lemma];
+};
+
+/* --- N. null ranges ---------------------------------------------------------- */
+
+label "N: Literal (128) W = 0, strict load";
+l0 <- time (llvm_verify probes (sym 128 "literal") [] false (lit_c 128 0) z3);
+label "N: Literal (128) W = 1, strict load: must fail (poison)";
+fails (llvm_verify probes (sym 128 "literal") [l0] false (lit_c 128 1) z3);
+label "N: Literal_No_Null (128) chain W = 0 .. 64, strict load (all)";
+time (chain probes (sym 128 "literal_no_null") (nn_c 128) z3 0 64 []);
+label "N: Literal (128) chain W = 0 .. 64, lax load (all)";
+lit64 <- time (chain probes_lax (sym 128 "literal") (lit_c 128) z3 0 64 []);
+
+/* --- R. recursion ---------------------------------------------------------------- */
+
+label "R: Literal_Agg (128) W = 64, one proof, strict load";
+time (llvm_verify probes (sym 128 "literal_agg") [] false (agg_c 128 64) z3);
+label "R: Literal (128) unfolded W = 64, lax load";
+time (llvm_verify probes_lax (sym 128 "literal") [] false (lit_c 128 64) z3);
+
+/* --- S. the secondary stack ------------------------------------------------------- */
+
+label "S: Literal_Agg (64) W = 64, secondary stack";
+time (llvm_verify probes (sym 64 "literal_agg") [] false (agg_c 64 64) z3);
+label "S: Literal_64 (64), constrained result (sret)";
+time (llvm_verify probes (sym 64 "literal_64") [] false
+  (do {
+     v <- llvm_fresh_var "v" (llvm_int 64);
+     llvm_precond {{ v <= 2 ^^ 62 }};
+     ret <- llvm_alloc (llvm_array 64 (llvm_int 8));
+     llvm_execute_func [ret, llvm_term v];
+     llvm_points_to ret (llvm_term {{ bytes_of v }});
+   }) z3);
+label "S: Literal (64) chain W = 0 .. 64, lax load (all)";
+time (chain probes_lax (sym 64 "literal") (lit_c 64) z3 0 64 []);
+
+/* --- B. bit sequences --------------------------------------------------------------- */
+
+/*
+ * P of len bits: one byte per bit (packed false, as SHA2.Bits), or
+ * len / 8 bytes, most significant bit first (packed true). First
+ * symbolic (symf), or the constant fc.
+ */
+let value_contract (iw : Int) (packed : Bool) (len : Int) (symf : Bool) (fc : Int) (c : Int) = do {
+  let n = if packed then eval_int {{ `len / 8 : [64] }} else len;
+  p <- llvm_fresh_var "p" (llvm_array n (llvm_int 8));
+  if packed then return () else llvm_precond {{ all (\b -> b <= 1) p }};
+  pp <- llvm_alloc (llvm_array n (llvm_int 8));
+  llvm_points_to pp (llvm_term p);
+  pb <- llvm_alloc_aligned 1 (llvm_alias (str_concat (str_concat "probe_bits_" (show iw)) "__p__bits_BOUNDS"));
+  llvm_points_to pb (bounds_v iw 0 (eval_int {{ `n - 1 : [64] }}));
+  let bits = if packed then {{ join (p : [n][8]) : [len] }} else {{ bits_of p : [len] }};
+  f <- llvm_fresh_var "first" (llvm_int iw);
+  let fterm = if symf then {{ zext f : [128] }} else {{ `fc : [128] }};
+  llvm_precond {{ fterm <= `len - `c }};
+  let farg = if symf then llvm_term f else if eval_bool {{ `iw == (128 : Integer) }} then llvm_term fterm else llvm_term {{ drop`{64} fterm : [64] }};
+  llvm_execute_func [llvm_struct_value [pp, pb], farg, llvm_term {{ `c : [32] }}];
+  llvm_points_to pp (llvm_term p);
+  llvm_points_to pb (bounds_v iw 0 (eval_int {{ `n - 1 : [64] }}));
+  llvm_return (llvm_term {{ zext (take`{c} (bits << fterm)) : [32] }});
+};
+rec value_chain (iw : Int) (packed : Bool) (len : Int) (c : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  let name = if packed then "value_packed" else "value";
+  print (str_concat (str_concat (str_concat (str_concat "-- B: " name) (str_concat " (" (show iw))) (str_concat ") P of " (show len))) (str_concat " bits, Count = " (show c)));
+  lemma <- time (llvm_verify probes (sym iw name) prev false (value_contract iw packed len true 0 c) yices);
+  if eval_bool {{ `c == (32 : Integer) }} then return lemma
+  else value_chain iw packed len (eval_int {{ `c + 1 : [32] }}) [lemma];
+};
+for [512, 1024, 2048] (\len -> do {
+  label (str_concat (str_concat "B: value (128) chain, P of " (show len)) " bits (all)");
+  v31 <- time (value_chain 128 false len 0 []);
+  label (str_concat (str_concat "B: value_packed (128) chain, P of " (show len)) " bits (all)");
+  time (value_chain 128 true len 0 []);
+  return ();
+});
+label "B: value (64) chain, P of 1024 bits (all)";
+time (value_chain 64 false 1024 0 []);
+/* Count = 32 with First concrete (as Parse calls it, at 32 j), on the chain to 31 with First symbolic. */
+rec value_chain_to (len : Int) (c : Int) (last : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- llvm_verify probes (sym 128 "value") prev false (value_contract 128 false len true 0 c) yices;
+  if eval_bool {{ `c == `last }} then return lemma
+  else value_chain_to len (eval_int {{ `c + 1 : [32] }}) last [lemma];
+};
+v31_1024 <- value_chain_to 1024 0 31 [];
+for [0, 480, 992] (\fc -> do {
+  label (str_concat "B: value (128) P of 1024 bits, Count = 32, First concrete = " (show fc));
+  time (llvm_verify probes (sym 128 "value") [v31_1024] false (value_contract 128 false 1024 false fc 32) yices);
+  return ();
+});
+label "B: value (128) P of 1024 bits, Count = 32, First symbolic";
+time (llvm_verify probes (sym 128 "value") [v31_1024] false (value_contract 128 false 1024 true 0 32) yices);
+label "B: value (128) P of 1024 bits, Count = 32, First symbolic, admit (no solver)";
+time (llvm_verify probes (sym 128 "value") [v31_1024] false (value_contract 128 false 1024 true 0 32) (admit "symbolic execution only"));
+label "B: value (128) P of 1024 bits, Count = 32, First symbolic, z3";
+time (llvm_verify probes (sym 128 "value") [v31_1024] false (value_contract 128 false 1024 true 0 32) z3);
+label "done";
+

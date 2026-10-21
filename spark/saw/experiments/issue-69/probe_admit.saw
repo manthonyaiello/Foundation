@@ -1,0 +1,13 @@
+/* Scratch: does `admit` exist, and what does a To_Bits lemma cost without the solver? */
+include "sha256_spec_common.saw";
+let verify_spec = verify_spec_lax;
+include "sha256_spec_pad.saw";
+
+let sym = spec_symbol "sequences_of_bits__literal";
+print "== W = 0 at used 48, z3";
+l0 <- time (llvm_verify sha256_spec_lax sym [] false (to_bits_contract_at 48 0 48 0 0 0) z3);
+print "== W = 1 at used 48, z3";
+l1 <- time (llvm_verify sha256_spec_lax sym [l0] false (to_bits_contract_at 48 0 48 0 0 1) z3);
+print "== W = 1 at used 48, admit";
+l1a <- time (llvm_verify sha256_spec_lax sym [l0] false (to_bits_contract_at 48 0 48 0 0 1) (admit "symex only"));
+print "done";
