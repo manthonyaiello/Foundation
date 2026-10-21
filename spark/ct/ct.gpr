@@ -7,12 +7,18 @@
 
 project CT is
 
+   --  The architecture, for ct_grind's Valgrind client requests:
+   --  scripts/check-ct.sh passes -XCT_ARCH=$(uname -m).
+   type Arch_Type is ("aarch64", "x86_64");
+   Arch : Arch_Type := external ("CT_ARCH", "aarch64");
+
    for Source_Dirs use
-     ("src", "../src", "../src/aes", "../src/sha2", "../src/hmac");
+     ("src", "src/arch-" & Arch,
+      "../src", "../src/aes", "../src/sha2", "../src/hmac");
    for Object_Dir use "../obj/ct";
    for Exec_Dir use "../obj/ct";
    for Create_Missing_Dirs use "True";
-   for Main use ("ct_bench.adb", "ct_dudect.adb");
+   for Main use ("ct_bench.adb", "ct_dudect.adb", "ct_grind.adb");
 
    --  Alire's "release" profile: Optimization Performance (-O3 -gnatn),
    --  no debug info, default runtime checks, and its section switches.
