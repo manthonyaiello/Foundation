@@ -225,7 +225,13 @@ its header lists). **They are optional, and they are kept for now** (Tony,
 
 - **Optional.** SAW proves the spec layer equal to NSA's Cryptol at k =
   128, 192 and 256, which is all of AES, so the Cryptol's properties
-  already hold of the SPARK spec. In general, re-proving a higher-level
+  already hold of the SPARK spec. (Since #80 the `{k}` functions are the
+  instances `AES128`, `AES192`, `AES256` of the generic `AES_K`, one per
+  key size; their renamed SAW contracts are unverified until the next SAW
+  session.) `Properties` states the four properties that take a key size
+  (`InvCipherEquivalence`, `CipherInverts`, `CipherInverts'`,
+  `EncryptInverts`) once, over the dispatchers of `Spec.Dispatch`, not
+  three times in the generic. In general, re-proving a higher-level
   spec's properties after moving to SPARK adds proof cost without adding a
   theorem. `SBoxCorrect` is the extreme case: 1122 s of gnatprove on the
   campaign machine for the slow unit `SBox_Entries` (1 h 40 min cold in
@@ -1289,8 +1295,9 @@ by gnatprove for all inputs and FFI-checked:
   equivalent inverse cipher (``InvCipher'``). `Impl.Main.Decrypt` uses
   `Decrypt_Block`, and no other subprogram calls these; #23 asked only for
   `KeyExpansion`, `Cipher` and `InvCipher`. SAW does prove the spec
-  layer's `InvCipher_Prime` and `InvRound_Prime` against ``InvCipher'``
-  and `InvRound'`.
+  layer's `InvCipher_Prime` (of the instances `AES<k>` since #80,
+  unverified until the next SAW session) and `Cipher.InvRound_Prime`
+  against ``InvCipher'`` and `InvRound'`.
 - `AES.Impl.Dot`: general GF(2^8) multiplication. The ciphers use `X_Times`
   (`foundation_spark-aes-impl.ads`), so only the FFI export calls `Dot`.
   SAW proves the spec layer's `GF28.Dot` against `(•)`.
