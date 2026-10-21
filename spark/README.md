@@ -1563,7 +1563,11 @@ results execute its code (rather than replace a call to it with an
 override), at which sizes, and why it has no result of its own (Tony,
 2026-10-20; PLAN, "SAW's scope"; #67). Each is proved by gnatprove for all
 inputs and FFI-checked. The board's SAW column counts only results of a
-row's own entities; this is what stands behind its `-`.
+row's own entities; this is what stands behind its `-`. A row whose spec
+entity is a dispatcher of `AES.Spec.Dispatch` (#80) counts the results
+of the instances `AES128`, `AES192` and `AES256` of the same name, one
+per key size: the dispatcher is each instance's function at its `K`
+(gnatprove), and SAW proves the instances.
 
 **Why fixed sizes: what NSA's own proofs do.**
 
