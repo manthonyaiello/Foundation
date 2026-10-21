@@ -52,6 +52,42 @@ rec word_of_lemmas (len : Int) (c : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec
 };
 
 /*
+ * Parse (P, N) = Preprocessing.cry's parse`{w = 32, N} P (Preprocessing.cry:47,
+ * [FIPS-PUB-180-4 Section 5.2]): parse M = split`{N, 16} (split`{N * 16, w} M),
+ * on its own (#67 item 3), at the padded lengths Hash uses: N = 1 and 2
+ * blocks, and 3 and 4 with saw_long. P is a fat pointer to 512 * N bits
+ * with bounds {0, 512 * N - 1}, writable and stated unchanged, as
+ * word_of_contract has it (in Hash it is Pad's result, on the secondary
+ * stack). Parse allocates its N blocks on the empty secondary stack, a
+ * bounds record {0, N - 1} then the 16 words of each block; its only
+ * recursion is Word_Of's (Value's), through Parse_Block and Split_At,
+ * which SAW executes: the override is Word_Of's lemma at Count = 32 for
+ * P's length.
+ */
+let parse_contract (nb : Int) = do {
+  let len = eval_int {{ 512 * `nb : [64] }};
+  let sparse = ss_size 32 (eval_int {{ 64 * `nb : [64] }});
+  stack <- secondary_stack;
+  p <- llvm_fresh_var "p" (llvm_array len (llvm_int 8));
+  llvm_precond {{ all (\b -> b <= 1) p }};
+  pp <- llvm_alloc (llvm_array len (llvm_int 8));
+  llvm_points_to pp (llvm_term p);
+  pb <- llvm_alloc_aligned 1 bits_bounds_t;
+  llvm_points_to pb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `len - 1 : [128] }}]);
+  llvm_execute_func [llvm_struct_value [pp, pb], llvm_term {{ `nb : [128] }}];
+  ss_post stack sparse;
+  llvm_points_to pp (llvm_term p);
+  llvm_points_to pb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `len - 1 : [128] }}]);
+  llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `nb - 1 : [128] }}]);
+  llvm_points_to_untyped (ss_at stack 32) (llvm_term {{ parse`{32, nb} (bits_of p) }});
+  llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+};
+let verify_parse (nb : Int) (word_of : LLVMSpec) =
+  verify_spec "sha256__parse" [word_of] (parse_contract nb) z3 "z3"
+    (str_concat (str_concat (str_concat (str_concat "N = " (show nb)) ": Preprocessing::parse`{32, ") (show nb))
+       "} (Preprocessing.cry's parse, at the padded lengths of Hash)");
+
+/*
  * Foldl_Step (H, Ms, N) = foldl step h (take`{N} ms) for Ms of nt blocks
  * and each N in 0 .. nt, with the lemma at N - 1 and Step's as the
  * overrides, and z3 with step uninterpreted. H is read-only (Hash passes

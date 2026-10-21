@@ -1,0 +1,37 @@
+/*
+ * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
+ *
+ * The spec layer's Parse at N = 1 block (#67 item 3) against
+ * Preprocessing.cry's parse`{32, 1} of the padded message's bits
+ * reversed, with the override of sha256_spec.saw's proof at that length
+ * (Word_Of's lemma at Count = 32 for 512 bits, proved here as it proves
+ * it), in the module's load with lax arithmetic. The proof must fail with
+ * a counterexample, which shows that the Parse proofs, with Word_Of
+ * overridden, compare the parsed words themselves.
+ */
+
+include "../sha256_spec_common.saw";
+let verify_spec = verify_spec_lax;
+include "../sha256_spec_pad.saw";
+/*
+ * sha256_spec_hash.saw's Foldl_Step lemmas name the compression
+ * function's lemma i_step, which this control does not use: bind it to a
+ * lemma it proves anyway, rather than prove sha256_spec_step.saw.
+ */
+i_step <- verify_small_k 0;
+include "../sha256_spec_hash.saw";
+
+w1 <- word_of_lemmas 512 0 [];
+verify_spec "sha256__parse" [w1]
+  (do {
+     stack <- secondary_stack;
+     p <- llvm_fresh_var "p" (llvm_array 512 (llvm_int 8));
+     llvm_precond {{ all (\b -> b <= 1) p }};
+     pp <- llvm_alloc (llvm_array 512 (llvm_int 8));
+     llvm_points_to pp (llvm_term p);
+     pb <- llvm_alloc_aligned 1 bits_bounds_t;
+     llvm_points_to pb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 511 : [128] }}]);
+     llvm_execute_func [llvm_struct_value [pp, pb], llvm_term {{ 1 : [128] }}];
+     llvm_points_to_untyped (ss_at stack 32) (llvm_term {{ parse`{32, 1} (reverse (bits_of p)) }});
+     llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+   }) z3 "z3" "N = 1 block: Preprocessing::parse of the message's bits reversed";

@@ -1423,6 +1423,7 @@ moved.
 | `SHA2.Sequences_Of_Bits.Literal` (#75: `SHA2.To_Bits`'s recursion) | ``drop`{128 - W} v``, `pad`'s ``(`l : [64])`` | W = 0 .. 64, for each k | W - 1 | z3 |
 | **`Pad`** | `Preprocessing.cry`: ``pad`{512, 32, l, k}`` | all twelve lengths | `Small_K`, `Zero`, `To_Bits` at 64 | z3 |
 | `Word_Sequences.Value` (#75: `Word_Of`'s recursion) | ``zext (take`{Count} (p << first))`` (a word of `parse`) | Count = 0 .. 32, P of 512 and 1024 bits | Count - 1 | yices |
+| **`Parse`** (#67 item 3) | `Preprocessing.cry`: ``parse`{32, N}`` | N = 1, 2 blocks; with `SAW_LONG=1` also 3, 4 | `Word_Of` at 32 for 512 N bits (`Parse_Block`, `Split_At` executed) | z3 |
 | `Blocks.Foldl_Take` (#75: `Foldl_Step`'s recursion) | ``foldl step h (take`{N} ms)`` | N = 0 .. 1 of 1 block, 0 .. 2 of 2 | N - 1, `Step` | z3, `step` uninterpreted |
 | **`Hash`** | `Main.cry`: ``hash`{l}`` | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes; with `SAW_LONG=1` also 120, 128, 200 | `Pad`, `Word_Of` at 32, `Foldl_Step` (`Parse`, `Parse_Block`, `Join`, `Bit` executed) | z3, `step` uninterpreted |
 | `Hash` (for HMAC), with its `Pad`, `Zero`, `To_Bits` chain | as above | at each base of the secondary stack where HMAC calls it (below) | as above | as above |
@@ -1493,8 +1494,8 @@ it").
   of its own, and each base costs `Pad`'s `To_Bits` chain again (65
   lemmas, about 70 s); the default run proves one length per case of
   `HMAC_init`. HMAC at other lengths, or λ < 256: not attempted.
-- On their own: `Parse`, `Parse_Block`, `Join` and `Bit` (executed within
-  `Hash`), `Ceil_Div` and `Ceil_Mod` (within `Small_K`), GF2's `Inner`,
+- On their own: `Parse_Block`, `Join` and `Bit` (executed within
+  `Hash`, and `Parse_Block` within `Parse`'s own results), `Ceil_Div` and `Ceil_Mod` (within `Small_K`), GF2's `Inner`,
   `Inner_Step`, `Inner_Next`, `Sub_Mult`, `Term`, `Lead`, `Reduce` and
   `Bit` (within `Pgcd` and the folds; `Inner` and the rest are pgcd's
   locals, with no Cryptol name), `SBox.Reversed_Bit` and `Affine_Bit`,
@@ -1556,8 +1557,9 @@ lengths) and `prop_hash`, `prop_hash_bits` (at nine). `SBox.affine` and
 are proved for every byte. Since #59's second PR, `Main`'s
 `prop_Encrypt*`/`prop_Decrypt*` too (every key and block at each key
 size), and HMAC's spec properties (`prop_HMAC_*`, `prop_HMAC_init`) at
-the (key, text) lengths proved, which overlap theirs only in part. Not
-backed: `prop_parse` (executed within `Hash` only) and `prop_Hash_Bytes`.
+the (key, text) lengths proved, which overlap theirs only in part. Since
+#67 item 3, `prop_parse` at N = 1 and 2 blocks (3 and 4 with
+`SAW_LONG=1`) of its N = 0 .. 8. Not backed: `prop_Hash_Bytes`.
 
 ### What SAW proves on its own, in place, or not at all
 
@@ -1628,14 +1630,20 @@ by gnatprove for all inputs and FFI-checked:
 
 | subprogram | executed within | at |
 |---|---|---|
-| `SHA2.SHA256.Parse`, `Parse_Block`, `Join`, `Bit` | every spec `Hash` result (`Pad`, `Word_Of` and `Foldl_Step` are overrides; these, which do not recurse, are executed) | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes; also 120, 128, 200 with `SAW_LONG=1`; and each `Hash` lemma at the secondary-stack bases where HMAC calls it |
+| `SHA2.SHA256.Parse_Block`, `Join`, `Bit` (and `Parse`, which has results of its own too) | every spec `Hash` result (`Pad`, `Word_Of` and `Foldl_Step` are overrides; these, which do not recurse, are executed); `Parse_Block` also within each `Parse` result | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes; also 120, 128, 200 with `SAW_LONG=1`; and each `Hash` lemma at the secondary-stack bases where HMAC calls it |
 | `Ceil_Div`, `Ceil_Mod` | `Small_K` | each length |
 | `HMAC.Join`, `Repeat`, `Zero`, `Byte_Bit`; the instance's `Opad`, `Ipad` | the `HMAC_init` and `HMAC` results | (32, 3), (64, 32), (65, 3); all seven pairs with `SAW_LONG=1` |
 | GF2's `Inner`, `Inner_Step`, `Inner_Next`, `Sub_Mult`, `Term`, `Lead`, `Reduce`, `Bit` | `Pgcd` and the folds | every byte (pgcd's locals; no Cryptol name) |
 | `SBox.Reversed_Bit`, `Affine_Bit` | `Affine` | every byte |
 | `KeyExpansion.Words`, the `Is_*` predicates | contracts only | |
 
-`Parse` gets a standalone result in #67 item 3 (on the next SAW session).
+`Parse` has results of its own since #67 item 3: ``parse`{32, N}`` at
+N = 1 and 2 blocks (3 and 4 with `SAW_LONG=1`), the padded lengths
+`Hash` is proved at, with `Word_Of`'s lemma at 32 as the override. `Hash`
+still executes it rather than take those results as overrides: there its
+message is `Pad`'s result on the secondary stack, above `Pad`'s
+temporaries, not an argument of its own, and a `Parse` lemma would be
+needed at that stack base for each length.
 
 **Why there is no SAW proof of `hash` over bytes.**
 `SHA256_Bytes.Hash_Bytes` is not a Cryptol declaration: it is the spec's
@@ -1809,7 +1817,9 @@ do not read `saw/`: the trust and docs gates scan `src/`, and the bitcode
      against the block reversed); `spec_sha256_step_reversed_feed_forward`
      (`Step`, as the `Compress` control); `spec_sha256_pad_complemented`
      (`Pad` at 1 byte, in the lax load, against `pad` of the message
-     complemented). (The leaf control was first `ShiftRows` against
+     complemented); `spec_sha256_parse_reversed` (`Parse` at 1 block, on
+     `Word_Of`'s lemmas, against `parse` of the bits reversed, #67 item
+     3). (The leaf control was first `ShiftRows` against
      `InvShiftRows`: rme's normal form of that false 128-bit equality took
      the 10 GB cap.)
 
