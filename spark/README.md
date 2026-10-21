@@ -592,10 +592,35 @@ mechanism was not isolated): SHA-2's `Ceil_Div` and `Ceil_Mod` (`/^`,
 `Byte_Bit` and `Join` (`@` and `join` on bytes;
 `HMAC.SHA256_Impl.Lemma_Update`, levels 2 and 3). The FFI shim
 instantiates the prelude at exactly those types, so the statements are
-checked against Cryptol all the same. AES (`foldl`, `split`/`join`, `@@`, `reverse`, `@`, `pmult`,
-`pmod`, `pdiv`) is migrated after its key-size rewrite (#80); its types
-are checked here already (`Bulk_Indexing` on a block and on a byte table,
-`pmult` at `[8] x [8]`, `pmod` at `[15]` mod `[9]`).
+checked against Cryptol all the same.
+
+AES since #75's second half: `foldl` (`Spec.Cipher`'s three round folds,
+`Folds`; GF28MultiplicationCorrect's fold over a byte's bits,
+`Enumeration_Folds`), `@@` (SubBytes, ShiftRows and their inverses,
+`Bulk_Indexing`), `join` and `split` between bytes and bits (`Spec.Main`'s
+`Join_Block`, `Split_Block`, `Byte_At`, `Bit_Of`, and `AES_K.Split_Key`,
+`Join_Split` at `[8]`), `@` and `head` on words (GF28's `Bit`, `Head`,
+`Product_Bit`, GF2's `Bit`, `Words`), and `pmult` (GF28 at `[8] x [8]`,
+GF2 at `[9] x [9]`, `Polynomial_Products`). Four stay written out, each
+for a measured reason:
+- `reverse` (`Cipher.Reverse_Keys`): through `Sequences.Reverse_Of`,
+  `AES.Impl.Decrypt_Block_Prime`'s assertion `RK (J) = W (Nr (K) - J)`
+  times out at level 2;
+- `pmod` (GF28's `Pmod_Fold`, `Pmod`): GF28 returns the remainder as a
+  `Byte`, and its bound below `2 ** 8` is an induction no expression
+  function can call; GF28's `Pmod` also takes any `Poly` dividend;
+- `pdiv` (GF2's `Pdiv`): with the prelude's, `Inner_Step`'s postcondition
+  does not prove at level 4 (it rests on `Pdiv_Fold`'s, which reduces by
+  the divisor's leading term, not by the prelude's `Top`);
+- `split`/`join` between a block and its columns (`Types.Split`, `Join`):
+  not in the prelude (which is between words and bits), and `Types` is
+  not ghost, so it cannot call the prelude.
+
+The prelude's folds recurse from the last element and AES's recursed
+from the first, so the lemmas that unfolded them induct from the last
+step now; `AES.Lemmas.Lemma_Foldl_*_Take_Eq` state that a fold's first N
+steps depend only on the first N elements, which a fold over a slice
+needs.
 
 **How it is checked.** gnatprove proves each instance where it is
 instantiated. `spark/cryptol/SPARK/Prelude.cry` checks each generic

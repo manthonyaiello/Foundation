@@ -13,8 +13,12 @@
 --  significant first, as GF28's Pmod_Fold is for pmod.
 --
 --  From the Cryptol prelude in SPARK (Foundation_Spark.Cryptol, #75): @ on
---  a [9] (Words) and pmult at [9] x [9] (Polynomial_Products). pdiv stays
---  inline: the prelude's Pdiv reduces by its Top (y), the largest power of
+--  a [9] (Words). pmult and pdiv stay inline. pmult: as the prelude's
+--  Pmult (Polynomial_Products at {8, 8}), GF2 still proves, but
+--  SBox_Entries, which evaluates pmult on constants at every step of
+--  inner for all 256 bytes, ran past 77 minutes at -j6 with 9 of its 32
+--  subprograms done, against about 26 minutes for the whole unit with
+--  Pmult's closed form below (#75). pdiv: the prelude's Pdiv reduces by its Top (y), the largest power of
 --  2 not above y, where Pdiv_Fold reduces by Lead (y), and Inner_Step's
 --  postcondition rests on Pdiv_Fold's, which pairs it with Pmod_Fold.
 --  With Pdiv as the prelude's (an instance of Polynomial_Quotients at
@@ -22,7 +26,6 @@
 --  (3)) does not prove at level 4.
 
 with Interfaces;
-with Foundation_Spark.Cryptol.Polynomial_Products;
 with Foundation_Spark.Cryptol.Words;
 
 package Foundation_Spark.AES.Spec.GF2 with
@@ -62,17 +65,15 @@ is
    --  @param Y The second factor.
    --  @return Y * x^^I if that coefficient of X is 1, and 0 otherwise.
 
-   package Products is new Cryptol.Polynomial_Products
-     (Product, 8, 8, Interfaces.Shift_Right);
-   --  The prelude's pmult at {u, v} = {8, 8}: [9] -> [9] -> [17].
-
    function Pmult (X, Y : Poly) return Product
-   is (Products.Pmult (Product (X), Product (Y)))
+   is (Term (X, 0, Y) xor Term (X, 1, Y) xor Term (X, 2, Y)
+       xor Term (X, 3, Y) xor Term (X, 4, Y) xor Term (X, 5, Y)
+       xor Term (X, 6, Y) xor Term (X, 7, Y) xor Term (X, 8, Y))
    with
      Pre  => Is_Poly9 (X) and then Is_Poly9 (Y),
      Post => Pmult'Result < 2 ** 17;
    --  Cryptol's pmult at type [9] -> [9] -> [17], GF2.cry's (^*): the
-   --  product of X and Y as polynomials over GF(2), the prelude's Pmult.
+   --  product of X and Y as polynomials over GF(2).
    --  @param X The first factor.
    --  @param Y The second factor.
    --  @return Their product, of degree at most 16.
