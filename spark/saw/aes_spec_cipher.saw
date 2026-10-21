@@ -60,17 +60,17 @@ c_invround_prime <- verify_spec "cipher__invround_prime" [c_addroundkey, c_invmi
  * instance (Round_Folds and so on), whose Foldl_Take recurses on the
  * number of steps N, so the lemmas are Foldl_Take's, one per N at each M
  * in 9, 11, 13 (aes_spec_common.saw's foldls and foldl_take_contract).
- * Each is the list of the three at N = M. (Unverified until the next SAW
- * session; PLAN step 7.)
+ * Each is the list of the three at N = M. Round's take its slice's
+ * bounds read-only, the inverse rounds' writable (foldl_take_contract).
  *
  * SubBytes and InvSubBytes now call Table_Indexing.Bulk_Index, and
  * ShiftRows and InvShiftRows Block_Indexing.Bulk_Index (the prelude's @@,
  * #75): their contracts above are unchanged, and SAW executes the
  * instances. Reverse_Keys stays inline (#75).
  */
-c_foldl_round <- foldls "cipher__round_folds__foldl_take" c_round {{ Round }} "Round";
-c_foldl_invround <- foldls "cipher__invround_folds__foldl_take" c_invround {{ InvRound }} "InvRound";
-c_foldl_invround_prime <- foldls "cipher__invround_prime_folds__foldl_take" c_invround_prime {{ InvRound' }} "InvRound'";
+c_foldl_round <- foldls true "cipher__round_folds__foldl_take" c_round {{ Round }} "Round";
+c_foldl_invround <- foldls false "cipher__invround_folds__foldl_take" c_invround {{ InvRound }} "InvRound";
+c_foldl_invround_prime <- foldls false "cipher__invround_prime_folds__foldl_take" c_invround_prime {{ InvRound' }} "InvRound'";
 
 /*
  * Cipher = Cipher.cry's Cipher`{k} [FIPS-PUB-197 Section 5.1], at k = 128,

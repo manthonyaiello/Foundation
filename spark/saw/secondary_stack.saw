@@ -28,23 +28,30 @@
  * the bytes used after the call: a caller that allocates next reads Top.
  */
 let ss_chunk_size = 65536;
-let ss_header stack (used : Int) =
+/*
+ * The header with `used` bytes allocated and High_Water_Mark hwm (a
+ * [64] term: a caller's earlier mark and release can leave it above
+ * `used`), and the header after allocations and no release (hwm = used).
+ */
+let ss_header_hwm stack (used : Int) (hwm : Term) =
   llvm_points_to_untyped (llvm_elem stack 0)
     (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_term {{ 0 : [8] }},
                                llvm_term {{ 0 : [8] }}, llvm_term {{ 0 : [16] }}, llvm_term {{ 0 : [32] }},
-                               llvm_term {{ `used : [64] }},
+                               llvm_term hwm,
                                llvm_packed_struct_value [llvm_term {{ `used + 1 : [64] }}, llvm_elem stack 48]]);
-let secondary_stack_used (used : Int) = do {
+let ss_header stack (used : Int) = ss_header_hwm stack used {{ `used : [64] }};
+let secondary_stack_hwm (used : Int) (hwm : Term) = do {
   llvm_alloc_global "system__soft_links__get_sec_stack";
   llvm_points_to (llvm_global "system__soft_links__get_sec_stack") (llvm_global "saw_soft_links__get_sec_stack");
   stack <- llvm_alloc_aligned 16 (llvm_array (eval_int {{ 80 + `ss_chunk_size : [64] }}) (llvm_int 8));
-  ss_header stack used;
+  ss_header_hwm stack used hwm;
   llvm_points_to_untyped (llvm_elem stack 48)
     (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_null, llvm_term {{ 0 : [64] }}]);
   llvm_alloc_global "system__soft_links__nt_tsd";
   llvm_points_to (llvm_elem (llvm_global "system__soft_links__nt_tsd") 2) stack;
   return stack;
 };
+let secondary_stack_used (used : Int) = secondary_stack_hwm used {{ `used : [64] }};
 let secondary_stack = secondary_stack_used 0;
 let ss_at stack (offset : Int) = llvm_elem stack (eval_int {{ 80 + `offset : [64] }});
 
@@ -69,19 +76,16 @@ let ss_post stack (used : Int) = do {
  * ss_post after a mark and its release (SS_Mark, SS_Release, which a
  * function that frees its temporaries calls around them): Top is back at
  * `used` bytes, and High_Water_Mark records the most bytes in use in
- * between, `hwm`.
+ * between, `hwm` (ss_post_hwm_t: a [64] term).
  */
-let ss_post_hwm stack (used : Int) (hwm : Int) = do {
-  llvm_points_to_untyped (llvm_elem stack 0)
-    (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_term {{ 0 : [8] }},
-                               llvm_term {{ 0 : [8] }}, llvm_term {{ 0 : [16] }}, llvm_term {{ 0 : [32] }},
-                               llvm_term {{ `hwm : [64] }},
-                               llvm_packed_struct_value [llvm_term {{ `used + 1 : [64] }}, llvm_elem stack 48]]);
+let ss_post_hwm_t stack (used : Int) (hwm : Term) = do {
+  ss_header_hwm stack used hwm;
   llvm_points_to_untyped (llvm_elem stack 48)
     (llvm_packed_struct_value [llvm_term {{ `ss_chunk_size : [64] }}, llvm_null, llvm_term {{ 0 : [64] }}]);
   llvm_points_to (llvm_global "system__soft_links__get_sec_stack") (llvm_global "saw_soft_links__get_sec_stack");
   llvm_points_to (llvm_elem (llvm_global "system__soft_links__nt_tsd") 2) stack;
 };
+let ss_post_hwm stack (used : Int) (hwm : Int) = ss_post_hwm_t stack used {{ `hwm : [64] }};
 
 /*
  * The first n bytes of the stack's memory, as found and left: what a

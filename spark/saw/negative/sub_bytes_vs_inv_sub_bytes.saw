@@ -5,7 +5,7 @@
  * the same SBox_Lanes override as aes_impl.saw (since #50 Sub_Bytes calls
  * the bitsliced SBox_Lanes, not Sub_Byte). The proof must fail with a
  * counterexample state, which shows the override does not make the
- * Sub_Bytes proof vacuous. UNVERIFIED since #50: the IOD session runs it.
+ * Sub_Bytes proof vacuous. (Run on the IOD, 2026-10-21: it fails.)
  */
 
 include "../aes_impl_common.saw";

@@ -233,8 +233,7 @@ its header lists). **They are optional, and they are kept for now** (Tony,
   128, 192 and 256, which is all of AES, so the Cryptol's properties
   already hold of the SPARK spec. (Since #80 the `{k}` functions are the
   instances `AES128`, `AES192`, `AES256` of the generic `AES_K`, one per
-  key size; their renamed SAW contracts are unverified until the next SAW
-  session.) `Properties` states the four properties that take a key size
+  key size, each proved by SAW.) `Properties` states the four properties that take a key size
   (`InvCipherEquivalence`, `CipherInverts`, `CipherInverts'`,
   `EncryptInverts`) once, over the dispatchers of `Spec.Dispatch`, not
   three times in the generic. In general, re-proving a higher-level
@@ -1372,25 +1371,28 @@ AES (`aes_spec.saw`, with `aes_spec_gf.saw`, `aes_spec_cipher.saw`,
 | `Types.Nk`, `.Nr`, `.Split`, `.Join` | as for the implementation | | | z3, rme |
 | `Cipher.SubBytes` to `.InvMixColumns`, `.AddRoundKey` | `Cipher.cry`, each | | `Dot`; the column step, `Split`, `Join` | rme |
 | `Cipher.Round`, `.InvRound`, `.InvRound_Prime` | `Round`, `InvRound`, `InvRound'` | | their four steps | rme; z3 for `InvRound'` |
-| `Cipher.Foldl_Round`, `.Foldl_InvRound`, `.Foldl_InvRound_Prime` | `foldl Round z xs` and the others | M = 0 .. 13 round keys | M - 1, the round | z3, the round uninterpreted |
+| `Cipher.Round_Folds.Foldl_Take`, `.InvRound_Folds.`, `.InvRound_Prime_Folds.` (#75: the recursion of `Foldl_Round` and the others) | ``foldl Round z (take`{N} xs)`` and the others | N = 0 .. M at M = 9, 11, 13 round keys; `Round`'s with the slice's bounds a read-only constant (`Cipher` passes `W (1 .. Nr - 1)`), the inverse rounds' writable (the reversed keys, on the secondary stack) | N - 1, the round | z3, the round uninterpreted |
 | `AES128.Cipher`, `AES192.`, `AES256.` | ``Cipher`{k}`` | 128, 192, 256 (one instance each) | the fold, `SubBytes`, `ShiftRows`, `AddRoundKey` | z3, the four uninterpreted |
 | `Cipher.Reverse_Keys` | `reverse` | 9, 11, 13 round keys | | z3 |
 | `AES<k>.InvCipher`, `.InvCipher_Prime` | ``InvCipher`{k}``, ``InvCipher'`{k}`` | 128, 192, 256 | the fold, the steps (`Reverse_Keys` executed) | z3, the round and steps uninterpreted |
 | `KeyExpansion.RotWord`, `.SubWord`, `"xor"` | `RotWord`, `SubWord`, `^` | | | rme |
 | `AES<k>.W` | `w @ i` = `(groupBy`{4} (join (KeyExpansion`{k} key))) @ i` | each I at each k: 44, 52, 60 | the lemmas below I (SAW applies those at I - 1 and I - Nk), the leaves | z3, `SubWord` uninterpreted |
 | `AES<k>.KeyExpansion` | ``KeyExpansion`{k}`` | 128, 192, 256 | the W lemmas, `Join` | z3, `SubWord` uninterpreted |
-| `Main.Bit_Of`, `.Byte_At`, `.Split_Block`; `AES<k>.Split_Key` | `Main.cry`'s `split`s: `b @ j`, ``take`{8} (bs << from)``, `split in`, `split (split key)` | `Byte_At` at 128, 192, 256 bits; `Split_Key` at each k | `Byte_At` | z3 |
-| `Main.Join_Block` | `Main.cry`'s `join : Block -> [128]` | | `Bit_Of` | z3 (no GEP rewrite since #68; unverified until the next SAW run) |
+| `Main.Bit_Of`, `.Byte_At`, `.Split_Block`; `AES<k>.Split_Key` | `Main.cry`'s `split`s: `b @ j`, ``take`{8} (bs << from)``, `split in`, `split (split key)` | `Byte_At` at 128, 192, 256 bits; `Split_Key` at each k (its result by value at every k) | none (since #75 `Split_Block` and `Split_Key` call the prelude's `Byte_Bits.Split_At`, executed) | z3 |
+| `Main.Join_Block` | `Main.cry`'s `join : Block -> [128]` | any `High_Water_Mark` found (since #75 it marks the secondary stack, calls the prelude's `Byte_Bits.Join`, executed, copies its 128 bits out and releases the mark) | | z3 |
 | **`AES<k>.Encrypt`, `.Decrypt`** | **`Main.cry`: ``AES`{k}.Encrypt``, ``.Decrypt``, which are `AES128.Encrypt` and the others** | 128, 192, 256 | `Split_Key`, `KeyExpansion`, `Split_Block`, `Cipher` or `InvCipher`, `Join_Block` | z3, `Cipher`, `InvCipher`, `KeyExpansion` uninterpreted |
 
 The `{k}` functions are the generic `AES.Spec.AES_K`'s, proved on its
 instances `AES128`, `AES192` and `AES256` (#80), with no `K` argument.
-**The rows naming `AES<k>` are unverified**: #80 rewrote their contracts
-on `foundation`, which has no GNAT-LLVM or SAW, and `saw/results.txt`
-still records the contracts as they were before #80 (the K-explicit
-`cipher__cipher` and the others, `Main`'s nested `AES128` wrappers, and
-`KeyExpansion` and `InvCipher` on a secondary stack in use) until the next
-SAW session. The dispatchers of `AES.Spec.Dispatch` are not proved by SAW:
+#80 wrote their contracts on `foundation`, which has no GNAT-LLVM or SAW;
+the IOD session of 2026-10-21 (#75, `saw/results.txt`) ran them and
+corrected them against the bitcode GNAT-LLVM 27 emits: the key words go
+by value at k = 128 and by reference at 192 and 256, as assumed;
+`KeyExpansion` returns through a pointer the caller passes first, as
+assumed; `Split_Key` returns its words **by value at every k** (not
+through one at 192 and 256); and `Encrypt` and `Decrypt` reach the
+secondary stack through `Join_Block`, which marks and releases it (#75).
+The dispatchers of `AES.Spec.Dispatch` are not proved by SAW:
 each is a `case` on `K` over the instances, and gnatprove proves that its
 postcondition, the Cryptol body, holds of every instance.
 
@@ -1404,9 +1406,10 @@ shared parts in `sha256_spec_common.saw`; the HMAC units are linked into
 100, 119, 120, 128 and 200 bytes; HMAC's (key, text) lengths M4.3's too.
 Since #75 the SHA-2 and HMAC spec bodies call the Cryptol prelude's
 instances, and the scripts name the instances' recursions (the rows
-marked #75); those edits, and the secondary-stack bases they may move,
-are unverified until the next SAW session, so `results.txt` records the
-scripts as they were before #75.
+marked #75). The wrappers (`To_Bits`, `Zero`, HMAC's `Repeat` and
+`Zero`) pass their callee's secondary-stack result through without a
+copy (GNAT-LLVM 27, read from the IR on 2026-10-21), so no stack base
+moved.
 
 | Ada (`SHA2.SHA256.` unless named) | Cryptol | sizes, lemmas | overrides | tactic |
 |---|---|---|---|---|
@@ -1595,8 +1598,7 @@ by gnatprove for all inputs and FFI-checked:
   equivalent inverse cipher (``InvCipher'``). `Impl.Main.Decrypt` uses
   `Decrypt_Block`, and no other subprogram calls these; #23 asked only for
   `KeyExpansion`, `Cipher` and `InvCipher`. SAW does prove the spec
-  layer's `InvCipher_Prime` (of the instances `AES<k>` since #80,
-  unverified until the next SAW session) and `Cipher.InvRound_Prime`
+  layer's `InvCipher_Prime` (of the instances `AES<k>` since #80) and `Cipher.InvRound_Prime`
   against ``InvCipher'`` and `InvRound'`.
 - `AES.Impl.Dot`: general GF(2^8) multiplication. The ciphers use `X_Times`
   (`foundation_spark-aes-impl.ads`), so only the FFI export calls `Dot`.
