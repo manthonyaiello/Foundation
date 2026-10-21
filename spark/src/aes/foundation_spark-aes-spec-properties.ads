@@ -29,6 +29,7 @@
 --  Foundation_Spark.AES.Lemmas, state that once per function.
 
 with Interfaces;
+with Foundation_Spark.Cryptol.Enumeration_Folds;
 with Foundation_Spark.AES.Spec.Cipher;
 with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.GF28;
@@ -53,17 +54,37 @@ is
    -- GF28 --
    ----------
 
+   type Mult_Env is record
+      B : Byte;
+      C : Byte;
+   end record;
+   --  The values GF28MultiplicationCorrect's fold closes over: b, whose
+   --  bits it folds over, and c.
+   --  @field B The Cryptol's b.
+   --  @field C The Cryptol's c.
+
+   function Mult_Step
+     (E : Mult_Env; A : Byte; I : GF28.Bit_Index) return Byte
+   is (GF28.xTimes (A) xor (if GF28.Bit (E.B, I) then E.C else 16#00#));
+   --  GF28.cry, GF28MultiplicationCorrect: the fold's function \a bi ->
+   --  xTimes a ^ if bi then c else 0x00, at the bit bi = b @ I.
+   --  @param E The b and c the function closes over.
+   --  @param A The accumulator, the Cryptol's a.
+   --  @param I The index of the bit bi in b.
+   --  @return xTimes a ^ (if b @ I then c else 0x00).
+
+   package Mult_Folds is new Cryptol.Enumeration_Folds
+     (Env => Mult_Env, Acc => Byte, Index => GF28.Bit_Index, F => Mult_Step);
+   --  The prelude's foldl over [0 ..< 8], with Mult_Step as its function.
+
    function Foldl_Mult (B, C : Byte; N : Natural) return Byte
-   is (if N = 0 then 16#00#
-       else GF28.xTimes (Foldl_Mult (B, C, N - 1))
-            xor (if GF28.Bit (B, N - 1) then C else 16#00#))
-   with
-     Pre                => N <= 8,
-     Subprogram_Variant => (Decreases => N);
+   is (Mult_Folds.Foldl ((B => B, C => C), 16#00#, 0, N))
+   with Pre => N <= 8;
    --  GF28.cry, GF28MultiplicationCorrect: the first N steps of
    --  foldl (\a bi -> xTimes a ^ if bi then c else 0x00) 0x00 b, the fold
    --  over the bits bi of B, most significant first, as Cryptol orders
-   --  them.
+   --  them. As the prelude's Enumeration_Folds over the bits' indices:
+   --  foldl f z b is foldl (\a i -> f a (b @ i)) z [0 ..< 8].
    --  @param B The byte whose bits are folded over.
    --  @param C The other factor.
    --  @param N How many bits of B, from the most significant, to use.
@@ -341,9 +362,8 @@ is
 
    procedure Lemma_Foldl_InvRound_Eq (A, B : Block; Xs, Ys : Round_Keys)
    with
-     Pre                => A = B and then Xs = Ys,
-     Post               => Foldl_InvRound (A, Xs) = Foldl_InvRound (B, Ys),
-     Subprogram_Variant => (Decreases => Xs'Length);
+     Pre  => A = B and then Xs = Ys,
+     Post => Foldl_InvRound (A, Xs) = Foldl_InvRound (B, Ys);
    --  foldl InvRound maps equal states and equal lists of round keys
    --  (equal as Ada arrays: same length and components, whatever their
    --  bounds) to equal states.
@@ -355,10 +375,8 @@ is
    procedure Lemma_Foldl_InvRound_Prime_Eq
      (A, B : Block; Xs, Ys : Round_Keys)
    with
-     Pre                => A = B and then Xs = Ys,
-     Post               =>
-       Foldl_InvRound_Prime (A, Xs) = Foldl_InvRound_Prime (B, Ys),
-     Subprogram_Variant => (Decreases => Xs'Length);
+     Pre  => A = B and then Xs = Ys,
+     Post => Foldl_InvRound_Prime (A, Xs) = Foldl_InvRound_Prime (B, Ys);
    --  foldl InvRound' maps equal states and equal lists of round keys to
    --  equal states, as Lemma_Foldl_InvRound_Eq.
    --  @param A An initial state.
@@ -368,10 +386,9 @@ is
 
    procedure Lemma_Foldl_Equivalence (Z : Block; Xs : Round_Keys)
    with
-     Post               =>
+     Post =>
        Foldl_InvRound_Prime (InvSubBytes (InvShiftRows (Z)), Xs)
-       = InvSubBytes (InvShiftRows (Foldl_InvRound (Z, Xs))),
-     Subprogram_Variant => (Decreases => Xs'Length);
+       = InvSubBytes (InvShiftRows (Foldl_InvRound (Z, Xs)));
    --  foldl InvRound' from InvSubBytes (InvShiftRows z) is InvSubBytes
    --  (InvShiftRows) of foldl InvRound from z: InvRound' is InvRound with
    --  InvSubBytes and InvShiftRows moved from its front to its back.
@@ -380,9 +397,8 @@ is
 
    procedure Lemma_Foldl_Inverts (Z : Block; Xs : Round_Keys)
    with
-     Post               =>
-       Foldl_InvRound_Prime (Foldl_Round (Z, Xs), Reverse_Keys (Xs)) = Z,
-     Subprogram_Variant => (Decreases => Xs'Length);
+     Post =>
+       Foldl_InvRound_Prime (Foldl_Round (Z, Xs), Reverse_Keys (Xs)) = Z;
    --  foldl InvRound' over the reversed round keys undoes foldl Round.
    --  @param Z The initial state of foldl Round.
    --  @param Xs The round keys.

@@ -12,10 +12,14 @@
 --  dividend has degree below 8 (Lemma_Pmod_Small), and the last three
 --  reduction steps are left to the provers' bit-vector reasoning.
 --
---  Folds. Cipher.cry's foldl consumes the round keys from the front, and
---  the implementation's loops apply one round at a time, so its invariant
---  needs the fold over a prefix extended by one key at the back. The
---  Lemma_Foldl_*_Snoc lemmas state that, one per round function.
+--  Folds. The implementation's loops apply one round at a time, so their
+--  invariant needs the fold over a prefix extended by one key at the
+--  back. The Lemma_Foldl_*_Snoc lemmas state that, one per round function.
+--  The spec's folds are the Cryptol prelude's Folds (#75), which recurse
+--  from the last element, so a Snoc lemma is the definition, except that
+--  the fold over the prefix is a fold over a slice, a different array: the
+--  Lemma_Foldl_*_Take_Eq lemmas state that a fold's first N steps depend
+--  only on the first N elements, compared with Ada's =.
 
 with Interfaces;
 with Foundation_Spark.AES.Spec.Cipher;
@@ -163,13 +167,72 @@ is
    --  @param B A state equal to A.
    --  @param Ki The round key.
 
+   procedure Lemma_Foldl_Round_Take_Eq
+     (A, B : Block; Xs, Ys : Round_Keys; N : Natural)
+   with
+     Pre                =>
+       A = B
+       and then N <= Xs'Length
+       and then N <= Ys'Length
+       and then (for all I in 0 .. N - 1 =>
+                   Xs (Xs'First + I) = Ys (Ys'First + I)),
+     Post               =>
+       Round_Folds.Foldl_Take (A, Xs, N) = Round_Folds.Foldl_Take (B, Ys, N),
+     Subprogram_Variant => (Decreases => N);
+   --  The first N steps of foldl Round agree from equal states over round
+   --  keys whose first N elements are equal, whatever their bounds.
+   --  @param A An initial state.
+   --  @param B An initial state equal to A.
+   --  @param Xs Round keys.
+   --  @param Ys Round keys whose first N elements equal those of Xs.
+   --  @param N The number of steps.
+
+   procedure Lemma_Foldl_InvRound_Take_Eq
+     (A, B : Block; Xs, Ys : Round_Keys; N : Natural)
+   with
+     Pre                =>
+       A = B
+       and then N <= Xs'Length
+       and then N <= Ys'Length
+       and then (for all I in 0 .. N - 1 =>
+                   Xs (Xs'First + I) = Ys (Ys'First + I)),
+     Post               =>
+       InvRound_Folds.Foldl_Take (A, Xs, N)
+       = InvRound_Folds.Foldl_Take (B, Ys, N),
+     Subprogram_Variant => (Decreases => N);
+   --  Lemma_Foldl_Round_Take_Eq for foldl InvRound.
+   --  @param A An initial state.
+   --  @param B An initial state equal to A.
+   --  @param Xs Round keys.
+   --  @param Ys Round keys whose first N elements equal those of Xs.
+   --  @param N The number of steps.
+
+   procedure Lemma_Foldl_InvRound_Prime_Take_Eq
+     (A, B : Block; Xs, Ys : Round_Keys; N : Natural)
+   with
+     Pre                =>
+       A = B
+       and then N <= Xs'Length
+       and then N <= Ys'Length
+       and then (for all I in 0 .. N - 1 =>
+                   Xs (Xs'First + I) = Ys (Ys'First + I)),
+     Post               =>
+       InvRound_Prime_Folds.Foldl_Take (A, Xs, N)
+       = InvRound_Prime_Folds.Foldl_Take (B, Ys, N),
+     Subprogram_Variant => (Decreases => N);
+   --  Lemma_Foldl_Round_Take_Eq for foldl InvRound'.
+   --  @param A An initial state.
+   --  @param B An initial state equal to A.
+   --  @param Xs Round keys.
+   --  @param Ys Round keys whose first N elements equal those of Xs.
+   --  @param N The number of steps.
+
    procedure Lemma_Foldl_Round_Snoc (Z : Block; Xs : Round_Keys)
    with
-     Pre                => Xs'Length > 0,
-     Post               =>
+     Pre  => Xs'Length > 0,
+     Post =>
        Foldl_Round (Z, Xs)
-       = Round (Foldl_Round (Z, Xs (Xs'First .. Xs'Last - 1)), Xs (Xs'Last)),
-     Subprogram_Variant => (Decreases => Xs'Length);
+       = Round (Foldl_Round (Z, Xs (Xs'First .. Xs'Last - 1)), Xs (Xs'Last));
    --  Cipher.cry's foldl Round over a non-empty list of round keys is one
    --  Round, by its last key, after the fold over the others.
    --  @param Z The initial state.
@@ -177,12 +240,11 @@ is
 
    procedure Lemma_Foldl_InvRound_Snoc (Z : Block; Xs : Round_Keys)
    with
-     Pre                => Xs'Length > 0,
-     Post               =>
+     Pre  => Xs'Length > 0,
+     Post =>
        Foldl_InvRound (Z, Xs)
        = InvRound (Foldl_InvRound (Z, Xs (Xs'First .. Xs'Last - 1)),
-                   Xs (Xs'Last)),
-     Subprogram_Variant => (Decreases => Xs'Length);
+                   Xs (Xs'Last));
    --  Cipher.cry's foldl InvRound over a non-empty list of round keys is
    --  one InvRound, by its last key, after the fold over the others.
    --  @param Z The initial state.
@@ -190,13 +252,12 @@ is
 
    procedure Lemma_Foldl_InvRound_Prime_Snoc (Z : Block; Xs : Round_Keys)
    with
-     Pre                => Xs'Length > 0,
-     Post               =>
+     Pre  => Xs'Length > 0,
+     Post =>
        Foldl_InvRound_Prime (Z, Xs)
        = InvRound_Prime
            (Foldl_InvRound_Prime (Z, Xs (Xs'First .. Xs'Last - 1)),
-            Xs (Xs'Last)),
-     Subprogram_Variant => (Decreases => Xs'Length);
+            Xs (Xs'Last));
    --  Cipher.cry's foldl InvRound' over a non-empty list of round keys is
    --  one InvRound', by its last key, after the fold over the others.
    --  @param Z The initial state.

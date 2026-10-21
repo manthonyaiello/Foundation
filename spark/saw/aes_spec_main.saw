@@ -86,9 +86,12 @@ m_byte_at_192 <- verify_byte_at 192;
 m_byte_at_256 <- verify_byte_at 256;
 
 /*
- * Split_Block = Main.cry's split in : [128] -> Block.
+ * Split_Block = Main.cry's split in : [128] -> Block. Since #75 it calls
+ * the prelude's Byte_Bits.Split_At (Join_Split, which calls its Value),
+ * not Byte_At, so SAW executes those at each concrete byte index and no
+ * override applies. (Unverified until the next SAW session; PLAN step 7.)
  */
-m_split_block <- verify_spec "main__split_block" [m_byte_at_128]
+m_split_block <- verify_spec "main__split_block" []
                    (do {
                       (bs, p) <- fresh_bits "bs" 128;
                       llvm_execute_func [p];
@@ -104,8 +107,16 @@ m_split_block <- verify_spec "main__split_block" [m_byte_at_128]
  * index value in GEP"), and check-saw.sh rewrote it (gep64). #68 narrowed
  * Bit_Index and retired the rewrite: the index is now at most 64 bits
  * (unverified until the next SAW session).
+ *
+ * Since #75 Join_Block is the prelude's Byte_Bits.Join (Join_Split) of the
+ * block, which returns an unconstrained Bits, on the secondary stack, that
+ * Join_Block copies into the caller's [128]; Join reads bits through
+ * Word_Bits.Bit, not Bit_Of, so no override applies. UNVERIFIED: this
+ * contract does not yet set up the secondary stack (README "SAW", "The
+ * secondary stack"); the next SAW session must add it, and its high
+ * water mark to Encrypt's and Decrypt's contracts.
  */
-m_join_block <- verify_spec "main__join_block" [m_bit_of]
+m_join_block <- verify_spec "main__join_block" []
                   (do {
                      b <- llvm_fresh_var "b" block_t;
                      ret <- llvm_alloc (bits_t 128);
@@ -124,9 +135,12 @@ m_join_block <- verify_spec "main__join_block" [m_bit_of]
  * as verify_byte_at's are (UNVERIFIED: that a static bounds record
  * matches). The result, of the constrained Key_Words, is returned by
  * value at k = 128 and through sret at 192 and 256 (key_words_by_value).
+ * Since #75 it reads each byte with the prelude's Byte_Bits.Split_At,
+ * not Byte_At, so byte_at is no longer an override; SAW executes
+ * Split_At. (Unverified until the next SAW session; PLAN step 7.)
  */
 let verify_split_key (k : Int) (nk : Int) (byte_at : LLVMSpec) =
-  verify_spec (instance_symbol k "split_key") [byte_at]
+  verify_spec (instance_symbol k "split_key") []
     (do {
        (key, kp) <- fresh_bits "key" k;
        let words = {{ split (split (bits_of key)) : [nk][4][8] }};

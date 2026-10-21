@@ -370,15 +370,7 @@ is
 
    procedure Lemma_Foldl_InvRound_Eq (A, B : Block; Xs, Ys : Round_Keys) is
    begin
-      if Xs'Length > 0 then
-         Lemmas.Lemma_InvRound_Eq (A, B, Xs (Xs'First));
-         Lemma_InvRound_Key_Eq (B, Xs (Xs'First), Ys (Ys'First));
-         pragma Assert
-           (Xs (Xs'First + 1 .. Xs'Last) = Ys (Ys'First + 1 .. Ys'Last));
-         Lemma_Foldl_InvRound_Eq
-           (InvRound (A, Xs (Xs'First)), InvRound (B, Ys (Ys'First)),
-            Xs (Xs'First + 1 .. Xs'Last), Ys (Ys'First + 1 .. Ys'Last));
-      end if;
+      Lemmas.Lemma_Foldl_InvRound_Take_Eq (A, B, Xs, Ys, Xs'Length);
    end Lemma_Foldl_InvRound_Eq;
 
    -----------------------------------
@@ -388,32 +380,43 @@ is
    procedure Lemma_Foldl_InvRound_Prime_Eq
      (A, B : Block; Xs, Ys : Round_Keys) is
    begin
-      if Xs'Length > 0 then
-         Lemmas.Lemma_InvRound_Prime_Eq (A, B, Xs (Xs'First));
-         Lemma_InvRound_Prime_Key_Eq (B, Xs (Xs'First), Ys (Ys'First));
-         pragma Assert
-           (Xs (Xs'First + 1 .. Xs'Last) = Ys (Ys'First + 1 .. Ys'Last));
-         Lemma_Foldl_InvRound_Prime_Eq
-           (InvRound_Prime (A, Xs (Xs'First)),
-            InvRound_Prime (B, Ys (Ys'First)),
-            Xs (Xs'First + 1 .. Xs'Last), Ys (Ys'First + 1 .. Ys'Last));
-      end if;
+      Lemmas.Lemma_Foldl_InvRound_Prime_Take_Eq (A, B, Xs, Ys, Xs'Length);
    end Lemma_Foldl_InvRound_Prime_Eq;
 
    -----------------------------
    -- Lemma_Foldl_Equivalence --
    -----------------------------
 
+   procedure Lemma_Equivalence_Take (Z : Block; Xs : Round_Keys; N : Natural)
+   with
+     Pre                => N <= Xs'Length,
+     Post               =>
+       InvRound_Prime_Folds.Foldl_Take (InvSubBytes (InvShiftRows (Z)), Xs, N)
+       = InvSubBytes (InvShiftRows (InvRound_Folds.Foldl_Take (Z, Xs, N))),
+     Subprogram_Variant => (Decreases => N);
+   --  Lemma_Foldl_Equivalence for the first N steps of each fold, by
+   --  induction from the last step, as the prelude's foldl recurses.
+   --  @param Z The initial state of foldl InvRound.
+   --  @param Xs The round keys.
+   --  @param N The number of steps.
+
+   procedure Lemma_Equivalence_Take (Z : Block; Xs : Round_Keys; N : Natural)
+   is
+   begin
+      if N > 0 then
+         Lemma_Equivalence_Take (Z, Xs, N - 1);
+         Lemmas.Lemma_InvRound_Prime_Eq
+           (InvRound_Prime_Folds.Foldl_Take
+              (InvSubBytes (InvShiftRows (Z)), Xs, N - 1),
+            InvSubBytes (InvShiftRows
+              (InvRound_Folds.Foldl_Take (Z, Xs, N - 1))),
+            Xs (Xs'First + (N - 1)));
+      end if;
+   end Lemma_Equivalence_Take;
+
    procedure Lemma_Foldl_Equivalence (Z : Block; Xs : Round_Keys) is
    begin
-      if Xs'Length > 0 then
-         Lemma_Foldl_Equivalence
-           (InvRound (Z, Xs (Xs'First)), Xs (Xs'First + 1 .. Xs'Last));
-         Lemma_Foldl_InvRound_Prime_Eq
-           (InvRound_Prime (InvSubBytes (InvShiftRows (Z)), Xs (Xs'First)),
-            InvSubBytes (InvShiftRows (InvRound (Z, Xs (Xs'First)))),
-            Xs (Xs'First + 1 .. Xs'Last), Xs (Xs'First + 1 .. Xs'Last));
-      end if;
+      Lemma_Equivalence_Take (Z, Xs, Xs'Length);
    end Lemma_Foldl_Equivalence;
 
    --------------------------
@@ -433,29 +436,62 @@ is
    -- Lemma_Foldl_Inverts --
    -------------------------
 
-   procedure Lemma_Foldl_Inverts (Z : Block; Xs : Round_Keys) is
+   procedure Lemma_Inverts_Take (Z : Block; Xs : Round_Keys; N : Natural)
+   with
+     Pre                => N <= Xs'Length,
+     Post               =>
+       InvRound_Prime_Folds.Foldl_Take
+         (Foldl_Round (Z, Xs), Reverse_Keys (Xs), N)
+       = Round_Folds.Foldl_Take (Z, Xs, Xs'Length - N),
+     Subprogram_Variant => (Decreases => N);
+   --  The first N steps of foldl InvRound' over the reversed round keys
+   --  undo the last N rounds of foldl Round, by induction from the last
+   --  step, as the prelude's foldl recurses.
+   --  @param Z The initial state of foldl Round.
+   --  @param Xs The round keys.
+   --  @param N The number of steps undone.
+
+   procedure Lemma_Inverts_Take (Z : Block; Xs : Round_Keys; N : Natural) is
    begin
-      if Xs'Length > 0 then
+      if N > 0 then
+         Lemma_Inverts_Take (Z, Xs, N - 1);
          declare
-            Init : constant Round_Keys := Xs (Xs'First .. Xs'Last - 1);
-            X    : constant Block := Xs (Xs'Last);
-            F    : constant Block := Foldl_Round (Z, Init);
-            Rev  : constant Round_Keys := Reverse_Keys (Xs);
+            X : constant Block := Xs (Xs'Last - (N - 1));
+            F : constant Block :=
+              Round_Folds.Foldl_Take (Z, Xs, Xs'Length - N);
          begin
-            Lemma_Foldl_Inverts (Z, Init);
-            Lemmas.Lemma_Foldl_Round_Snoc (Z, Xs);
-            pragma Assert (Foldl_Round (Z, Xs) = Round (F, X));
-            pragma Assert (Rev (Rev'First) = X);
-            RoundInverts (F, X);
-            Lemmas.Lemma_InvRound_Prime_Eq
-              (Foldl_Round (Z, Xs), Round (F, X), X);
             pragma Assert
-              (Rev (Rev'First + 1 .. Rev'Last) = Reverse_Keys (Init));
-            Lemma_Foldl_InvRound_Prime_Eq
-              (InvRound_Prime (Foldl_Round (Z, Xs), X), F,
-               Rev (Rev'First + 1 .. Rev'Last), Reverse_Keys (Init));
+              (Reverse_Keys (Xs) (Xs'First + (N - 1)) = X);
+            pragma Assert
+              (Round_Folds.Foldl_Take (Z, Xs, Xs'Length - (N - 1))
+               = Round (F, X));
+            Lemma_InvRound_Prime_Key_Eq
+              (InvRound_Prime_Folds.Foldl_Take
+                 (Foldl_Round (Z, Xs), Reverse_Keys (Xs), N - 1),
+               Reverse_Keys (Xs) (Xs'First + (N - 1)), X);
+            pragma Assert
+              (InvRound_Prime_Folds.Foldl_Take
+                 (Foldl_Round (Z, Xs), Reverse_Keys (Xs), N)
+               = InvRound_Prime
+                   (InvRound_Prime_Folds.Foldl_Take
+                      (Foldl_Round (Z, Xs), Reverse_Keys (Xs), N - 1),
+                    X));
+            Lemmas.Lemma_InvRound_Prime_Eq
+              (InvRound_Prime_Folds.Foldl_Take
+                 (Foldl_Round (Z, Xs), Reverse_Keys (Xs), N - 1),
+               Round (F, X), X);
+            RoundInverts (F, X);
+            pragma Assert
+              (InvRound_Prime_Folds.Foldl_Take
+                 (Foldl_Round (Z, Xs), Reverse_Keys (Xs), N)
+               = InvRound_Prime (Round (F, X), X));
          end;
       end if;
+   end Lemma_Inverts_Take;
+
+   procedure Lemma_Foldl_Inverts (Z : Block; Xs : Round_Keys) is
+   begin
+      Lemma_Inverts_Take (Z, Xs, Xs'Length);
    end Lemma_Foldl_Inverts;
 
    -------------------------
