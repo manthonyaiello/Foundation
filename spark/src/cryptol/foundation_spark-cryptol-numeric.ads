@@ -15,9 +15,12 @@ package Foundation_Spark.Cryptol.Numeric with
   Pure
 is
 
+   pragma Compile_Time_Error
+     (Num'First < 0, "Cryptol's numeric types are naturals");
+
    function Ceil_Div (A, B : Num) return Num is
      ((A + (B - 1)) / B)
-   with Pre => A >= 0 and then B > 0 and then A <= Num'Last - B;
+   with Pre => B > 0 and then A <= Num'Last - B;
    --  Cryptol's `a /^ b`: the least n with n * b >= a.
    --  @param A The dividend, a natural.
    --  @param B The divisor, positive.
@@ -25,7 +28,7 @@ is
 
    function Ceil_Mod (A, B : Num) return Num is
      (Ceil_Div (A, B) * B - A)
-   with Pre => A >= 0 and then B > 0 and then A <= Num'Last - B;
+   with Pre => B > 0 and then A <= Num'Last - B;
    --  Cryptol's `a %^ b`: `b * (a /^ b) - a`, the distance from A up to
    --  the next multiple of B.
    --  @param A The dividend, a natural.

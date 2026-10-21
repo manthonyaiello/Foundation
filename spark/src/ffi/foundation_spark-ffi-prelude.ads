@@ -4,11 +4,13 @@
 --  spark/cryptol/SPARK/Prelude.cry.
 --
 --  Where a spec layer instantiates a generic, the shim calls that instance:
---  SHA2.Sequences_Of_Bits and SHA2.Lengths, the SHA-256 instance's
---  Word_Sequences, and HMAC's Byte_Words and Byte_Sequences. The rest are
---  instantiated here at the types AES uses the built-in at: foldl over
---  bytes, @@ on a block and on a byte table, pmult at [8] x [8] and
---  [9] x [9], pmod at [15] mod [9], pdiv at [8] / [8] and [9] / [9].
+--  SHA2.Sequences_Of_Bits, the SHA-256 instance's Word_Sequences, and
+--  HMAC's Byte_Sequences. The rest are instantiated here: Join_Split at
+--  [8] and Numeric at SHA-2's lengths (the statements HMAC's Byte_Bit and
+--  Join and SHA-2's Ceil_Div and Ceil_Mod keep inline, #75), and, at the
+--  types AES uses the built-in at, foldl over bytes, @@ on a block and on
+--  a byte table, pmult at [8] x [8] and [9] x [9], pmod at [15] mod [9],
+--  pdiv at [8] / [8] and [9] / [9].
 --
 --  A fold takes a function, which C cannot pass, so the folds here fold
 --  fixed ones, Step and Step_E, which Prelude.cry states again in Cryptol.
@@ -26,6 +28,7 @@ with Foundation_Spark.Cryptol.Bulk_Indexing;
 with Foundation_Spark.Cryptol.Enumeration_Folds;
 with Foundation_Spark.Cryptol.Folds;
 with Foundation_Spark.Cryptol.Join_Split;
+with Foundation_Spark.Cryptol.Numeric;
 with Foundation_Spark.Cryptol.Polynomial_Products;
 with Foundation_Spark.Cryptol.Polynomial_Quotients;
 with Foundation_Spark.Cryptol.Polynomial_Remainders;
@@ -62,7 +65,10 @@ is
    subtype Word_64 is Interfaces.Unsigned_64;
    --  A Cryptol [k] with 32 < k <= 64 in C: uint64_t.
 
-   type Byte_Array is array (Natural range <>) of Byte;
+   subtype Fold_Index is Natural range 0 .. 15;
+   --  The indices of the [n][8] folded, n <= 16.
+
+   type Byte_Array is array (Fold_Index range <>) of Byte;
    --  A sequence of bytes, Cryptol's [n][8], for the fold over a sequence.
 
    subtype Fold_Buffer is Byte_Array (0 .. 15);
@@ -77,7 +83,7 @@ is
    --  @return 3 * Z + X, modulo 256.
 
    package Byte_Folds is new Cryptol.Folds
-     (Acc => Byte, Index => Natural, Element => Byte, Seq => Byte_Array,
+     (Acc => Byte, Index => Fold_Index, Element => Byte, Seq => Byte_Array,
       F   => Step);
    --  The prelude's foldl over bytes, folding Step.
 
@@ -116,6 +122,21 @@ is
       Bits        => SHA2.Bits);
    --  The prelude's @ and Value at [64]: the shims pass a [64] to and from
    --  bits with it.
+
+   package Byte_Words is new Cryptol.Join_Split
+     (Word        => Byte,
+      Width       => 8,
+      Shift_Right => Interfaces.Shift_Right,
+      Word_Index  => HMAC.Byte_Index,
+      Words       => HMAC.Bytes,
+      Bit_Index   => SHA2.Bit_Index,
+      Bits        => SHA2.Bits);
+   --  The prelude's @, join and split between HMAC's bytes [8] and SHA-2's
+   --  bits: what HMAC.Byte_Bit and HMAC.Join state inline.
+
+   package Lengths is new Cryptol.Numeric (SHA2.Bit_Index);
+   --  The prelude's /^ and %^ on SHA-2's lengths: what SHA2.Ceil_Div and
+   --  SHA2.Ceil_Mod state inline.
 
    subtype Nibble is Byte range 0 .. 15;
    --  An index into a block, Cryptol's [4], held in a uint8_t.
@@ -224,8 +245,8 @@ is
      Pre           => J < 8,
      Post          =>
        Bit_8'Result
-       = Bit_Byte (HMAC.Byte_Words.Word_Bits.Bit (X, Natural (J)));
-   --  Cryptol's x @ j at [8], by HMAC's instance of the prelude's Words.
+       = Bit_Byte (Byte_Words.Word_Bits.Bit (X, Natural (J)));
+   --  Cryptol's x @ j at [8], by the prelude's Words (in Byte_Words).
    --  @param X The byte.
    --  @param J The bit's index, a [3].
    --  @return The bit, as 1 or 0.
@@ -236,8 +257,8 @@ is
      Convention    => C,
      External_Name => "spark_head_8",
      Post          =>
-       Head_8'Result = Bit_Byte (HMAC.Byte_Words.Word_Bits.Head (X));
-   --  Cryptol's head x at [8], by HMAC's instance of the prelude's Words.
+       Head_8'Result = Bit_Byte (Byte_Words.Word_Bits.Head (X));
+   --  Cryptol's head x at [8], by the prelude's Words (in Byte_Words).
    --  @param X The byte.
    --  @return Its most significant bit, as 1 or 0.
 
@@ -278,11 +299,11 @@ is
      Convention    => C,
      External_Name => "spark_join_bytes",
      Post          =>
-       HMAC.Byte_Words.Join (Xs)'Length = 32
+       Byte_Words.Join (Xs)'Length = 32
        and then Join_Bytes'Result
                 = SHA2.SHA256.Word_Sequences.Value
-                    (HMAC.Byte_Words.Join (Xs), 0, 32);
-   --  Cryptol's join at [4][8] -> [32], by HMAC's instance of the prelude's
+                    (Byte_Words.Join (Xs), 0, 32);
+   --  Cryptol's join at [4][8] -> [32], by Byte_Words, the prelude's
    --  Join_Split, read back as a [32] by the SHA-256 instance's Value.
    --  @param Xs The four bytes.
    --  @return Their 32 bits as a word.
@@ -319,10 +340,10 @@ is
        and then
          (for all K in HMAC.Byte_Index range 0 .. 7 =>
             Output (K)
-            = HMAC.Byte_Words.Split_At
+            = Byte_Words.Split_At
                 (SHA2.SHA256.Word_Sequences.Join (Ws), SHA2.Bit_Index (K)));
    --  Cryptol's join at [2][32] -> [64], by the SHA-256 instance of the
-   --  prelude's Join_Split, split back into bytes by HMAC's instance.
+   --  prelude's Join_Split, split back into bytes by Byte_Words.
    --  @param Ws The two words.
    --  @param Output Their 64 bits as eight bytes, written through Cryptol's
    --  output pointer.
@@ -411,13 +432,13 @@ is
      External_Name => "spark_ceil_div",
      Pre           => N >= 1 and then M < 2 ** 62 and then N < 2 ** 62,
      Post          =>
-       SHA2.Lengths.Ceil_Div (SHA2.Bit_Index (M), SHA2.Bit_Index (N))
+       Lengths.Ceil_Div (SHA2.Bit_Index (M), SHA2.Bit_Index (N))
        < 2 ** 64
        and then Ceil_Div'Result
                 = Word_64
-                    (SHA2.Lengths.Ceil_Div
+                    (Lengths.Ceil_Div
                        (SHA2.Bit_Index (M), SHA2.Bit_Index (N)));
-   --  Cryptol's m /^ n, by SHA-2's instance of the prelude's Numeric.
+   --  Cryptol's m /^ n, by the prelude's Numeric (Lengths).
    --  @param M Cryptol's {m}.
    --  @param N Cryptol's {n}, at least 1.
    --  @return M /^ N.
@@ -429,13 +450,13 @@ is
      External_Name => "spark_ceil_mod",
      Pre           => N >= 1 and then M < 2 ** 62 and then N < 2 ** 62,
      Post          =>
-       SHA2.Lengths.Ceil_Mod (SHA2.Bit_Index (M), SHA2.Bit_Index (N))
+       Lengths.Ceil_Mod (SHA2.Bit_Index (M), SHA2.Bit_Index (N))
        in 0 .. 2 ** 64 - 1
        and then Ceil_Mod'Result
                 = Word_64
-                    (SHA2.Lengths.Ceil_Mod
+                    (Lengths.Ceil_Mod
                        (SHA2.Bit_Index (M), SHA2.Bit_Index (N)));
-   --  Cryptol's m %^ n, by SHA-2's instance of the prelude's Numeric.
+   --  Cryptol's m %^ n, by the prelude's Numeric (Lengths).
    --  @param M Cryptol's {m}.
    --  @param N Cryptol's {n}, at least 1.
    --  @return M %^ N.

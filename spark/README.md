@@ -580,8 +580,16 @@ know:
   the same way, bit of weight `2 ** i` the coefficient of `x ^^ i`.
 
 **Who uses it.** SHA-2 (`foldl` twice, `@`, `join`, `split`, `zero`, the
-literal of `pad`, `/^` and `%^`) and HMAC (`@`, `join`, `repeat`, `zero`)
-since #75. AES (`foldl`, `split`/`join`, `@@`, `reverse`, `@`, `pmult`,
+literal of `pad`) and HMAC (`repeat`, `zero`) since #75. Three
+statements stay inline, the same as the prelude's, because routing them
+through an instance cost an implementation lemma its proof (each fails at
+the committed level with the instance and proves without it; the
+mechanism was not isolated): SHA-2's `Ceil_Div` and `Ceil_Mod` (`/^`,
+`%^`; `SHA256_Bytes.Lemma_Pad_Bytes_Bits`, level 2) and HMAC's
+`Byte_Bit` and `Join` (`@` and `join` on bytes;
+`HMAC.SHA256_Impl.Lemma_Update`, levels 2 and 3). The FFI shim
+instantiates the prelude at exactly those types, so the statements are
+checked against Cryptol all the same. AES (`foldl`, `split`/`join`, `@@`, `reverse`, `@`, `pmult`,
 `pmod`, `pdiv`) is migrated after its key-size rewrite (#80); its types
 are checked here already (`Bulk_Indexing` on a block and on a byte table,
 `pmult` at `[8] x [8]`, `pmod` at `[15]` mod `[9]`).

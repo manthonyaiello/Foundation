@@ -10,10 +10,10 @@
  *
  * Generics are checked through instances. Where a spec layer instantiates
  * a generic, the property calls that instance (SHA-2's Sequences_Of_Bits,
- * Lengths, the SHA-256 Word_Sequences, HMAC's Byte_Words and
- * Byte_Sequences); elsewhere the shim instantiates it at the types AES
- * uses the built-in at (pmult at [8] x [8], pmod at [15] mod [9], @@ on a
- * block). A fold takes a function, which C cannot pass, so the shim folds a
+ * the SHA-256 Word_Sequences, HMAC's Byte_Sequences); elsewhere the shim
+ * instantiates it: Join_Split at [8] and Numeric at SHA-2's lengths (what
+ * HMAC and SHA-2 state inline), and the rest at the types AES uses the
+ * built-in at (pmult at [8] x [8], pmod at [15] mod [9], @@ on a block). A fold takes a function, which C cannot pass, so the shim folds a
  * fixed one, f z x = 3 * z + x on bytes (with e * x for the closure), whose
  * result depends on the order of the elements, and the property folds the
  * same one in Cryptol.
@@ -46,8 +46,8 @@ foreign spark_foldl_enumeration :
   {from, to} (fin from, fin to, to <= 256) => [8] -> [8] -> [8]
 
 /**
- * Foundation_Spark.FFI.Prelude.Bit_8: the prelude's Words.Bit at [8] (the
- * instance HMAC's Byte_Words reads bytes with): x @ j, as 0 or 1.
+ * Foundation_Spark.FFI.Prelude.Bit_8: the prelude's Words.Bit at [8], as
+ * HMAC.Byte_Bit states it inline: x @ j, as 0 or 1.
  */
 foreign spark_bit_8 : [8] -> [3] -> [8]
 
@@ -67,7 +67,7 @@ foreign spark_bit_32 : [32] -> [5] -> [8]
 foreign spark_bit_15 : [15] -> [4] -> [8]
 
 /**
- * Foundation_Spark.FFI.Prelude.Join_Bytes: HMAC's Byte_Words.Join of four
+ * Foundation_Spark.FFI.Prelude.Join_Bytes: the shim's Byte_Words.Join of four
  * bytes, read back as a [32] by the SHA-256 Word_Sequences.Value.
  */
 foreign spark_join_bytes : [4][8] -> [32]
@@ -81,7 +81,7 @@ foreign spark_split_word : [64] -> [2][32]
 
 /**
  * Foundation_Spark.FFI.Prelude.Join_Words: the SHA-256 Word_Sequences.Join
- * of two words, read back as bytes by HMAC's Byte_Words.Split_At.
+ * of two words, read back as bytes by the shim's Byte_Words.Split_At.
  */
 foreign spark_join_words : [2][32] -> [8][8]
 
@@ -122,7 +122,7 @@ foreign spark_bulk_index_block : [16][8] -> [16][4] -> [16][8]
 foreign spark_bulk_index_table : [256][8] -> [16][8] -> [16][8]
 
 /**
- * Foundation_Spark.FFI.Prelude.Ceil_Div and Ceil_Mod: SHA-2's Lengths at
+ * Foundation_Spark.FFI.Prelude.Ceil_Div and Ceil_Mod: the shim's Lengths at
  * the values of the type parameters m and n.
  */
 foreign spark_ceil_div : {m, n} (fin m, fin n, n >= 1) => () -> [64]
