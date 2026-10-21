@@ -1203,7 +1203,7 @@ layer, which the FFI check tests against the same Cryptol.
 
 | Ada (`AES.Impl`) | Cryptol | k | overrides | tactic |
 |---|---|---|---|---|
-| `Expand_Key` | `KeyExpansion.cry`: ``KeyExpansion`{k}`` | 128, 192, 256 | `Nk`, `Nr`, `Sub_Byte` | z3, `SBox` uninterpreted |
+| `Expand_Key` | `KeyExpansion.cry`: ``KeyExpansion`{k}`` | 128, 192, 256 | `Nk`, `Nr`, `Sub_Word` | z3, `SubWord`, `SBox` uninterpreted |
 | `Encrypt_Block` | `Cipher.cry`: ``Cipher`{k}`` | 128, 192, 256 | `Nr`, `Round`, `Sub_Bytes`, `Shift_Rows`, `Add_Round_Key` | z3, `Round`, `SubBytes`, `ShiftRows`, `AddRoundKey` uninterpreted |
 | `Decrypt_Block` | `Cipher.cry`: ``InvCipher`{k}`` | 128, 192, 256 | `Nr`, `Inv_Round`, `Inv_Sub_Bytes`, `Inv_Shift_Rows`, `Add_Round_Key` | z3, `InvRound`, `InvSubBytes`, `InvShiftRows`, `AddRoundKey` uninterpreted |
 
@@ -1215,8 +1215,10 @@ proved first and then passed as an override to its callers:
 | `AES.Spec.Types.Nk`, `.Nr` | `Types.cry`: `Nk k = k / 32`, `Nr k = Nk k + 6`, for `k` in 128, 192, 256 | | z3 (rme does not finish on the 32-bit division) |
 | `AES.Spec.Types.Split`, `.Join` | Cryptol's `split : Block -> [4]AESWord`, `join` | | rme |
 | `X_Times` | `GF28.cry`: `xTimes` | | rme |
-| `Sub_Byte`, `Inv_Sub_Byte` | `SBox.cry`: `\b -> SBox @ b`, `\b -> InvSBox @ b` | | rme |
-| `Sub_Bytes`, `Inv_Sub_Bytes` | `Cipher.cry`: `SubBytes`, `InvSubBytes` | `Sub_Byte`, `Inv_Sub_Byte` | rme |
+| `SBox_Lanes`, `Inv_SBox_Lanes` (body-local, the bitsliced S-box of #50, `Unsigned_64` as `i64`) | `SBox.cry`: `\x -> join [SBox @ b \| b <- split x]` on `[64]`, and the same with `InvSBox` | | rme |
+| `Sub_Byte`, `Inv_Sub_Byte` | `SBox.cry`: `\b -> SBox @ b`, `\b -> InvSBox @ b` | `SBox_Lanes`, `Inv_SBox_Lanes` | rme |
+| `Sub_Bytes`, `Inv_Sub_Bytes` | `Cipher.cry`: `SubBytes`, `InvSubBytes` | `SBox_Lanes`, `Inv_SBox_Lanes` | rme |
+| `Sub_Word` | `KeyExpansion.cry`: `SubWord` | `SBox_Lanes` | rme |
 | `Shift_Rows`, `Inv_Shift_Rows` | `Cipher.cry`: `ShiftRows`, `InvShiftRows` | | rme |
 | `Add_Round_Key` | `Cipher.cry`: `AddRoundKey` | | rme |
 | `Mix_Column` | `Cipher.cry`: `MixColumnsStep` | `X_Times` | rme |
@@ -1228,9 +1230,11 @@ proved first and then passed as an override to its callers:
 
 Not proved by SAW: `Dot` (no cipher calls it), and `Decrypt_Block_Prime`
 with `Inv_Round_Prime` (``InvCipher'``, which the issue does not ask for).
-`Sub_Word`, `Rot_Word`, `Xor_Word` and `Rcon` are expression functions
-that llvm-gcc inlines into `Expand_Key` even at `-O0`, so they are proved
-as part of it. Why, and what proves them instead: "What SAW proves on its
+`Rot_Word`, `Xor_Word` and `Rcon` are expression functions that
+llvm-gcc marks `alwaysinline` and inlines into `Expand_Key` even at
+`-O0`, so they are proved as part of it. (`Sub_Word` was one too until
+#50 made it a function of its own; since then it has its own proof and
+is `Expand_Key`'s override.) Why, and what proves them instead: "What SAW proves on its
 own, in place, or not at all", below.
 
 ### SHA-256 and HMAC-SHA-256
@@ -1606,7 +1610,7 @@ by gnatprove for all inputs and FFI-checked:
 | `SHA256_Stream.Init`, `Update`, `Final`, `Load_Block`, `To_Digest` | every `SHA256_Stream.Hash` result (`Hash` is `Init`, one `Update`, `Final`; `Compress` is the only override) | 12 message lengths: 0, 1, 55, 56, 63, 64, 65, 100, 119, 120, 128, 200 bytes (every run) | `Update` and `Final` would need a contract over the streaming context (buffer, count, chaining state) and its invariant, and SAW would still prove them only at fixed fill levels and data lengths; `Load_Block` and `To_Digest` take arrays and offsets that differ from call to call, so one contract would not serve as their override |
 | the same, and `Init_Key`, `Xor_Pad`, and HMAC's incremental `Init`, `Update`, `Final` | every `HMAC_SHA256` result (`HMAC_SHA256` is `Init`, one `Update`, `Final`; `Compress` is the override, and at keys of 65 and 100 bytes so is `SHA256_Stream.Hash` at that length, for `Init_Key`'s call) | 7 (key, text) pairs: (0, 0), (32, 3), (32, 32), (64, 3), (64, 32), (65, 3), (100, 32) bytes (every run) | the incremental interface is the same function as the one-shot `HMAC_SHA256`, which SAW proves; on its own it needs a contract over two streaming contexts, as above |
 | `SHA256_Stream.Hash_Chunked` | none | | its claim is the digest for every way of splitting the message into chunks; SAW can only check particular splits |
-| `AES.Impl.Sub_Word`, `Rot_Word`, `Xor_Word`, `Rcon` | `Expand_Key`'s results (llvm-gcc inlines them, even at `-O0`) | k = 128, 192, 256 | no symbol of their own in the bitcode |
+| `AES.Impl.Rot_Word`, `Xor_Word`, `Rcon` | `Expand_Key`'s results (llvm-gcc inlines them, even at `-O0`) | k = 128, 192, 256 | `alwaysinline` expression functions: `Expand_Key` makes no call to them, so no proof of them could be its override (`Sub_Word`, a function since #50, is proved on its own) |
 | `AES.Impl.Main.Encrypt`, `Decrypt` | none | | a byte-level composition of `Expand_Key` with `Encrypt_Block` or `Decrypt_Block`, each SAW-proved at k = 128, 192, 256; #23 did not ask for them. The FFI checks them against `Main.cry`'s `Encrypt` and `Decrypt` |
 
 **Spec-layer subprograms that SAW executes, not proves on their own**
@@ -1666,7 +1670,14 @@ the same module, and `check-saw.sh` refuses to run if a script under
 $ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install LLVM_LINK_DIR=.../llvm-21.1.8 scripts/check-saw.sh
 $ scripts/check-saw.sh --print      # run, print the record, write nothing
 $ SAW_LONG=1 scripts/check-saw.sh   # also the long proofs; writes saw/results-long.txt
+$ SAW_LAYERS=impl scripts/check-saw.sh --print   # one layer only (impl or spec)
 ```
+
+`SAW_LAYERS=impl` compiles and proves the implementation modules alone,
+with the negative controls not named `spec_*`; `SAW_LAYERS=spec` the spec
+layer alone, with the `spec_*` controls. A one-layer run is never a
+record: the script requires `--print` with it, and prints its
+`layers` line.
 
 **What the default run proves, and `SAW_LONG`.** The default run (about
 an hour on the x86_64 IOD) proves everything above but `Hash` at 120, 128
@@ -1874,8 +1885,10 @@ What `llvm-gcc -O0` makes of `AES.Impl`, which M4.2 (#23) builds on:
   bounds `{0, Nk - 1}` and `W`'s `Nr + 1` blocks writable with bounds
   `{0, Nr}` (the precondition), and states the result with
   `llvm_points_to` on `W`'s data. After `llvm-link` the two units' fat
-  pointer and bounds types are merged into one (`..._key_words_FP`,
-  `..._round_keys_BOUNDS`).
+  pointer and bounds types are merged into one each, named after the
+  first the linker met: the bounds `..._spec__types__round_keys_BOUNDS`,
+  which the contracts name, and (since #50 added `AES.Impl`'s `Planes`)
+  the fat pointer `..._aes__impl__TplanesB_FP`, which they do not.
 - **Layout against the Cryptol.** Element `i` of an Ada array is element
   `i` of the Cryptol sequence, and a `Byte` is the `[8]` whose head is its
   most significant bit, so no reordering is needed anywhere:
@@ -1899,10 +1912,11 @@ What `llvm-gcc -O0` makes of `AES.Impl`, which M4.2 (#23) builds on:
   M4.1 left the choice between linking and `llvm_unsafe_assume_spec`;
   M4.2 links (`llvm-link`, above), so `Nk`, `Nr`, `Split` and `Join` are
   proved in the linked module and are overrides like any other.
-- **Expression functions of `AES.Impl` itself** (`Sub_Word`, `Rot_Word`,
-  `Xor_Word`, `Rcon`) are inlined into their callers by llvm-gcc even at
-  `-O0` (the inlined blocks are named `..._xor_word.exit` and so on).
-  `Expand_Key` calls none of them: it calls `Sub_Byte`, `Nk` and `Nr`.
+- **Expression functions of `AES.Impl` itself** (`Rot_Word`, `Xor_Word`,
+  `Rcon`) are `alwaysinline` and inlined into their callers by llvm-gcc
+  even at `-O0` (the inlined blocks are named `..._xor_word.exit` and so
+  on). `Expand_Key` calls none of them: it calls `Sub_Word` (a function
+  since #50, which calls `SBox_Lanes`), `Nk` and `Nr`.
 
 What `llvm-gcc -O0` makes of the SHA-256 and HMAC units (M4.3, #24):
 
@@ -1977,9 +1991,9 @@ adds:
   `range 0 .. 256` (`Object_Size` 16). Unconstrained, they are fat
   pointers `{ ptr, ptr }` whose bounds record is two of the index type
   (`..._bits_BOUNDS`): SHA-2's `{ i128, i128 }`, AES's `{ i16, i16 }`, so
-  AES's `Byte_At (Bs, From)` is `i8 ({ ptr, ptr } %bs, i16 %from)` (the
-  AES widths are unverified until the next GNAT-LLVM session: they are
-  `Bit_Index`'s `Object_Size`, not read from the IR). The contracts take
+  AES's `Byte_At (Bs, From)` is `i8 ({ ptr, ptr } %bs, i16 %from)` (read
+  from GNAT-LLVM 27's IR, 2026-10-21: `%..._main__bits_BOUNDS = type
+  { i16, i16 }`). The contracts take
   n bytes under the precondition that each is 0 or 1 (an Ada Boolean's
   validity) and read them as Cryptol bits (`[ b == 1 | b <- bs ]`).
   `Block_Bits` (`Bits (0 .. 127)`, constrained) is passed by reference and
@@ -1994,7 +2008,15 @@ adds:
   `trunc` to `i64` (`gep64`, with `opt` and `llvm-extract`). #68 narrowed
   AES's `Bit_Index` instead, which removes the index, the rewrite and the
   two tools; `check-saw.sh` still refuses a linked spec module with an
-  `i128` GEP index, by name, before SAW would.
+  `i128` GEP index, by name, before SAW would (it disassembles with
+  `llvm-link -S`; on a 128-bit-indexed constrained array its pattern
+  finds the two `getelementptr ..., i128 %n`). Read from GNAT-LLVM 27's
+  IR on 2026-10-21, the linked AES spec module has no `i128` GEP index:
+  163 are `i64` (every index through a fat pointer, sign-extended), 374
+  `i32` (record fields), and 5 `i16` (a byte, zero-extended, indexing a
+  256-entry S-box table). Since #85, `Join_Block` indexes nothing itself:
+  it calls the prelude's `Byte_Bits.Join`, which returns on the secondary
+  stack, and copies the 128 bits out (`memcpy`).
 - **Unconstrained results** are on the secondary stack: `SS_Allocate`'s
   block holds the bounds record, then the data (`Reverse_Keys`'
   `Round_Keys`: `{ i32, i32 }` at 0, the blocks at 8; a `SHA2.Bits`:
