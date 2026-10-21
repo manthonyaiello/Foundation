@@ -3,7 +3,7 @@
 # One line per function the campaign promises, which makes this file the
 # board's denominator:
 #
-#     function | spec entity | impl entity
+#     function | spec entity | impl entity [| kind]
 #
 # function     The Cryptol declaration, qualified by its module as the .cry
 #              file names it (AES::GF28::xTimes, SHA2::Main::step). The FFI
@@ -15,7 +15,23 @@
 #              entity of the instance that is proved
 #              (Foundation_Spark.SHA2.SHA256.Step), not the generic's.
 # impl entity  The implementation entity proved equal to the spec, likewise;
-#              `-` until it exists.
+#              `-` until it exists, or for a row that has none by design.
+# kind         How the row is complete (#67; README "Where spec and
+#              implementation are not one-to-one"). Optional: a row without
+#              a fourth field is `impl`.
+#                impl          the default: the spec is FFI-checked, and the
+#                              impl entity is proved equal to it.
+#                impl = spec   the spec function is executable, and is the
+#                              implementation: the impl entity is the spec
+#                              entity.
+#                spec-only E...  no implementation, by design: complete when
+#                              the spec's unit is proved and so is each
+#                              entity E (the proofs that tie the spec to the
+#                              implementation). No FFI property is needed.
+#                subsumed-by F   no implementation, by design: complete when
+#                              the spec is FFI-checked and row F (a function
+#                              of this file) is complete, F's proof being
+#                              the proof of this row's spec.
 #
 # The spec and the implementation of one function live in different units, so
 # a row names both. A tick that adds a spec-layer function adds its row here in
@@ -56,8 +72,14 @@ AES::Cipher::InvRound'        | Foundation_Spark.AES.Spec.Cipher.InvRound_Prime 
 # AES (#12): SBox.cry's affine, which its property SBoxCorrect checks the
 # S-box against, and the GF2.cry inverse it is built on, at SBox.cry's types.
 # Ghost only: the implementation reads the table, so there is no impl entity.
-AES::SBox::affine             | Foundation_Spark.AES.Spec.SBox.Affine               | -
-GF2::inverse (AES)            | Foundation_Spark.AES.Spec.GF2.Inverse               | -
+# spec-only (#67): Sub_Byte's postcondition is the spec's SBox (B), the
+# SBox row above, and SBoxCorrect (affine B = SBox (B) for every byte,
+# proved from SBox_Entries' Lemma_SBox_Entry, the slow unit) ties the table
+# to affine and to the inverse it is built on. No FFI property (Tony,
+# 2026-10-20): the proof chain does not need one, and the table they equal
+# is FFI-checked. SAW proves both at the spec layer for every byte.
+AES::SBox::affine             | Foundation_Spark.AES.Spec.SBox.Affine               | - | spec-only Foundation_Spark.AES.Spec.Properties.SBoxCorrect Foundation_Spark.AES.Spec.SBox.SBox_Entries.Lemma_SBox_Entry
+GF2::inverse (AES)            | Foundation_Spark.AES.Spec.GF2.Inverse               | - | spec-only Foundation_Spark.AES.Spec.Properties.SBoxCorrect Foundation_Spark.AES.Spec.SBox.SBox_Entries.Lemma_SBox_Entry
 
 # AES (#9): KeyExpansion.cry. Rcon is a constant table, so its entity is the
 # KeyExpansion package.
@@ -83,13 +105,14 @@ AES::Main::Decrypt            | Foundation_Spark.AES.Spec.Main.Decrypt          
 # spec functions are not ghost: they are executable, and they are what
 # SHA256_Stream.Compress calls at run time for every round and schedule
 # word. There is no other implementation of them to prove equal, and a
-# wrapper that only called them would add a name, not a proof.
-SHA2::Functions::Ch           | Foundation_Spark.SHA2.SHA256.Logical.Ch             | Foundation_Spark.SHA2.SHA256.Logical.Ch
-SHA2::Functions::Maj          | Foundation_Spark.SHA2.SHA256.Logical.Maj            | Foundation_Spark.SHA2.SHA256.Logical.Maj
-SHA2::Functions::SIGMA_256_0  | Foundation_Spark.SHA2.Functions.SIGMA_256_0         | Foundation_Spark.SHA2.Functions.SIGMA_256_0
-SHA2::Functions::SIGMA_256_1  | Foundation_Spark.SHA2.Functions.SIGMA_256_1         | Foundation_Spark.SHA2.Functions.SIGMA_256_1
-SHA2::Functions::sigma_256_0  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0   | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0
-SHA2::Functions::sigma_256_1  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1   | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1
+# wrapper that only called them would add a name, not a proof. Their kind
+# is impl = spec (#67).
+SHA2::Functions::Ch           | Foundation_Spark.SHA2.SHA256.Logical.Ch             | Foundation_Spark.SHA2.SHA256.Logical.Ch | impl = spec
+SHA2::Functions::Maj          | Foundation_Spark.SHA2.SHA256.Logical.Maj            | Foundation_Spark.SHA2.SHA256.Logical.Maj | impl = spec
+SHA2::Functions::SIGMA_256_0  | Foundation_Spark.SHA2.Functions.SIGMA_256_0         | Foundation_Spark.SHA2.Functions.SIGMA_256_0 | impl = spec
+SHA2::Functions::SIGMA_256_1  | Foundation_Spark.SHA2.Functions.SIGMA_256_1         | Foundation_Spark.SHA2.Functions.SIGMA_256_1 | impl = spec
+SHA2::Functions::sigma_256_0  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0   | Foundation_Spark.SHA2.Functions.Small_Sigma_256_0 | impl = spec
+SHA2::Functions::sigma_256_1  | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1   | Foundation_Spark.SHA2.Functions.Small_Sigma_256_1 | impl = spec
 SHA2::Main::step (SHA-256)    | Foundation_Spark.SHA2.SHA256.Step                   | Foundation_Spark.SHA2.SHA256_Stream.Compress
 
 # SHA-2 (#15): Preprocessing.cry's pad and parse (stated in the generic Main,
@@ -101,8 +124,10 @@ SHA2::Main::step (SHA-256)    | Foundation_Spark.SHA2.SHA256.Step               
 # block with it as it reaches it. pad has no executable counterpart of its
 # own: the stream never builds the padded message, and SHA256_Stream.Final
 # writes only its last one or two blocks (Tail_Pad), whose correctness is
-# part of Lemma_Final and so of Hash's proof.
-SHA2::Preprocessing::pad (SHA-256)   | Foundation_Spark.SHA2.SHA256.Pad     | -
+# part of Lemma_Final and so of Hash's proof: its kind is subsumed-by the
+# hash row (#67), whose impl's postcondition is the spec's Hash, defined
+# through Pad.
+SHA2::Preprocessing::pad (SHA-256)   | Foundation_Spark.SHA2.SHA256.Pad     | - | subsumed-by SHA2::Main::hash (SHA-256)
 SHA2::Preprocessing::parse (SHA-256) | Foundation_Spark.SHA2.SHA256.Parse   | Foundation_Spark.SHA2.SHA256_Stream.Load_Block
 SHA2::Main::hash (SHA-256)    | Foundation_Spark.SHA2.SHA256.Hash                   | Foundation_Spark.SHA2.SHA256_Stream.Hash
 

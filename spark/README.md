@@ -15,7 +15,8 @@ Foundation algorithms, proved against the Cryptol specifications in
   `foreign` and state the properties, and `properties.txt`
 - `saw/` – SAW scripts proving the implementation's bitcode against the
   Cryptol directly (E4), `SHA256Main.cry` (SHA-2's `Main` at SHA-256, for
-  them), and `results.txt`, their record; local only, see "SAW"
+  them), and `results.txt`, their record, which the board reads and
+  reports stale when SAW's inputs have changed; local only, see "SAW"
 
 ## Toolchain
 
@@ -112,21 +113,23 @@ rows file and the FFI log. `scripts/board.py` prints markdown;
 `--json` prints JSON, and `--json-out FILE` writes it beside the markdown. It
 reports and does not gate.
 
-It prints one row per function (spec, FFI-checked, impl proved, SAW, holes,
-complete) and one per tracked unit (level, entities analyzed, checks proved,
-unproved, and the manifest's assumes, justifications, `SPARK_Mode Off`,
-warning and check suppressions and foreign bindings, and whether the unit's
-`.spark` is `fresh`, `stale` or `missing`). A row is complete, as the PLAN
-says, when the spec exists and is FFI-checked and its implementation is proved
-with zero unproved checks, assumptions and justifications. SAW is "not run"
-until E4.
+It prints one row per function (kind, spec, FFI-checked, impl proved, SAW,
+holes, complete) and one per tracked unit (level, entities analyzed, checks
+proved, unproved, and the manifest's assumes, justifications, `SPARK_Mode
+Off`, warning and check suppressions and foreign bindings, and whether the
+unit's `.spark` is `fresh`, `stale` or `missing`). A row is complete, as the
+PLAN says, when the spec exists and is FFI-checked and its implementation is
+proved with zero unproved checks, assumptions and justifications, or, for a
+row with no implementation by design, when what covers it is (its kind,
+below).
 
 **Rows.** A function's spec and implementation live in different units, so
-`scripts/board-rows.txt` maps each row to both:
+`scripts/board-rows.txt` maps each row to both, and optionally gives the
+row's kind:
 
 ```text
-# function | spec entity | impl entity
-AES::GF28::xTimes | Foundation_Spark.AES.Spec.GF28.xTimes | -
+# function | spec entity | impl entity [| kind]
+AES::GF28::xTimes | Foundation_Spark.AES.Spec.GF28.xTimes | Foundation_Spark.AES.Impl.X_Times
 ```
 
 The function is the Cryptol declaration, qualified by module. The entities are
@@ -134,6 +137,43 @@ named as gnatprove names them in the `.spark` files (for a generic, the
 proved instance's entity). The file is the board's denominator: a tick that
 adds a spec-layer function adds its row, and the tick that implements it fills
 in the impl entity.
+
+**Row kinds** (#67). The fourth field says how the row is complete; a row
+without one is `impl`:
+
+| kind | impl entity | complete when |
+|---|---|---|
+| `impl` | the implementation | the spec is FFI-checked, and the impl entity and its unit are proved |
+| `impl = spec` | the spec entity itself | as `impl`: the spec function is executable, and is the implementation |
+| `spec-only E ...` | `-` | the spec's unit is proved, and so is each entity `E` (the proofs that tie the spec to the implementation, a slow unit's by its current recorded proof); an FFI property is not needed, and one that exists must pass |
+| `subsumed-by F` | `-` | the spec is FFI-checked, and row `F` is complete: `F`'s proof is the proof of this row's spec |
+
+The board prints a `spec-only` or `subsumed-by` row that is complete as
+"yes, by design", and counts them in its summary. The next section says
+which rows these are, and why.
+
+**SAW.** The SAW column reads `saw/results.txt`, the record of the last
+default `check-saw.sh` run (local only, GNAT Pro; "SAW", below): per row,
+the results whose subprogram is the row's spec entity (`spec`) and its impl
+entity (`impl`), with how many of them are in the lax-arithmetic module, or
+`-` for none. A result matches an entity when its name's parts are the last
+parts of the entity's qualified name (`sha256_stream.hash` is
+`Foundation_Spark.SHA2.SHA256_Stream.Hash`, `cipher__subbytes` is
+`Foundation_Spark.AES.Spec.Cipher.SubBytes`). Under the table it summarizes
+`results.txt` and `results-long.txt`: the commit and date they were
+recorded at, the results in all, of the implementation and of the spec
+layer, the lax ones of each, and how many rows have a result of their own.
+A row without one is not unproved by SAW: SAW executes it inside a
+result of its caller, or leaves it out, for the reasons in "SAW" below.
+
+A SAW record is **stale** when what SAW read has changed since: a `source`,
+`cryptol` or `spec.adc` file whose sha256 is no longer the one recorded, or
+a SAW script (`saw/`, `scripts/check-saw.sh`, `scripts/toolchain-pins.env`)
+that differs from the recorded commit's (when this checkout has that
+commit). The board then says **STALE**, names the changed inputs, and marks
+every row's SAW cell "(stale)": the results are not this tree's until
+`check-saw.sh` is run again. The board cannot re-run SAW (no GNAT Pro on
+the campaign machine or in CI); it reports the record honestly.
 
 **FFI log.** `scripts/check-ffi.sh` (M0.3) writes `obj/ffi/ffi-results.txt`,
 one line per property, `|`-separated, `#` for comments:
@@ -151,6 +191,58 @@ one property and every one passed all of its tests. The board shows "not
 run" while the file does not exist, and a property's commit when it is not
 the board's. A property that fails is logged with `passed` 0: Cryptol stops
 at the first counterexample and does not say how many tests passed before it.
+
+## Where spec and implementation are not one-to-one
+
+The spec layer mirrors the Cryptol declaration by declaration; the
+implementation is shaped for execution. Mostly there is one implementation
+entity per spec function, proved equal to it. In the places below there is
+not, **by design** (Tony, 2026-10-20; PLAN, "Spec and implementation need not
+be one-to-one"). Each is covered by a proved function, so none is a hole or
+a missing proof. The board shows each by its row kind.
+
+| row | kind | covered by | why this is the design |
+|---|---|---|---|
+| `AES::SBox::affine`, `GF2::inverse (AES)` | `spec-only` | `Impl.Sub_Byte`'s postcondition is `Spec.SBox.SBox (B)`, the table (row `AES::SBox::SBox`, `prop_SBox` `:exhaust` 256). `Spec.Properties.SBoxCorrect` proves `Affine (B) = SBox (B)` for every byte, from the slow unit `Spec.SBox.SBox_Entries` (`Lemma_SBox_Entry`, 2501 checks). `Affine` is built on `Inverse`, so the one proof ties the table to both | The implementation reads the S-box table, as FIPS 197 presents it and as practical AES does; `SBox.cry` defines the table and states `SBoxCorrect` relating it to `affine`, and the spec mirrors both. No FFI property for the two (Tony, 2026-10-20): the proof chain does not need one, and the table they equal is FFI-checked. SAW proves both at the spec layer for every byte |
+| `SHA2::Preprocessing::pad (SHA-256)` | `subsumed-by SHA2::Main::hash (SHA-256)` | `SHA256_Stream.Hash`'s postcondition is the spec's `Hash`, which is defined through `Pad` (as `hash` is through `pad` in `Main.cry`). `Final` writes only the padded message's last one or two blocks (`Tail_Pad`), and `Lemma_Final` proves them those of `Pad (M)` | A streaming hash never builds the padded message: it would cost a copy of the whole message. `Pad` itself is FFI-checked (`prop_pad`, `:check` 100) and SAW-proved at the spec layer at twelve lengths |
+| `SHA2::Functions::Ch`, `Maj`, `SIGMA_256_0/1`, `sigma_256_0/1` | `impl = spec` | the spec functions themselves, proved free of run-time errors and FFI-checked | `Functions.cry`'s functions are on `[32]`, which the spec states on `Unsigned_32` with no change of representation, so the spec functions are executable and are what `Compress` calls at run time. A second implementation, or a wrapper, would add a name, not a proof |
+| `SHA2::Main::hash (SHA-256, bytes)` | `impl` | `SHA256_Stream.Hash`, proved equal to `SHA256_Bytes.Hash_Bytes` and to the spec's `Hash` on the message's bits | `Hash_Bytes` is not a Cryptol declaration: it is SPARK's representation layer, `Hash` on the bits of a byte array, proved equal to it by gnatprove (`Lemma_Hash_Bytes`). It is the row through which the byte-level FFI properties (`prop_Hash_Bytes`, `prop_Stream_*`) reach `hash` |
+
+Three of these are counted complete "by design" on the board (`affine`,
+`inverse`, `pad`); the `impl = spec` and `Hash_Bytes` rows are complete in
+the ordinary way. The parts of the implementation that do have a spec
+counterpart but that SAW does not prove on their own are in "SAW", below:
+"What SAW proves on its own, in place, or not at all".
+
+## The Cryptol's own properties, re-proved
+
+`AES.Spec.Properties` states and proves, of the SPARK spec layer, 13 of the
+15 properties that `algorithms/AES` states about itself
+(`GF28MultiplicationCorrect`, `SBoxCorrect`, `SBoxInverts`, the `*Inverts`
+of `Cipher.cry`, `InvCipherEquivalence`, `EncryptInverts`, and the others
+its header lists). **They are optional, and they are kept for now** (Tony,
+2026-10-20; PLAN, "Re-proved Cryptol properties are optional"; #67):
+
+- **Optional.** SAW proves the spec layer equal to NSA's Cryptol at k =
+  128, 192 and 256, which is all of AES, so the Cryptol's properties
+  already hold of the SPARK spec. In general, re-proving a higher-level
+  spec's properties after moving to SPARK adds proof cost without adding a
+  theorem. `SBoxCorrect` is the extreme case: 1122 s of gnatprove on the
+  campaign machine for the slow unit `SBox_Entries` (1 h 40 min cold in
+  CI) for a closed property that Cryptol evaluates in under a second, about
+  a table that is textually identical in both specs.
+- **Kept for now, because SAW is not in CI.** The transfer rests on a local
+  SAW run (GNAT Pro 27, recorded in `saw/results.txt`), and any change to
+  the spec suspends it until SAW is run again (the board says so:
+  **STALE**). The properties are re-proved on every PR, so until SAW runs in
+  CI they are the continuously checked cross-check that the SPARK spec is
+  right.
+- **Two are not stated:** `SBoxPolynomialIsIrreducible` and
+  `inverseCorrect` (#73 item 3). For the reason above, that is acceptable.
+- **What the transfer assumes.** SAW proves the spec layer's bitcode equal
+  to the Cryptol, while gnatprove reasons about the Ada source. Carrying a
+  property from the Cryptol to the source assumes GNAT-LLVM compiled the
+  ghost spec faithfully.
 
 ## The FFI harness
 
@@ -718,8 +810,10 @@ unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
   of each. A body is included because it can change what gnatprove assumes
   of its unit (generated `Global` contracts, a generic's instance), so the
   closure errs towards staleness. Units outside `src/` (the runtime) are
-  listed in the verbose output but not hashed. The toolchain versions are
-  inputs; `alire.toml` is not;
+  listed in the verbose output but not hashed;
+- `alire.toml`, the crate's manifest: it pins the crate's dependencies and
+  its build switches (`ada_version`), which gnatprove reads too (#67, a
+  follow-up of PR #44);
 - the GPR's proof switches for those files: the `Prove` package's level
   definitions, `Proof_Switches ("Ada")`, and each input file's own
   `Proof_Switches`;
@@ -769,6 +863,17 @@ tree, since the entry records HEAD. In CI, the `SPARK prove slow units`
 workflow (`spark-prove-slow.yml`, `workflow_dispatch`, up to 180 minutes) runs
 `prove-slow.sh --print`: it uploads gnatprove's output and prints the entries
 in its summary. It cannot push, so the entries are committed by hand.
+
+**When the fingerprint gains an input.** Adding an input to what
+`slow_proofs.py` hashes (as `alire.toml` was, #67) makes every entry stale
+although nothing its proof read has changed. `scripts/slow_proofs.py refresh
+FILE` rewrites the entry's inputs and fingerprint and keeps its commit, date,
+level and checks, but only when every difference is a new input that is a
+file whose content is the same as at the entry's recorded commit (`git
+show`). A changed or removed input, a new input that is not a file, or a new
+file that differs from the recorded commit's is refused, and the unit is
+proved again. The gate's STALE message offers `refresh` when every change is
+a new input.
 
 The board shows a row whose spec (or impl) entity is in a slow unit as
 `slow: proved at <sha> (on demand)`, or **STALE** when the fingerprint no
@@ -828,7 +933,8 @@ Not proved by SAW: `Dot` (no cipher calls it), and `Decrypt_Block_Prime`
 with `Inv_Round_Prime` (``InvCipher'``, which the issue does not ask for).
 `Sub_Word`, `Rot_Word`, `Xor_Word` and `Rcon` are expression functions
 that llvm-gcc inlines into `Expand_Key` even at `-O0`, so they are proved
-as part of it.
+as part of it. Why, and what proves them instead: "What SAW proves on its
+own, in place, or not at all", below.
 
 ### SHA-256 and HMAC-SHA-256
 
@@ -904,7 +1010,10 @@ leaves:
 Not proved by SAW: `Load_Block` and `To_Digest` on their own (they are
 executed within `Hash`'s proofs: they take arrays and offsets that differ
 from call to call, so one contract would not serve as their override), `Init`, `Update` and `Final` on their own (likewise, through
-`Hash`), `Hash_Chunked`, and the incremental HMAC interface.
+`Hash`), `Hash_Chunked`, and the incremental HMAC interface on its own
+(executed within `HMAC_SHA256`). Precisely which results execute each,
+and what proves them for every input: "What SAW proves on its own, in
+place, or not at all", below.
 
 ### The spec layer
 
@@ -1055,7 +1164,8 @@ whole 7784 s, peak 7.2 GB (below, "Running it").
   longer. `Pad` is proved at those lengths in every run.
 - `SHA2.SHA256_Bytes` (`Hash_Bytes` and its helpers): not the spec layer,
   but a ghost representation change (bytes for bits) proved equal to it by
-  gnatprove (`Lemma_Hash_Bytes`); not attempted.
+  gnatprove (`Lemma_Hash_Bytes`); not attempted, and not needed (below,
+  "What SAW proves on its own, in place, or not at all").
 - HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and (100, 32) bytes
   only with `SAW_LONG=1`: each call of a hash is at a secondary-stack base
   of its own, and each base costs `Pad`'s `To_Bits` chain again (65
@@ -1123,6 +1233,113 @@ are proved for every byte. Since #59's second PR, `Main`'s
 size), and HMAC's spec properties (`prop_HMAC_*`, `prop_HMAC_init`) at
 the (key, text) lengths proved, which overlap theirs only in part. Not
 backed: `prop_parse` (executed within `Hash` only) and `prop_Hash_Bytes`.
+
+### What SAW proves on its own, in place, or not at all
+
+SAW's results are of particular subprograms at particular sizes. This
+section says, for every subprogram that has no SAW result of its own, which
+results execute its code (rather than replace a call to it with an
+override), at which sizes, and why it has no result of its own (Tony,
+2026-10-20; PLAN, "SAW's scope"; #67). Each is proved by gnatprove for all
+inputs and FFI-checked. The board's SAW column counts only results of a
+row's own entities; this is what stands behind its `-`.
+
+**Why fixed sizes: what NSA's own proofs do.**
+
+- **AES: the same as NSA's.** NSA's only implementation proofs in this
+  repository are of Rust: `algorithms/AES/rust/Cipher/theorems/saw.py`
+  proves `Cipher::cipher` against ``Cipher`{k}`` and `Cipher::inv_cipher`
+  against ``InvCipher'`{k}``, and `KeyExpansion/theorems/saw.py` the key
+  expansion against ``KeyExpansion`{k}``, each at k = 128, 192 and 256, one
+  proof per key size. Ours are at the same three sizes (against
+  ``InvCipher`{k}`` for `Decrypt_Block`). The only other implementation
+  proof is `algorithms/Keccak/rust`'s, of the fixed-size permutation
+  `Keccak_p`. The repository has no C.
+- **SHA-256 and HMAC: NSA has no implementation proof to compare against.**
+  There is no Rust or C for them. `algorithms/SHA2/theorems` proves
+  properties of the Cryptol alone: `Preprocessing.saw` proves `padTest512`
+  and `padTest1024`, `pad` on the single input "abc". The fixed lengths
+  therefore come from SAW itself: it executes the code symbolically, so loop
+  bounds and buffer sizes must be concrete, one proof per length. The
+  lengths are chosen at the padding's boundaries (0; 55, the longest message
+  whose padding fits one block; 56, the shortest that needs two; 63, 64 and
+  65 around a whole block; 119 and 120, the same boundary in the second
+  block; 128; 200, four blocks; 1 and 100 besides), and HMAC's keys at each
+  case of `HMAC_init` (shorter than the block, the block, longer): "SHA-256
+  and HMAC-SHA-256" above, and `saw/sha256_impl.saw`'s comments.
+- **What SPARK adds**: gnatprove proves the same subprograms for every
+  length (below).
+
+**Implementation subprograms that nothing calls: left out.** Both are proved
+by gnatprove for all inputs and FFI-checked:
+
+- `AES.Impl.Decrypt_Block_Prime` and `Inv_Round_Prime`: FIPS 197's
+  equivalent inverse cipher (``InvCipher'``). `Impl.Main.Decrypt` uses
+  `Decrypt_Block`, and no other subprogram calls these; #23 asked only for
+  `KeyExpansion`, `Cipher` and `InvCipher`. SAW does prove the spec
+  layer's `InvCipher_Prime` and `InvRound_Prime` against ``InvCipher'``
+  and `InvRound'`.
+- `AES.Impl.Dot`: general GF(2^8) multiplication. The ciphers use `X_Times`
+  (`foundation_spark-aes-impl.ads`), so only the FFI export calls `Dot`.
+  SAW proves the spec layer's `GF28.Dot` against `(•)`.
+
+**Implementation subprograms that SAW checks in place, not on their own**
+(`saw/sha256_impl.saw`, `saw/aes_impl.saw`):
+
+| subprogram | executed within | at | why not on its own |
+|---|---|---|---|
+| `SHA256_Stream.Init`, `Update`, `Final`, `Load_Block`, `To_Digest` | every `SHA256_Stream.Hash` result (`Hash` is `Init`, one `Update`, `Final`; `Compress` is the only override) | 12 message lengths: 0, 1, 55, 56, 63, 64, 65, 100, 119, 120, 128, 200 bytes (every run) | `Update` and `Final` would need a contract over the streaming context (buffer, count, chaining state) and its invariant, and SAW would still prove them only at fixed fill levels and data lengths; `Load_Block` and `To_Digest` take arrays and offsets that differ from call to call, so one contract would not serve as their override |
+| the same, and `Init_Key`, `Xor_Pad`, and HMAC's incremental `Init`, `Update`, `Final` | every `HMAC_SHA256` result (`HMAC_SHA256` is `Init`, one `Update`, `Final`; `Compress` is the override, and at keys of 65 and 100 bytes so is `SHA256_Stream.Hash` at that length, for `Init_Key`'s call) | 7 (key, text) pairs: (0, 0), (32, 3), (32, 32), (64, 3), (64, 32), (65, 3), (100, 32) bytes (every run) | the incremental interface is the same function as the one-shot `HMAC_SHA256`, which SAW proves; on its own it needs a contract over two streaming contexts, as above |
+| `SHA256_Stream.Hash_Chunked` | none | | its claim is the digest for every way of splitting the message into chunks; SAW can only check particular splits |
+| `AES.Impl.Sub_Word`, `Rot_Word`, `Xor_Word`, `Rcon` | `Expand_Key`'s results (llvm-gcc inlines them, even at `-O0`) | k = 128, 192, 256 | no symbol of their own in the bitcode |
+| `AES.Impl.Main.Encrypt`, `Decrypt` | none | | a byte-level composition of `Expand_Key` with `Encrypt_Block` or `Decrypt_Block`, each SAW-proved at k = 128, 192, 256; #23 did not ask for them. The FFI checks them against `Main.cry`'s `Encrypt` and `Decrypt` |
+
+**Spec-layer subprograms that SAW executes, not proves on their own**
+(`saw/sha256_spec_hash.saw`, `sha256_spec_hmac.saw`, `aes_spec_gf.saw`):
+
+| subprogram | executed within | at |
+|---|---|---|
+| `SHA2.SHA256.Parse`, `Parse_Block`, `Join`, `Bit` | every spec `Hash` result (`Pad`, `Word_Of` and `Foldl_Step` are overrides; these, which do not recurse, are executed) | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes; also 120, 128, 200 with `SAW_LONG=1`; and each `Hash` lemma at the secondary-stack bases where HMAC calls it |
+| `Ceil_Div`, `Ceil_Mod` | `Small_K` | each length |
+| `HMAC.Join`, `Repeat`, `Zero`, `Byte_Bit`; the instance's `Opad`, `Ipad` | the `HMAC_init` and `HMAC` results | (32, 3), (64, 32), (65, 3); all seven pairs with `SAW_LONG=1` |
+| GF2's `Inner`, `Inner_Step`, `Inner_Next`, `Sub_Mult`, `Term`, `Lead`, `Reduce`, `Bit` | `Pgcd` and the folds | every byte (pgcd's locals; no Cryptol name) |
+| `SBox.Reversed_Bit`, `Affine_Bit` | `Affine` | every byte |
+| `KeyExpansion.Words`, the `Is_*` predicates | contracts only | |
+
+`Parse` gets a standalone result in #67 item 3 (on the next SAW session).
+
+**Why there is no SAW proof of `hash` over bytes.**
+`SHA256_Bytes.Hash_Bytes` is not a Cryptol declaration: it is the spec's
+`Hash` on the bits of a byte array, proved equal to it by gnatprove
+(`Lemma_Hash_Bytes`). The end-to-end claim a SAW proof of it would carry,
+`SHA256_Stream.Hash` on bytes = Cryptol `hash`, is already a SAW result of
+the implementation layer, at 12 lengths. A SAW proof of `Hash_Bytes` would
+sit between two things already joined.
+
+**Where the SPARK argument is stronger.** Not to criticize SAW, but to show
+what SPARK adds:
+
+- **Every length, not fixed lengths.** gnatprove proves `Hash`, `HMAC`,
+  `Pad` and `Parse` for every message and key length (below 2 ** 61 bytes;
+  HMAC's text below `Max_Text`). SAW proves the implementation's `Hash` at
+  12 lengths and `HMAC_SHA256` at 7 (key, text) pairs; the spec layer's
+  `Hash` at 9 lengths and `HMAC` at 3 pairs in the default run (12 and 7
+  with `SAW_LONG=1`).
+- **Every chunking and every call sequence.** `Hash_Chunked`, and the
+  streaming and incremental interfaces through `Lemma_Update` and
+  `Lemma_Final`, are proved for all inputs, which SAW cannot state.
+- **Absence of run-time errors in the lax-arithmetic results.** In the
+  default run, 24 implementation-layer results (the 4 top-level ones:
+  `Hash` at 0, 64 and 128 bytes and `HMAC_SHA256` at (0, 0); and the 19
+  leaves and `Compress` re-proved in that module as their overrides) and
+  1393 spec-layer results (2173 under `SAW_LONG=1`) are proved in the
+  module loaded with lax arithmetic. There, absence of overflow rests on
+  gnatprove (AoRTE), not on SAW.
+- **The subprograms SAW leaves out** (above): gnatprove covers them.
+- **What SAW adds, to keep this fair.** It checks the bitcode GNAT-LLVM
+  actually emits against NSA's own Cryptol, with no SPARK spec layer in
+  between. For the implementation layer, that removes the spec layer from
+  the trusted base.
 
 ### Running it
 
