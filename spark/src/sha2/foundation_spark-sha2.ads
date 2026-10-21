@@ -5,6 +5,7 @@
 --  SHA-256 as SHA256 (SHA256.cry).
 
 with Interfaces;
+with Foundation_Spark.Cryptol.Bit_Sequences;
 
 package Foundation_Spark.SHA2 with
   SPARK_Mode,
@@ -29,13 +30,19 @@ is
    --  is: element 0 is the first (most significant) bit. Used only in
    --  ghost code, the spec layer's messages and digests.
 
+   package Sequences_Of_Bits is new Cryptol.Bit_Sequences (Bit_Index, Bits);
+   --  The prelude's `zero` and numeric literals at the bit sequences [l].
+
    function Ceil_Div (A, B : Bit_Index) return Bit_Index is
      ((A + (B - 1)) / B)
    with
      Ghost,
      Pre => B > 0 and then A <= Bit_Index'Last - B;
    --  Cryptol's ceiling division `a /^ b` on naturals, as Main.cry:59
-   --  uses it for `type N`: the least n with n * b >= a.
+   --  uses it for `type N`: the least n with n * b >= a. The same
+   --  statement as the prelude's Numeric.Ceil_Div, kept inline (#75): as
+   --  a call of a Numeric instance, SHA256_Bytes' Lemma_Pad_Bytes_Bits
+   --  lost its proof at level 2.
    --  @param A The dividend.
    --  @param B The divisor, positive.
    --  @return A divided by B, rounded up.
@@ -47,27 +54,25 @@ is
      Pre => B > 0 and then A <= Bit_Index'Last - B;
    --  Cryptol's ceiling modulus `a %^ b` on naturals, as Main.cry:58 uses
    --  it for `type k`: `b * (a /^ b) - a`, the distance from A up to the
-   --  next multiple of B.
+   --  next multiple of B. Kept inline, as Ceil_Div is.
    --  @param A The dividend.
    --  @param B The divisor, positive.
    --  @return What A lacks of a multiple of B.
 
    function To_Bits (Value, Width : Bit_Index) return Bits is
-     (if Width = 0 then []
-      else To_Bits (Value / 2, Width - 1) & [Value mod 2 = 1])
+     (Sequences_Of_Bits.Literal (Value, Width))
    with
      Ghost,
-     Subprogram_Variant => (Decreases => Width),
-     Post               =>
+     Post =>
        To_Bits'Result'First = 0 and then To_Bits'Result'Length = Width;
    --  A natural number as a Width-bit sequence, Cryptol's literal
    --  `(`value : [width])`, as Preprocessing.cry:23 writes the message
-   --  length `(`l : [2 * w])`: most significant bit first. Stated by
-   --  recursion on the width: the last bit is Value mod 2, and the bits
-   --  before it are Value / 2 in Width - 1 bits. Cryptol rejects a
-   --  literal that does not fit its type; here a Value of 2 ** Width or
-   --  more keeps its Width low bits, and callers (Main's Pad) require
-   --  that it fits.
+   --  length `(`l : [2 * w])`: most significant bit first. The prelude's
+   --  Bit_Sequences.Literal states it, by recursion on the width: the
+   --  last bit is Value mod 2, and the bits before it are Value / 2 in
+   --  Width - 1 bits. Cryptol rejects a literal that does not fit its
+   --  type; here a Value of 2 ** Width or more keeps its Width low bits,
+   --  and callers (Main's Pad) require that it fits.
    --  @param Value The number, below 2 ** Width.
    --  @param Width The number of bits.
    --  @return The Width-bit big-endian representation of Value, indexed

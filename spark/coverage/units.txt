@@ -14,4 +14,5 @@ Foundation_Spark.FFI.SHA2_Functions_Exports
 Foundation_Spark.FFI.SHA2_Preprocessing_Exports
 Foundation_Spark.FFI.SHA2_SHA256_Exports
 Foundation_Spark.FFI.HMAC_SHA256_Exports
+Foundation_Spark.FFI.Prelude_Exports
 Foundation_Spark.SHA2.Functions

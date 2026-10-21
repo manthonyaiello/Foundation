@@ -22,6 +22,13 @@
  * message, 512 times the number of blocks), First symbolic, First +
  * Count <= len. P and its bounds are writable and stated unchanged (Pad
  * leaves them on the secondary stack).
+ *
+ * Since #75 the recursion is the prelude's: Word_Of calls the SHA-256
+ * Word_Sequences.Value (Cryptol.Join_Split), and Parse_Block calls
+ * Word_Sequences.Split_At, which calls Value at Count = 32. So these
+ * lemmas are Value's, with Word_Of's contract, and Parse_Block takes the
+ * lemma at 32 through Split_At, which SAW executes. (Unverified until the
+ * next SAW session; PLAN step 7.)
  */
 let word_of_contract (len : Int) (c : Int) = do {
   p <- llvm_fresh_var "p" (llvm_array len (llvm_int 8));
@@ -38,7 +45,7 @@ let word_of_contract (len : Int) (c : Int) = do {
   llvm_return (llvm_term {{ zext (take`{c} ((bits_of p) << first)) : [32] }});
 };
 rec word_of_lemmas (len : Int) (c : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "sha256__word_of" prev (word_of_contract len c) yices "yices"
+  lemma <- verify_spec "sha256__word_sequences__value" prev (word_of_contract len c) yices "yices"
              (str_concat (str_concat (str_concat (str_concat "P of " (show len)) " bits, Count = ") (show c))
                 ": zext (take`{Count} (p << first)) (a word of Preprocessing.cry's parse)");
   if eval_bool {{ `c == (32 : Integer) }} then return lemma
@@ -51,6 +58,12 @@ rec word_of_lemmas (len : Int) (c : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec
  * overrides, and z3 with step uninterpreted. H is read-only (Hash passes
  * the constant H0); Ms and its bounds are writable and stated unchanged
  * (Parse leaves them on the secondary stack).
+ *
+ * Since #75 the recursion is the prelude's: Foldl_Step (H, Ms, N) calls
+ * the SHA-256 Blocks.Foldl_Take (H, Ms, N) (Cryptol.Folds), with the same
+ * arguments, which recurses on N. So these lemmas are Foldl_Take's, with
+ * Foldl_Step's contract, and Hash reaches them through Foldl_Step, which
+ * SAW executes. (Unverified until the next SAW session; PLAN step 7.)
  */
 let block_vector_bounds_t = bits_bounds_t;
 let foldl_step_contract (nt : Int) (n : Int) = do {
@@ -68,7 +81,7 @@ let foldl_step_contract (nt : Int) (n : Int) = do {
   llvm_return (llvm_term {{ foldl step h (take`{n} ms) }});
 };
 rec foldl_step_lemmas (nt : Int) (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "sha256__foldl_step" (concat prev [i_step]) (foldl_step_contract nt n)
+  lemma <- verify_spec "sha256__blocks__foldl_take" (concat prev [i_step]) (foldl_step_contract nt n)
              (w4_unint_z3 ["step"]) "w4_unint_z3 step"
              (str_concat (str_concat (str_concat (str_concat "Ms of " (show nt)) " blocks, N = ") (show n))
                 ": foldl SHA256Main::step h (take`{N} ms) (Main.cry's hash's foldl)");

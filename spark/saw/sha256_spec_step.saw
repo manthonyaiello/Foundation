@@ -98,10 +98,27 @@ i_step3 <- round_lemmas 0 [] [];
 /* --- Foldl_Step3, one N at a time ------------------------------------------ */
 
 /*
- * Foldl_Step3 (M, H, N) = foldl (step3 m) h [0 ..< N], for each N in
+ * Foldl_Step3 (M, H, N) = foldl (step3 m) h [0 ..< N]. Since #75 the
+ * recursion is the prelude's: Foldl_Step3 calls its instance
+ * Rounds.Foldl (M, H, 0, N) of Cryptol.Enumeration_Folds, which recurses
+ * on its bound. So the per-N lemmas are Rounds.Foldl's, for each N in
  * 0 .. 64, with the lemma at N - 1 and Step3's (SAW applies the one at
- * round N - 1) as the overrides.
+ * round N - 1) as the overrides, and Foldl_Step3 is proved once, at 64,
+ * over the lemma at 64. (#75: these symbol and argument changes are
+ * unverified until the next SAW session; PLAN step 7.)
  */
+let rounds_foldl_contract (n : Int) = do {
+  m <- llvm_fresh_var "m" block_t;
+  mp <- llvm_alloc block_t;
+  llvm_points_to mp (llvm_term m);
+  h <- llvm_fresh_var "h" hash_value_t;
+  hp <- llvm_alloc hash_value_t;
+  llvm_points_to hp (llvm_term h);
+  llvm_execute_func [mp, hp, llvm_term {{ 0 : [32] }}, llvm_term {{ `n : [32] }}];
+  llvm_points_to mp (llvm_term m);
+  llvm_points_to hp (llvm_term h);
+  llvm_return (llvm_term {{ foldl (step3 m) h [0 ..< n] }});
+};
 let foldl_step3_contract (n : Int) = do {
   m <- llvm_fresh_var "m" block_t;
   mp <- llvm_alloc block_t;
@@ -115,13 +132,16 @@ let foldl_step3_contract (n : Int) = do {
   llvm_return (llvm_term {{ foldl (step3 m) h [0 ..< n] }});
 };
 rec foldl_lemmas (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "sha256__foldl_step3" (concat prev i_step3) (foldl_step3_contract n)
+  lemma <- verify_spec "sha256__rounds__foldl" (concat prev i_step3) (rounds_foldl_contract n)
              unint_sigmas unint_sigmas_name
-             (str_concat (str_concat "N = " (show n)) ": foldl (step3 m) h [0 ..< N]");
+             (str_concat (str_concat "N = " (show n)) ": foldl (step3 m) h [0 ..< N] (Rounds.Foldl)");
   if eval_bool {{ `n == (64 : Integer) }} then return lemma
   else foldl_lemmas (eval_int {{ `n + 1 : [32] }}) [lemma];
 };
-i_foldl_step3_64 <- foldl_lemmas 0 [];
+i_rounds_foldl_64 <- foldl_lemmas 0 [];
+i_foldl_step3_64 <- verify_spec "sha256__foldl_step3" [i_rounds_foldl_64] (foldl_step3_contract 64)
+                      unint_sigmas unint_sigmas_name
+                      "N = 64: foldl (step3 m) h [0 ..< N]";
 
 /* --- "+" and Step -------------------------------------------------------- */
 
