@@ -14,6 +14,16 @@
  * AES.Spec.Types), so the overrides of Spec.Types' Nk, Nr, Split and Join
  * are proofs, not assumptions (check-saw.sh refuses any assumed spec in
  * saw/).
+ *
+ * Fixed key sizes, as NSA's own proofs (#67 item 9; README "SAW", "What
+ * SAW proves on its own, in place, or not at all"). NSA's only
+ * implementation proofs in this repository are of Rust:
+ * algorithms/AES/rust/Cipher/theorems/saw.py proves cipher against
+ * Cipher`{k} and inv_cipher against InvCipher'`{k}, and
+ * KeyExpansion/theorems/saw.py the key expansion against KeyExpansion`{k},
+ * each at k = 128, 192 and 256, one proof per key size. These are at the
+ * same three sizes (Decrypt_Block against InvCipher`{k}). gnatprove proves
+ * the same subprograms for every Key_Size against the SPARK spec layer.
  */
 
 include "aes_impl_common.saw";

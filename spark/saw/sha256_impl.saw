@@ -11,6 +11,18 @@
  * SAW proves each length separately; gnatprove (E2, E3) proves the same
  * subprograms for every length, against the SPARK spec layer.
  *
+ * Why fixed lengths (#67 item 9; README "SAW", "What SAW proves on its
+ * own, in place, or not at all"): NSA has no implementation proof of
+ * SHA-256 or HMAC to compare against. There is no Rust or C for them, and
+ * algorithms/SHA2/theorems proves properties of the Cryptol alone
+ * (Preprocessing.saw: padTest512 and padTest1024, pad on the single input
+ * "abc"). The fixed lengths come from SAW itself: it executes the code
+ * symbolically, so loop bounds and buffer sizes must be concrete, one
+ * proof per length. They are chosen at the padding's boundaries (below,
+ * the Hash proofs: 0, 1, 55, 56, 63, 64, 65, 100, 119, 120, 128 and 200
+ * bytes) and at each case of HMAC_init (a key shorter than the block, the
+ * block, longer).
+ *
  * Shaped as aes_impl.saw: leaves first, each verified leaf passed as an
  * override to the subprograms that call it, rme for the leaves that are
  * bitwise, z3 with the overridden Cryptol functions uninterpreted above

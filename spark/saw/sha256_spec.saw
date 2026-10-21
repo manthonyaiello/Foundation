@@ -28,6 +28,15 @@
  * time, 65 lemmas. T1 and Step3 take the round t and are proved at each,
  * 64 lemmas apiece. To_Bits, Word_Of and Foldl_Step likewise, one width,
  * count or block count at a time.
+ *
+ * No SAW proof of hash over bytes (#67 item 4; README "SAW", "What SAW
+ * proves on its own, in place, or not at all"): SHA256_Bytes.Hash_Bytes is
+ * not a Cryptol declaration. It is the spec's Hash on the bits of a byte
+ * array, proved equal to it by gnatprove (Lemma_Hash_Bytes). The
+ * end-to-end claim a SAW proof of it would carry, SHA256_Stream.Hash on
+ * bytes = Cryptol hash, is already a SAW result of the implementation
+ * layer (sha256_impl.saw), at 12 lengths. A SAW proof of Hash_Bytes would
+ * sit between two things already joined.
  */
 
 include "sha256_spec_common.saw";
@@ -85,6 +94,23 @@ let foldl_step_for (nb : Int) =
   else if eval_bool {{ `nb == (2 : Integer) }} then i_foldl_step_2
   else if eval_bool {{ `nb == (3 : Integer) }} then i_foldl_step_3
   else i_foldl_step_4;
+
+/*
+ * Parse on its own (#67 item 3): Preprocessing.cry's parse`{32, N} at the
+ * padded lengths Hash uses, 1 and 2 blocks, and 3 and 4 with saw_long,
+ * with Word_Of's lemma at 32 for that length as the override
+ * (sha256_spec_hash.saw's parse_contract). Hash still executes Parse
+ * within its own proofs rather than take these as overrides: there Parse's
+ * message is Pad's result, on the secondary stack above Pad's own
+ * temporaries, not an allocation of its own.
+ */
+verify_parse 1 i_word_of_1;
+verify_parse 2 i_word_of_2;
+if saw_long then do {
+  verify_parse 3 i_word_of_3;
+  verify_parse 4 i_word_of_4;
+  return ();
+} else return ();
 
 /*
  * Pad, and Hash where the padded message has 1 or 2 blocks (3 or 4 too
