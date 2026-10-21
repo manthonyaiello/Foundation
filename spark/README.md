@@ -601,14 +601,18 @@ AES since #75's second half: `foldl` (`Spec.Cipher`'s three round folds,
 `Join_Block`, `Split_Block`, `Byte_At`, `Bit_Of`, and `AES_K.Split_Key`,
 `Join_Split` at `[8]`), `@` and `head` on words (GF28's `Bit`, `Head`,
 `Product_Bit`, GF2's `Bit`, `Words`), and `pmult` (GF28 at `[8] x [8]`,
-GF2 at `[9] x [9]`, `Polynomial_Products`). Four stay written out, each
-for a measured reason:
+`Polynomial_Products`). Five stay written out, each for a measured
+reason:
 - `reverse` (`Cipher.Reverse_Keys`): through `Sequences.Reverse_Of`,
   `AES.Impl.Decrypt_Block_Prime`'s assertion `RK (J) = W (Nr (K) - J)`
   times out at level 2;
 - `pmod` (GF28's `Pmod_Fold`, `Pmod`): GF28 returns the remainder as a
   `Byte`, and its bound below `2 ** 8` is an induction no expression
   function can call; GF28's `Pmod` also takes any `Poly` dividend;
+- `pmult` at `[9] x [9]` (GF2's `Pmult`, a closed form): GF2 proves with
+  the prelude's, but the slow `SBox_Entries`, which evaluates it on
+  constants, ran past 77 minutes at -j6 with 9 of its 32 subprograms
+  done, against about 26 minutes for the whole unit;
 - `pdiv` (GF2's `Pdiv`): with the prelude's, `Inner_Step`'s postcondition
   does not prove at level 4 (it rests on `Pdiv_Fold`'s, which reduces by
   the divisor's leading term, not by the prelude's `Top`);
