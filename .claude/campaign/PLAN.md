@@ -1,23 +1,22 @@
 # The campaign plan: SPARK AES, SHA-256 and HMAC against the Cryptol
 
-**Provenance.** Rewritten 2026-10-19 (evening, UTC); updated 2026-10-20
-(08:15 UTC) at `9d750d8` (the merge of PR #65), on the x86_64 IOD just before
-Tony shut it down; updated again 2026-10-20 on `foundation` after Tony's
-review of E4's loose ends and the small items (no code changed; issues
-#67–#70 filed), and again after his side-by-side review of the AES spec
-layer against the Cryptol (no code changed; #72–#75 filed). The gnatprove board was re-counted on 2026-10-19 on
-`ec57e9e` on the IOD with FSF 16.1 (`check-proof.sh`, `-j8`, CI allowance:
-3554/3554, 786 s); PRs #57–#66 since changed no `spark/src`, `spark/cryptol`
-or FFI script. The SAW numbers are `spark/saw/results.txt` (default run) and
-`results-long.txt` (`SAW_LONG=1`) at `9d750d8`; the orchestrator re-ran the
-default at the head of each PR. **Open:** #67–#70, #72–#75 (below) and
-E5's #50, #51.
-**E0–E4 are closed** (epic #21 closed 2026-10-20); E5 remains.
-**The day's measurements** are in `.claude/campaign/measurements/2026-10-19-iod.md`.
-**The AES spec crosswalk** (Cryptol and SPARK side by side, Tony's review of
-2026-10-20) is `.claude/campaign/walkthroughs/aes-spec-crosswalk-2026-10-20.html`,
-the "before" of #68 and #72–#75. Publish the "after" as a new dated copy and
-a new artifact (`walkthroughs/README.md`).
+**Provenance.** Rewritten 2026-10-21 on `foundation`, at `main` =
+`726bc58` (the merge of PR #86), after the session of 2026-10-20/21. That
+session merged PRs #76, #77, #79, #81, #82, #83, #84, #85 and #86, closed the
+spike PR #78, and adopted the generic AES spec (#74, below). The gnatprove
+board was counted by the ticks and confirmed through CI on each PR's head.
+The last full gate was on `dc6e7b6` (#85's head, merged unchanged): 72
+units, 4231/4231. **SAW has not run since `9d750d8`**: `spark/saw/results.txt`
+and `results-long.txt` are stale, and `board.py` says so. Every SAW contract
+edited since then is unverified (see "Next", step 1). Nothing is open
+on `foundation`: every remaining item needs the IOD.
+**Open:** #50 (its IOD half), #67 (item 3, SAW `Parse`), #68 (item 4, the
+SAW re-run), #69, #75 (SAW, plus five statements left inline), and #51.
+**E0–E4 are closed**; E5 is under way (#49 closed, #50 half done).
+**Measurements:** `.claude/campaign/measurements/2026-10-19-iod.md` (the E4
+day). The AES spec crosswalks (`.claude/campaign/walkthroughs/`) are the
+"before" of 2026-10-20 (published), and the "after #80" and "after #75"
+copies (2026-10-20 and 2026-10-21), **written but not yet published**.
 
 **A fresh session starts at "Next".**
 
@@ -45,155 +44,146 @@ check proved, against a SPARK spec layer, with no assumptions.
 
 ## The board
 
-Counted on `main` (gnatprove at `ec57e9e`, unchanged since; SAW at `9d750d8`):
+Counted on `main` = `726bc58` (gate at `1140824`, PR #86's head; SAW last at
+`9d750d8`):
 
-* **37 of 40 functions complete** (spec exists and is FFI-checked,
-  implementation proved, no holes).
-* **53 units, 3554 checks in the default gate: 3554 proved**, 0 justified,
+* **40 of 40 functions complete**, 3 of them by design (`board.py`'s row
+  kinds, #67/PR #81): `AES::SBox::affine` and `GF2::inverse (AES)` are
+  `spec-only`, covered by `SBoxCorrect` and `SBox_Entries.Lemma_SBox_Entry`;
+  `SHA2::Preprocessing::pad` is `subsumed-by` `hash`. `Ch`, `Maj`, Σ, σ are
+  `impl = spec` rows.
+* **72 units, 4231 checks in the default gate: 4231 proved**, 0 justified,
   0 unproved. Plus one slow unit proved on demand:
-  `foundation_spark-aes-spec-properties-sbox_entries`, 2482/2482, proved at
-  `46c5799`, fingerprint current.
+  `foundation_spark-aes-spec-sbox-sbox_entries` (moved out from under
+  `Properties` by PR #79; closure `Types`, `SBox`, `GF2`, `GF28` and the
+  prelude), **2565/2565** at level 4, proved at `283afe5`, fingerprint
+  current. PR #86 (#70) split each row lemma, so pgcd's steps no longer
+  carry the 256-entry `SBox` table. That took the proof from 1148 s to 493 s
+  on `foundation` (`-j6`, idle pool), and the cold CI run from 1h40m47s to
+  28m24s. The cost was never gnat2why, which takes 3 s: it was gnatwhy3's
+  per-goal transformations, 3404 s of CPU before and 1015 s after. `alire.toml` is now in every slow fingerprint, and
+  `slow_proofs.py refresh FILE` records an input-only change without
+  re-proving, when the new input is unchanged since the proof.
 * **Holes:** 0 assumes, 0 justifications, 0 `SPARK_Mode Off`, 0 warning
-  suppressions, 0 check suppressions. 21 foreign bindings (the FFI export
-  units, each justified in `spark/scripts/trust-surface.txt`).
-* **FFI:** 119 properties, all passing (50+ AES, SHA-256, HMAC; see
-  `spark/cryptol/properties.txt`). CI FFI job about 10–14 min on x86_64.
-* **SAW (implementation layer, local, GNAT Pro 27 LLVM bitcode, -O0):**
-  87 proved, 8 negative controls fail as they must, 0 assumed specs
-  (`check-saw.sh` refuses `llvm_unsafe_assume_spec`). AES: 19 leaves plus
-  `Expand_Key`, `Encrypt_Block`, `Decrypt_Block` at k = 128/192/256 against
-  ``KeyExpansion`{k}``, ``Cipher`{k}``, ``InvCipher`{k}``. SHA-256: 19 leaves,
-  `Compress` = `step` for all inputs, `Hash` at 0, 1, 55, 56, 63, 64, 65, 100,
-  119, 120, 128, 200 bytes; HMAC at (key, text) = (0,0), (32,3), (32,32),
-  (64,3), (64,32), (65,3), (100,32). **4 of them (Hash at 0/64/128, HMAC
-  (0,0)) are in a lax-arithmetic module** (null-range poison, below): there,
-  absence of overflow rests on gnatprove, not SAW (accepted, below).
-* **SAW (spec layer, #59, PRs #63 and #65):** default run **2742 proved**
-  (AES 1083, SHA-256 + HMAC 1659), **1393 of them lax**; `SAW_LONG=1` **3522**
-  (2173 lax). 0 assumed specs. AES: GF(2)/GF(2^8), **`Affine` and
-  `GF2::inverse` for every byte** (the two rows below that have no
-  implementation), the round functions, `KeyExpansion.W` per index
-  (44/52/60 lemmas, never unfolded), KeyExpansion, Cipher, InvCipher,
-  InvCipher', and Main's **`Encrypt`/`Decrypt`/`AES128/192/256`** (through
-  the `gep64` rewrite of `Join_Block`, which #68 retires). SHA-256: `W` per index,
-  `Step` = NSA's `step`, **`Pad` at the 12 M4.3 lengths**, `Hash` at 9
-  lengths (3 more under `SAW_LONG`: 120, 128, 200 bytes). **HMAC** = NSA's
-  `HMAC` at one (key, text) per key case by default ((32,3), (64,32),
-  (65,3)), all seven M4.3 pairs under `SAW_LONG`. Spec-layer rows
-  SAW-proved: **38 of 40** (not: `parse` on its own, which #67 adds; `hash`
-  over bytes, a SPARK-side representation layer, which #67 documents).
-* **SAW in all, default run:** 2829 proved, 19 negative controls fail, 3838 s
-  (orchestrator's re-run at `86e7e2d`; tick's record 3785 s), peak 3.84 GB.
-  `SAW_LONG=1`: 3609 proved, 7784 s, peak 7.23 GB. `board.py`'s SAW column
-  still prints "not run" (#67).
+  suppressions, 0 check suppressions. **23 foreign bindings** (the FFI
+  export units, each justified in `spark/scripts/trust-surface.txt`; #83
+  added the prelude's shim and exports).
+* **FFI:** 147 properties, all passing (`spark/cryptol/properties.txt`):
+  the 119 of 2026-10-19, 22 for the Cryptol prelude against Cryptol's
+  built-ins (#83), and 6 for the constant-time S-box leaves, three at
+  `:exhaust` 256 (#84). CI FFI job about 11–15 min.
+* **Constant time (#50, PR #84):** AES's S-box is a bitsliced Boyar–Peralta
+  circuit, proved equal to the tables. `scripts/check-ct.sh`:
+  * the object-code check finds 0 violations on aarch64 (re-run by the
+    orchestrator);
+  * dudect max |t| is at most 2.1 on aarch64 (17.6 before);
+  * cost on aarch64 at `-O3`: AES-128 encrypt 1.64×, decrypt 1.42×,
+    `Expand_Key` 2.9×.
 
-The three rows the board counts incomplete, though complete by design (Tony,
-2026-10-20; #67 gives them row kinds so the board says so):
-
-| row | why |
-|---|---|
-| `AES::SBox::affine` | ghost-only by design (#12); the implementation reads the S-box table, which `SBoxCorrect` proves equal to `affine` for every byte |
-| `GF2::inverse (AES)` | same |
-| `SHA2::Preprocessing::pad` | no executable counterpart: `Final` writes only the last one or two padded blocks, proved through `Hash` |
-
-`Ch`, `Maj`, Σ, σ are "impl = spec" rows: the spec functions are non-ghost
-`Unsigned_32` functions that `Compress` calls at run time.
+  Valgrind and x86_64 wait for the IOD.
+* **SAW: STALE.** The last run recorded is `results.txt` at `d874133`:
+  2829 proved, implementation 87 (24 lax) and spec layer 2742 (1393 lax),
+  in 3838 s. `results-long.txt` (`SAW_LONG=1`) at `c31472e`: 3609 proved.
+  Rows with a SAW result of their own: spec 35 of 40, impl 27 of 37.
+  `AES.Impl.Main.Encrypt`/`Decrypt` have none (#67 documents why). Since
+  then, #68, #80, #83, #84 and #85 edited SAW contracts that nobody has run;
+  the IOD session's list is in "Next".
 
 ## The issues
 
 | epic | sub-issues | state |
 |---|---|---|
-| **#1** E0 infrastructure | #2 Cryptol/SAW · #3 CI · #4 FFI harness · #5 levels, board · #6 x86_64 bootstrap | all closed |
+| **#1** E0 infrastructure | #2 #3 #4 #5 #6 | all closed |
 | **#7** E1 AES | #8 #9 #10 #11 #12 | all closed |
 | **#13** E2 SHA-256 | #14 #15 #16 #17 | all closed |
 | **#18** E3 HMAC-SHA-256 | #19 #20 | all closed |
-| **#21** E4 SAW | #22 M4.1 spike · #23 M4.2 AES · #24 M4.3 SHA-256 and HMAC · #59 M4.4 spec layer | all closed (PRs #57, #58, #60, #63, #65) |
-| **#48** E5 assurance beyond the proofs | #49 M5.1 coverage · #50 M5.2 constant time · #51 M5.3 binaries and performance | #49 closed (PR #55); #50, #51 open |
+| **#21** E4 SAW | #22 #23 #24 #59 | all closed |
+| **#48** E5 assurance beyond the proofs | #49 M5.1 coverage · #50 M5.2 constant time · #51 M5.3 binaries and performance | #49 closed; #50 IOD half open; #51 open |
+| review of 2026-10-20 | #67 board kinds, SAW scope, docs · #68 AES `Bit_Index` · #69 SAW spec-layer cost · #70 cheaper SBoxCorrect · #72 SPARKlib · #73 AES spec feedback · #74 generic spike · #75 Cryptol prelude · #80 generic AES | #70 #72 #73 #74 #80 closed; #67 #68 #75 wait for SAW; #69 for the IOD |
 
 ## Next
 
-Done on 2026-10-19, on the x86_64 IOD with Tony's GNAT Pro 27.0 install:
-* **Tool sanity** (Tony asked): FSF 16.1 gate 3554/3554 (786 s, `-j8`).
-  SPARK Pro 27 gnatprove on the same tree: `sbox_entries` 2482/2482 (2836 s,
-  level 4, max VC 20 s), but the default gate **3641/3645** with the CI
-  allowance: 4 Pro-27 regressions, listed under "Small items". The crate stays
-  on FSF 16.1 (Tony), so these are not gate failures.
-* **#22 M4.1** (PR #57): GNAT-LLVM 27 (LLVM 21.1.8) bitcode loads in SAW 1.6
-  (without `-g`); `X_Times`, `Sub_Byte`, `Sub_Bytes` proved; the bitcode ABI
-  written down (README "The bitcode ABI").
-* **#23 M4.2** (PR #58): AES at k = 128/192/256, no assumptions, by linking
-  the units with a pinned `llvm-link` 21.1.8 (LLVM's own release).
-* **#24 M4.3** (PR #60): SHA-256 `Compress` for all inputs, `Hash` and HMAC
-  at fixed sizes; `check-saw.sh` caps every SAW run at 10 GB.
-* **#59 M4.4** (PR #63, `Part of #59`): the spec layer, 2162 results (board
-  above). Spec bitcode: `saw/spec.adc` (`Assertion_Policy (Ignore)` then
-  `(Ghost => Check)`; GNAT rejects the `others =>` form), `-gnatp`,
-  `-fno-inline` (GNAT-LLVM marks expression functions `alwaysinline`).
-  GNAT's runtime (`s-secsta`, `s-soflin`) is compiled and executed for the
-  secondary stack; `saw/saw_soft_links.ads` is a one-line trusted harness
-  adapter (static chain). `saw/SHA256Step.cry` copies `step`'s local
-  definitions, tied to NSA's `step` by the `Step` proof.
-* **#59 closed** (PR #65, 2026-10-20): the HMAC spec layer (`saw/HMACInit.cry`
-  copies Main.cry's private `HMAC_init` word for word; HMAC's proof against
-  NSA's public `HMAC` ties it), AES Main through `gep64`, `Hash` at 3–4
-  blocks under `SAW_LONG=1` (writes `saw/results-long.txt`). The default
-  `check-saw.sh` takes about 64 min; `SAW_LONG=1` about 130 min. The
-  bootstrap extracts `opt` and `llvm-extract` too (for `gep64`).
-* The raw logs of 2026-10-19/20 are untracked in the main checkout of the IOD
-  (`.claude/campaign/runs/2026-10-19-iod/`), retrieved by Tony at shutdown;
-  every number that matters is in the measurements file.
+Done on 2026-10-20/21 on `foundation` (Tony asked to settle the generic and
+to defer all SAW, #68's included, to one IOD session):
+* **#72** (PR #76): SPARKlib removed; the crate has no dependencies.
+* **#68** (PR #77, `Part of`): AES `Bit_Index` is `0 .. 256`; `gep64`,
+  `opt` and `llvm-extract` retired. The AES spec SAW contracts now state
+  indices as `i16`, inferred from the type's 16-bit `Object_Size`, not
+  read from the IR.
+* **#74 spike** (PR #78, closed): the generic costs no measurable proof
+  time. With an idle pool, cold, `-j4`, the gate took 530 s on `main` and
+  537 s on the spike. **Tony adopted it.**
+* **#70 cheap part** (PR #79): `SBox_Entries` moved under `Spec.SBox`.
+* **#67 except item 3** (PR #81): row kinds, the SAW column with staleness,
+  `alire.toml` fingerprinted, and the README on SAW's scope, NSA practice,
+  not-one-to-one rows and the optional re-proved properties.
+* **#80 + #73 item 1** (PR #82):
+  * `Spec.AES_K` generic over `K : Key_Size`, holding `KeyExpansion`
+    (with `W`), `Cipher`, `InvCipher`, `InvCipher'`, `Encrypt`, `Decrypt`
+    and `Split_Key`;
+  * instances `Spec.AES128/192/256`;
+  * `Spec.Dispatch`, one ghost dispatcher per `{k}` function, whose
+    postcondition restates the body with an explicit K;
+  * every `K` is a `Key_Size`; `Types.Key` is gone.
 
-**Order** (Tony, 2026-10-20, after the AES spec review). Everything through
-step 6 runs on `foundation`, except the SAW parts, which wait for one IOD
-session (step 7). Each PR edits its own SAW contracts as best it can and says
-they are unverified until that session; `results.txt` is stale meanwhile.
-Steps 2–4 each make `sbox_entries` stale (its closure is almost the whole
-AES spec, as a child of `Properties`): re-prove it each time (about 26 min
-here, 1h40m cold in CI), or first do the cheap part of #70 (step 6).
+  The PR body has minimal reproducers of two GNAT 16.1 bugs.
+* **#75** (PRs #83, #85, `Part of`): the Cryptol prelude in SPARK
+  (`spark/src/cryptol/`, `Foundation_Spark.Cryptol.*`), with SHA-2, HMAC
+  and AES bodies on it. Five statements stay inline, each measured:
+  * SHA-2's `/^`/`%^`, HMAC's byte `@`/`join`, and AES's `Reverse_Keys`:
+    their instance forms made implementation lemmas time out, and the
+    cause is not isolated;
+  * GF28's `pmod`: a `Byte` result;
+  * GF2's `pmult` and `pdiv`: `SBox_Entries` blew up past 77 min, and
+    `Inner_Step` failed.
+* **#50 except the IOD half** (PR #84): the constant-time S-box (board above).
+* **#70** (PR #86, closed): `SBoxCorrect` 57% cheaper (board above).
 
-1. **#72**: remove the unused SPARKlib dependency (GPRs, `alire.toml`,
-   docs; no proof change expected). Then **#68**: narrow AES's `Bit_Index`
-   to what AES needs, and remove `gep64` and its machinery. SAW's
-   confirmation waits for step 7.
-2. **#74 spike**: a generic AES spec over the key size (`KeyExpansion` and
-   `Cipher` only), bridged to the flexible implementation by ghost
-   dispatchers. A draft PR, not merged, with cold proof times and lemma
-   churn. **Tony decides** "AES key sizes" (below) on it. It comes before
-   #73, because its outcome decides what #73's `Key_Size` change looks like.
-3. **#73 item 1**: `Key k` as a `Key_Size` predicate subtype. Under the
-   generic, it is the formal's subtype, done together with the full generic
-   change (a follow-up issue from #74). Otherwise it is the type of every
-   `K`. Rewrite `spec-types.ads`'s header to record the outcome. (#73 item 2
-   moved to #75; item 3 is resolved: the two unstated `SBox.cry` properties
-   are not added, see "Re-proved Cryptol properties are optional".)
-4. **#75** (stretch; Tony: worthwhile, not essential): a ghost "Cryptol
-   prelude in SPARK" stating `foldl`, `split`/`join`, `@@`, `reverse`,
-   big-endian bit access and `pmult`/`pmod`/`pdiv` once, under Cryptol's
-   names. Migrate AES, then SHA-2, then HMAC; only bodies change.
-5. **#67**, revisited in light of steps 1–4, then done except its SAW item
-   (item 3, `Parse`): board row kinds, the not-one-to-one statements, the
-   SAW-scope and NSA-practice documentation, where SPARK is stronger,
-   `board.py`'s SAW column, `alire.toml` in the slow-proof fingerprint, and
-   item 11 (re-proved properties are optional, and why they are kept).
-6. **#70**: a cheaper `SBoxCorrect`, after #75 has restated `Affine` and
-   `Inverse`. Its cheap part, moving `sbox_entries` out from under
-   `Properties` (e.g. to a child of `Spec.SBox`, closure `Types`, `SBox`,
-   `GF2`, `GF28`), may go early to stop steps 2–4 making it stale.
-7. **One IOD session (GNAT Pro 27)** for all SAW work:
-   * the full `check-saw.sh` (and `SAW_LONG=1` if time allows), confirming
-     #68's removal of `gep64`, and fixing whatever steps 1–4's contract
-     edits broke, PR by PR;
-   * #67 item 3 (`Parse`);
-   * **#69**: why SAW costs about 100 times more on the spec layer, measured
-     on the spec as steps 2–4 left it;
-   * commit `results.txt` (and `results-long.txt`).
+**Order from here:**
 
-   A second, earlier session is worth it only if the full generic change
-   (step 3) turns out large.
-8. **E5**: **M5.2 (#50)** constant time (the AES table S-box leaks), then
-   **M5.3 (#51)** binaries and performance (x86_64 numbers need an IOD; it
-   adds gnatcov to the x86_64 bootstrap when it needs it). Neither needs
-   GNAT Pro.
+1. **One IOD session (GNAT Pro 27)**, in this order:
+   1. The full `check-saw.sh`, then `SAW_LONG=1` if time allows. Fix each
+      PR's unverified contract edits:
+      * **#68**: check first the GEP index width GNAT-LLVM emits for
+        `Join_Block` and the `bits_BOUNDS` layout (`i16` assumed); the
+        `llvm-link -S` guard.
+      * **#80**: symbols `aes<k>__cipher`, `__invcipher`,
+        `__invcipher_prime`, `__w`, `__keyexpansion`, `__split_key`,
+        `__encrypt`, `__decrypt`, with no K argument. Assumed: key words by
+        value at k = 128 and by reference at 192/256; `KeyExpansion`'s and
+        `Split_Key`'s results through `sret`; `Encrypt` no longer on the
+        secondary stack; `Types.Nk`/`Nr` possibly not emitted. Expected:
+        the spec-layer count falls by about 12 (not measured).
+      * **#83**: SHA-2's per-N lemmas retargeted to
+        `sha256__rounds__foldl`, `sha256__blocks__foldl_take`,
+        `sha256__word_sequences__value`, `sequences_of_bits__literal`.
+        Check first whether the wrappers move the secondary-stack bases of
+        `Pad`, `To_Bits` and HMAC.
+      * **#85**: AES fold lemmas retargeted to
+        `cipher__*_folds__foldl_take` (N = 9, 11, 13); GF28 `pmult` to
+        `gf28__products__products`. `Join_Block` now returns through the
+        secondary stack and its contract does not set that up (flagged
+        UNVERIFIED in the script).
+      * **#84**: new `sbox_lanes`/`inv_sbox_lanes` (rme, i64) and
+        `sub_word`; overrides for `sub_byte`, `sub_bytes` (and inverses),
+        `expand_key`; the updated negative control must still fail.
+      * Commit `results.txt` (and `results-long.txt`).
+   2. **#67 item 3**: `Parse`.
+   3. **#69**: why SAW costs about 100× more on the spec layer, measured on
+      the spec as it now is.
+   4. **#50's IOD half**:
+      * install Valgrind;
+      * run `OBJDUMP=objdump CT_SAMPLES=1000000 scripts/check-ct.sh`
+        (expect 0 object-code violations, and `ct_grind` 0 errors with its
+        control failing; the x86 scanner patterns and client requests are
+        untested);
+      * run the harness against `b967ebb`, so the tools are seen to flag the
+        table S-box;
+      * record the x86_64 numbers, then close #50.
+   5. If time allows, **#51**'s x86_64 numbers.
+2. **Publish the crosswalk "after"** (the after-#75 copy, or a fresh one
+   after #70): a new artifact, per `walkthroughs/README.md`.
+3. **#51** (M5.3 binaries and performance), the rest.
 
 Small items: none open. Settled on 2026-10-20 (Tony):
 * **Dropped:** Pro-27 proof repair (the crate stays on FSF 16.1; Pro 27's 4
@@ -221,7 +211,11 @@ Not yet, and not filed:
 
 * **`foundation`**: an aarch64 Linux container on niss, 11 CPUs, long-lived.
   Main checkout `/work/Foundation`. alr 2.1.1, gnatprove FSF 16.1.0,
-  gprbuild 26.0.1 on PATH; Cryptol 3.6.0 built from source with FFI
+  gprbuild 26.0.1, on an interactive shell's PATH only. **A tick's or the
+  orchestrator's shell has none of them**: pass
+  `env PATH=/home/tony/Software/alr/bin:~/.local/share/alire/toolchains/gnat_native_16.1.0_*/bin:~/.local/share/alire/toolchains/gprbuild_*/bin:~/.local/share/alire/releases/gnatprove_16.1.0_*/bin:$PATH`.
+  GNAT's own `objdump` is in the gnat_native bin; there is no system
+  `objdump`, `gdb` or Valgrind. Cryptol 3.6.0 built from source with FFI
   (`~/.local/bin/cryptol`; headers in `~/.local/sysroot`). **No system C
   toolchain**: GNAT's gcc is the only one. No SAW, no GNAT-LLVM (neither
   exists for aarch64 Linux). `/tmp` is a ramfs. `spark-scheduler` pool of 10.
@@ -277,29 +271,49 @@ Not yet, and not filed:
   samples on the executables proved equal to the spec (so faithfulness is
   checked transitively), a few direct tests per ghost spec export. A long run
   at large N is deferred to times Tony chooses.
-* **AES key sizes.** **Under reconsideration (Tony, 2026-10-20), pending
-  the spike #74.** Now: unconstrained arrays with an explicit `K` and
-  `Is_Key_Words`/`Is_Round_Keys` preconditions, held through M1.4, no
-  generic. This is the spec layer's largest deviation from the Cryptol, whose
-  `{k}` functions `AES128 = AES`{128}` instantiates.
-  * *First review, earlier the same day:* kept. A generic mirrors `{k}` more
-    closely (lengths in the subtypes, no `Is_*` preconditions, Cryptol's
-    arities, `AES128` an instance), but proof time triples and the
-    implementation would either triple its executable footprint or need
-    bridging proofs to three generic specs.
-  * *Why reopened:* that weighed the wrong alternatives. Only the `{k}`
-    functions need be generic (`KeyExpansion`, `Cipher`, `InvCipher`,
-    `InvCipher'`, `Encrypt`/`Decrypt`). `Round`, the S-boxes, GF(2^8) and
-    their lemmas stay non-generic and are proved once. The instances'
-    subtypes constrain the existing unconstrained types, so the
-    implementation stays flexible in `K` with no conversions. The bridge is
-    one ghost dispatcher per `{k}` function (`case K is when 128 =>
-    AES128.Cipher (W, S) …`), named by the implementation's postconditions.
-    Tripling is confined to the `k`-dependent parts. The unknown is the
-    lemmas the three-way split needs.
-  * *Decide on:* #74's proof times, lemma churn and reading of the generic
-    `Cipher` beside `Cipher.cry`. `Key k` becomes a `Key_Size` predicate
-    subtype either way (#73), the formal's subtype under the generic.
+* **AES key sizes: a generic over the key size** (Tony, 2026-10-20, on the
+  spike #74; done by #80, PR #82). The `{k}` functions are the generic
+  `Spec.AES_K` with formal `K : Key_Size`: `KeyExpansion` with its `W`,
+  `Cipher`, `InvCipher`, `InvCipher'`, Main's `Encrypt`/`Decrypt` and
+  `Split_Key`. `Spec.AES128/192/256` are its instances, as
+  ``AES128 = AES`{128}`` is in Cryptol.
+  * **What stays non-generic.** `Round`, the S-boxes, GF(2^8) and their
+    lemmas are proved once.
+  * **The instances' subtypes** constrain the unconstrained `Key_Words` and
+    `Round_Keys`, so the generic functions take Cryptol's arguments with no
+    precondition. The implementation stays flexible in `K`.
+  * **The bridge** is `Spec.Dispatch`: one ghost dispatcher per `{k}`
+    function, whose postcondition restates the Cryptol body with an
+    explicit K and is proved per instance. Only the dispatchers case on
+    K.
+  * **`Key_Size` is a `Static_Predicate` (`128 | 192 | 256`)**, not
+    Types.cry's clauses: Pure instances need a static K.
+    `Dispatch.Lemma_Key_Size` proves the list equal to the clauses. `Nk`
+    and `Nr` are Ada 2022 `Static` functions.
+  * **The properties that take K** stay K-explicit over the dispatchers.
+    Inside the generic, each would be proved three times for one theorem.
+  * **Numbers.** The spike measured the gate at 530 s on `main` and 537 s
+    with the generic (cold, `-j4`, idle pool), with checks 3554 → 3674.
+    Proof time did not triple.
+  * **History.** An earlier review the same day had declined the generic,
+    weighing it as if the whole spec and implementation had to be generic.
+* **The Cryptol prelude in SPARK** (#75; PRs #83, #85). Cryptol's built-ins
+  the spec layers use are stated once, as ghost generics in
+  `spark/src/cryptol/`, each citing its line in Cryptol 3.6's `Cryptol.cry`
+  or the reference manual. Each is FFI-checked against Cryptol's own
+  built-in.
+  * **`foldl`** is a Cryptol primitive with no body, so `Folds` recurses
+    from the last element, as the prelude's example and the
+    implementation's loops do. The head-first equation is a theorem, stated
+    only where needed.
+  * **A spec body uses the prelude, unless an instance form costs a
+    proof.** Then the statement stays inline, word for word the prelude's,
+    with the reason in its comment. Five such statements remain (listed in
+    "Next").
+* **SAW waits for one IOD session** (Tony, 2026-10-20): spec and
+  implementation changes land on `foundation` first, each PR editing its
+  SAW contracts and saying they are unverified. One IOD session then
+  confirms them all.
 * **SHA-2 generality.** A generic mirroring `SHA2::Main`, instantiated for
   SHA-256 only. Library-level instances need `pragma SPARK_Mode (On)`.
 * **Bit sequences.** Ghost Boolean arrays, length < 2**64. SHA-2's index is
@@ -389,6 +403,29 @@ Not yet, and not filed:
   `calcGEP_array`'s 64-bit limit with Galois (draft in PR #65; a precise
   request includes LangRef's `trunc nsw` / `trunc nuw` rules for
   `nusw`/`nuw` GEPs) is optional now.
+* **The constant-time S-box's cost** (#50, PR #84). It is merged, and it
+  costs this much on aarch64 at `-O3`: AES-128 encrypt 1.64×, decrypt
+  1.42×, `Expand_Key` 2.9×. Accept it, or ask for a cheaper constant-time
+  option. A T-table AES is excluded, since it leaks.
+* **Two GNAT 16.1 bugs to report upstream.** Minimal reproducers are in PR
+  #82's body:
+  * `Program_Error` at `sem_type.adb:825` on a `Static` function called in
+    an instance's expression function;
+  * under `-gnata`, "R is undefined" for an iterated aggregate inside a
+    quantified postcondition.
+* **Publish the crosswalk "after"** (the after-#75 copy is the current
+  spec; #70 changed no spec body).
+* **`SBox_Entries` and the default gate.** The unit now takes 28m24s cold in
+  CI, and the PR proof job's timeout is 30 min, so it still cannot join the
+  gate. Two further levers, both measured on a probe and neither applied:
+  * one inverse lemma per byte, about 20% faster on the probe;
+  * Z3 alone for this unit, which proved 8194 of its 8393 goals. This would
+    take a `--prover` switch in its `Proof_Switches`, which is a
+    level-policy change.
+* **A tick changed global Alire state** on `foundation` (2026-10-20, #72's
+  tick, in a scratch copy). It ran `alr toolchain --select --local`, which
+  updated the global index (`fec6b3b` → `4635347`) and may have saved an
+  "online without asking" setting. Check `~/.config/alire`.
 
 ## Live ambushes
 
@@ -406,6 +443,18 @@ Not yet, and not filed:
   is `~/Software/alr/bin/alr` and the toolchain comes from
   `~/Software/null_crate`'s `alr printenv`; neither is on a tick's `PATH`
   by default.
+* **Moving a spec body behind a prelude instance can time out an
+  implementation lemma**, even with the same formula (#83, #85). Five cases
+  are known and none is explained. Bisect primitive by primitive against
+  the implementation lemmas: it takes about 1–2 min per unit. Restating GF2
+  can also blow up `SBox_Entries`: GF2's `pmult` via the prelude ran past
+  77 min for 9 of its 32 subprograms.
+* **gnatprove warns on a `Subprogram_Variant` of a function that no longer
+  recurses**, and the gate fails on warnings (#85 removed eight).
+* **GNAT 16.1 and generics** (#82): a `Static` function called in an
+  instance's expression function crashes the compiler; read a constant
+  instead. A Pure library-level instance needs a static actual, so its
+  subtype needs a `Static_Predicate`.
 * **A hand re-run replays cached proofs** (about 2 s); `prove.sh` refuses
   `-f`. CI's run is the cold one.
 * **gnatdoc 26 crashes** on: `declare` expressions; a line break right after
