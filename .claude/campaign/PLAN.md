@@ -15,8 +15,9 @@ SAW re-run), #69, #75 (SAW, plus five statements left inline), and #51.
 **E0–E4 are closed**; E5 is under way (#49 closed, #50 half done).
 **Measurements:** `.claude/campaign/measurements/2026-10-19-iod.md` (the E4
 day). The AES spec crosswalks (`.claude/campaign/walkthroughs/`) are the
-"before" of 2026-10-20 (published), and the "after #80" and "after #75"
-copies (2026-10-20 and 2026-10-21), **written but not yet published**.
+"before" of 2026-10-20 and the "after #75" of 2026-10-21 (both published),
+plus an old-vs-new SPARK page (published, PR #88); the links are in the
+walkthroughs README. The "after #80" copy is superseded and unpublished.
 
 **A fresh session starts at "Next".**
 
@@ -181,9 +182,7 @@ to defer all SAW, #68's included, to one IOD session):
         table S-box;
       * record the x86_64 numbers, then close #50.
    5. If time allows, **#51**'s x86_64 numbers.
-2. **Publish the crosswalk "after"** (the after-#75 copy, or a fresh one
-   after #70): a new artifact, per `walkthroughs/README.md`.
-3. **#51** (M5.3 binaries and performance), the rest.
+2. **#51** (M5.3 binaries and performance), the rest.
 
 Small items: none open. Settled on 2026-10-20 (Tony):
 * **Dropped:** Pro-27 proof repair (the crate stays on FSF 16.1; Pro 27's 4
@@ -413,8 +412,6 @@ Not yet, and not filed:
     an instance's expression function;
   * under `-gnata`, "R is undefined" for an iterated aggregate inside a
     quantified postcondition.
-* **Publish the crosswalk "after"** (the after-#75 copy is the current
-  spec; #70 changed no spec body).
 * **`SBox_Entries` and the default gate.** The unit now takes 28m24s cold in
   CI, and the PR proof job's timeout is 30 min, so it still cannot join the
   gate. Two further levers, both measured on a probe and neither applied:
