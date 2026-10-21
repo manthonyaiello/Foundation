@@ -1,16 +1,40 @@
 --  The types AES is stated in, mirroring algorithms/AES/Types.cry
 --  [FIPS-PUB-197 Sections 2.1, 2.3 and 5].
 --
---  Key-size polymorphism. The Cryptol is polymorphic in the key size k
---  under the constraint Key k ({k} (Key k) => ...). Following the
---  campaign's decision, the SPARK states it with unconstrained arrays
---  (Key_Words for [Nk k]AESWord, Round_Keys for [Nr k + 1]Block) and the
---  constraint as a precondition: a subprogram that the Cryptol types
---  {k} (Key k) => takes the key size K as an explicit Natural parameter,
---  in the place of the Cryptol's type application, and requires
---  Is_Key_Words (K, ...) or Is_Round_Keys (K, ...). Cryptol's FFI passes
---  a numeric type parameter as a leading size_t argument, so the explicit
---  K is also the shape of the exported function.
+--  Key-size polymorphism (issue #80, decided on spike #74). The Cryptol is
+--  polymorphic in the key size k under the constraint Key k
+--  ({k} (Key k) => ...). The SPARK states it as the Cryptol does:
+--  * The constraint Key k is the subtype Key_Size. Its predicate lists
+--    the values, 128 | 192 | 256, rather than Types.cry's clauses, because
+--    it must be a Static_Predicate (below); Dispatch.Lemma_Key_Size proves
+--    the list equal to the clauses.
+--  * The {k} functions (KeyExpansion, Cipher, InvCipher, InvCipher' and
+--    Main.cry's Encrypt and Decrypt) are the generic Spec.AES_K, whose
+--    formal K : Key_Size is the Cryptol's k. Its instances AES128, AES192
+--    and AES256 are the Cryptol's AES128 = AES`{128} and so on. In them,
+--    [Nk k]AESWord and [Nr k + 1]Block are constrained subtypes of the
+--    unconstrained Key_Words and Round_Keys below, so the functions take
+--    the Cryptol's arguments and no precondition.
+--  * Everything without a {k} is not generic and is proved once.
+--  * The implementation stays flexible in the key size: one body serves
+--    all three, with K : Key_Size as an explicit parameter and the typing
+--    of its arrays as Is_Key_Words or Is_Round_Keys preconditions (a
+--    subtype cannot relate an array's length to another parameter). Its
+--    postconditions name the instances through the ghost dispatchers of
+--    Spec.Dispatch (case K is when 128 => AES128.Cipher (W, Input), ...),
+--    whose postconditions state the Cryptol bodies uniformly in K. Cryptol's
+--    FFI passes {k} as a leading size_t, so the explicit K is also the
+--    shape of the exported functions.
+--  Key_Size is a Static_Predicate, not a Dynamic_Predicate with Types.cry's
+--  clauses (which a static predicate cannot state: no mod, RM 3.2.4),
+--  because a Pure instance needs static bounds for its subtypes
+--  ("non-static constant in preelaborated unit", RM 10.2.1), and only a
+--  static subtype makes the formal K static in an instance. It also makes
+--  a case over K complete without others. Nk and Nr are Static functions
+--  (Ada 2022) for the same reason; a static function has no Pre, so the
+--  constraint is their parameter's subtype. The generic was weighed and
+--  declined earlier on 2026-10-20 on the belief that proof time would
+--  triple; spike #74 measured no change in wall-clock (PR #78).
 --
 --  This unit is not ghost: the implementation layer uses the same types.
 
@@ -60,35 +84,40 @@ is
    --  @param Ws The four columns.
    --  @return Their concatenation.
 
-   function Key (K : Natural) return Boolean
-   is (K mod 64 = 0 and then K / 64 >= 2 and then K / 64 <= 4);
+   subtype Key_Size is Natural
+   with Static_Predicate => Key_Size in 128 | 192 | 256;
    --  Types.cry: type constraint Key k = (fin k, k % 64 == 0,
-   --  k / 64 >= 2, k / 64 <= 4). The standard key sizes 128, 192 and 256
-   --  [FIPS-PUB-197 Sections 1, 5 and 6.1]. Fin k holds of any Natural.
-   --  @param K A key size in bits.
-   --  @return Whether K is 128, 192 or 256.
+   --  k / 64 >= 2, k / 64 <= 4), as a subtype: the standard key sizes 128,
+   --  192 and 256 [FIPS-PUB-197 Sections 1, 5 and 6.1]. Fin k holds of any
+   --  Natural. It is the type of the formal K of the generic AES_K, and of
+   --  every K that stands for the Cryptol's k (issue #73 item 1, as #80
+   --  settled it). The predicate lists the values that Key k allows, and
+   --  Dispatch.Lemma_Key_Size proves the list equal to Key k's clauses,
+   --  clause for clause; why it is a list is in the header.
 
-   function Nk (K : Natural) return Positive
+   function Nk (K : Key_Size) return Positive
    is (K / 32)
-   with Pre => Key (K);
+   with Static;
    --  Types.cry: type Nk k = k / 32. The number of 32-bit words in the
-   --  key: 4, 6 or 8 [FIPS-PUB-197 Sections 2.3 and 5].
+   --  key: 4, 6 or 8 [FIPS-PUB-197 Sections 2.3 and 5]. Static (Ada 2022),
+   --  so that Nk (K) of a generic's formal K is a static bound; a static
+   --  function cannot have a Pre, so the constraint Key k is K's subtype.
    --  @param K The key size in bits.
    --  @return K / 32.
 
-   function Nr (K : Natural) return Positive
+   function Nr (K : Key_Size) return Positive
    is (Nk (K) + 6)
-   with Pre => Key (K);
+   with Static;
    --  Types.cry: type Nr k = Nk k + 6. The number of rounds: 10, 12 or 14
    --  [FIPS-PUB-197 Sections 2.3 and 5].
    --  @param K The key size in bits.
    --  @return Nk (K) + 6.
 
    Max_Nk : constant := 8;
-   --  Nk (256), the largest Nk that Key allows.
+   --  Nk (256), the largest Nk that Key_Size allows.
 
    Max_Nr : constant := 14;
-   --  Nr (256), the largest Nr that Key allows.
+   --  Nr (256), the largest Nr that Key_Size allows.
 
    subtype Key_Word_Index is Natural range 0 .. Max_Nk - 1;
    --  The indices a Key_Words array may use.
@@ -98,13 +127,13 @@ is
    --  KeyExpansion.cry's KeyExpansion). Its length is fixed by K through
    --  Is_Key_Words.
 
-   function Is_Key_Words (K : Natural; W : Key_Words) return Boolean
-   is (Key (K) and then W'First = 0 and then W'Length = Nk (K));
-   --  The typing W : [Nk k]AESWord under the constraint Key k, with
-   --  Cryptol's zero-based indexing.
+   function Is_Key_Words (K : Key_Size; W : Key_Words) return Boolean
+   is (W'First = 0 and then W'Length = Nk (K));
+   --  The typing W : [Nk k]AESWord, with Cryptol's zero-based indexing, for
+   --  a K that is not static (in AES_K it is the subtype Key_Words).
    --  @param K The key size in bits.
    --  @param W The key words.
-   --  @return Whether K is a key size and W has Nk (K) words from index 0.
+   --  @return Whether W has Nk (K) words from index 0.
 
    subtype Round_Key_Index is Natural range 0 .. Max_Nr;
    --  The indices a Round_Keys array may use.
@@ -114,13 +143,12 @@ is
    --  KeyExpansion and the first argument of Cipher.cry's Cipher and
    --  InvCipher). Its length is fixed by K through Is_Round_Keys.
 
-   function Is_Round_Keys (K : Natural; W : Round_Keys) return Boolean
-   is (Key (K) and then W'First = 0 and then W'Length = Nr (K) + 1);
-   --  The typing W : [Nr k + 1]Block under the constraint Key k, with
-   --  Cryptol's zero-based indexing.
+   function Is_Round_Keys (K : Key_Size; W : Round_Keys) return Boolean
+   is (W'First = 0 and then W'Length = Nr (K) + 1);
+   --  The typing W : [Nr k + 1]Block, with Cryptol's zero-based indexing,
+   --  for a K that is not static (in AES_K it is the subtype Round_Keys).
    --  @param K The key size in bits.
    --  @param W The round keys.
-   --  @return Whether K is a key size and W has Nr (K) + 1 blocks from
-   --  index 0.
+   --  @return Whether W has Nr (K) + 1 blocks from index 0.
 
 end Foundation_Spark.AES.Spec.Types;

@@ -1,5 +1,4 @@
 with Foundation_Spark.AES.Lemmas;
-with Foundation_Spark.AES.Spec.KeyExpansion;
 with Foundation_Spark.AES.Spec.SBox.SBox_Entries;
 
 package body Foundation_Spark.AES.Spec.Properties with
@@ -422,7 +421,7 @@ is
    --------------------------
 
    procedure InvCipherEquivalence
-     (K : Natural; Ws : Round_Keys; State : Block)
+     (K : Key_Size; Ws : Round_Keys; State : Block)
    is
       Rev : constant Round_Keys := Reverse_Keys (Ws (1 .. Nr (K) - 1));
       S0  : constant Block := AddRoundKey (State, Ws (Nr (K)));
@@ -464,12 +463,12 @@ is
    -------------------------
 
    procedure CipherInverts_Prime
-     (K : Natural; Ws : Round_Keys; State : Block)
+     (K : Key_Size; Ws : Round_Keys; State : Block)
    is
       Mid : constant Round_Keys := Ws (1 .. Nr (K) - 1);
       F   : constant Block :=
         Foldl_Round (AddRoundKey (State, Ws (0)), Mid);
-      C   : constant Block := Cipher.Cipher (K, Ws, State);
+      C   : constant Block := Dispatch.Cipher (K, Ws, State);
       S1  : constant Block := ShiftRows (SubBytes (F));
    begin
       pragma Assert (C = AddRoundKey (S1, Ws (Nr (K))));
@@ -490,15 +489,11 @@ is
    -- CipherInverts --
    -------------------
 
-   procedure CipherInverts (K : Natural; Ws : Round_Keys; State : Block) is
+   procedure CipherInverts (K : Key_Size; Ws : Round_Keys; State : Block) is
    begin
-      InvCipherEquivalence (K, Ws, Cipher.Cipher (K, Ws, State));
+      InvCipherEquivalence (K, Ws, Dispatch.Cipher (K, Ws, State));
       CipherInverts_Prime (K, Ws, State);
    end CipherInverts;
-
-   ------------------------
-   -- Lemma_InvCipher_Eq --
-   ------------------------
 
    ----------------------------
    -- Lemma_Split_Join_Block --
@@ -518,7 +513,20 @@ is
       end loop;
    end Lemma_Split_Join_Block;
 
-   procedure Lemma_InvCipher_Eq (K : Natural; Ws : Round_Keys; A, B : Block)
+   ----------------------------
+   -- Lemma_Join_Split_Block --
+   ----------------------------
+
+   procedure Lemma_Join_Split_Block (Bs : Main.Block_Bits) is
+   begin
+      pragma Assert (Main.Join_Block (Main.Split_Block (Bs)) = Bs);
+   end Lemma_Join_Split_Block;
+
+   ------------------------
+   -- Lemma_InvCipher_Eq --
+   ------------------------
+
+   procedure Lemma_InvCipher_Eq (K : Key_Size; Ws : Round_Keys; A, B : Block)
    is
       Rev : constant Round_Keys := Reverse_Keys (Ws (1 .. Nr (K) - 1));
    begin
@@ -532,16 +540,17 @@ is
    --------------------
 
    procedure EncryptInverts
-     (K : Natural; Key : Main.Bits; Input : Main.Block_Bits)
+     (K : Key_Size; Key : Main.Bits; Input : Main.Block_Bits)
    is
       W  : constant Round_Keys :=
-        KeyExpansion.KeyExpansion (K, Main.Split_Key (K, Key));
+        Dispatch.KeyExpansion (K, Dispatch.Split_Key (K, Key));
       P  : constant Block := Main.Split_Block (Input);
-      C  : constant Block := Cipher.Cipher (K, W, P);
+      C  : constant Block := Dispatch.Cipher (K, W, P);
    begin
       Lemma_Split_Join_Block (C);
       Lemma_InvCipher_Eq (K, W, Main.Split_Block (Main.Join_Block (C)), C);
       CipherInverts (K, W, P);
+      Lemma_Join_Split_Block (Input);
       pragma Assert (Main.Join_Block (P) = Input);
    end EncryptInverts;
 

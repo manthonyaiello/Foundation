@@ -23,9 +23,9 @@ is
    procedure KeyExpansion
      (K : C_Size; Key : All_Key_Words; Output : in out All_Round_Keys) is
    begin
-      Output (0 .. Nr (Key_Size (K))) :=
-        Foundation_Spark.AES.Spec.KeyExpansion.KeyExpansion
-          (Key_Size (K), Key_Words_Of (K, Key));
+      Output (0 .. Nr (Key_Size_Of (K))) :=
+        Foundation_Spark.AES.Spec.Dispatch.KeyExpansion
+          (Key_Size_Of (K), Key_Words_Of (K, Key));
    end KeyExpansion;
 
 end Foundation_Spark.FFI.AES_KeyExpansion;

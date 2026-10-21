@@ -11,9 +11,17 @@
 --  Each property is a ghost procedure named as the Cryptol property, whose
 --  postcondition is the property's body and whose parameters are its
 --  arguments. Where the Cryptol is polymorphic in the key size k under Key
---  k, the procedure takes K explicitly and requires the typing of its
---  arguments, as the spec layer does. The other procedures are the lemmas
---  the properties are proved with.
+--  k (InvCipherEquivalence, CipherInverts, CipherInverts' and
+--  EncryptInverts), the procedure takes K : Key_Size explicitly, requires
+--  the typing of its arguments, and states the property over the
+--  dispatchers of Spec.Dispatch, as the implementation's postconditions
+--  do. They could instead live in the generic AES_K, as the Cryptol states
+--  them, but then each would be proved three times, once per instance, for
+--  the same theorem, and a property that SAW already carries to the spec
+--  layer is kept only as a cross-check (PLAN.md, "Re-proved Cryptol
+--  properties are optional"). Proved over the dispatchers, each holds for
+--  every key size at the cost of one proof (issue #80). The other
+--  procedures are the lemmas the properties are proved with.
 --
 --  Ada's = on arrays is componentwise, not the provers' equality, so a
 --  function applied to two equal arrays is not known to give equal results
@@ -22,6 +30,7 @@
 
 with Interfaces;
 with Foundation_Spark.AES.Spec.Cipher;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.GF28;
 with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.SBox;
@@ -126,10 +135,13 @@ is
    --  @param Xs The Cryptol's xs.
    --  @param Ki The Cryptol's ki.
 
-   procedure InvCipherEquivalence (K : Natural; Ws : Round_Keys; State : Block)
+   procedure InvCipherEquivalence
+     (K : Key_Size; Ws : Round_Keys; State : Block)
    with
      Pre  => Is_Round_Keys (K, Ws),
-     Post => InvCipher (K, Ws, State) = InvCipher_Prime (K, Ws, State);
+     Post =>
+       Dispatch.InvCipher (K, Ws, State)
+       = Dispatch.InvCipher_Prime (K, Ws, State);
    --  Cipher.cry: property InvCipherEquivalence ws state = InvCipher`{k}
    --  ws state == InvCipher'`{k} ws state, for {k} (Key k) and
    --  ws : [Nr k + 1]Block.
@@ -138,10 +150,12 @@ is
    --  @param State The Cryptol's state.
 
    procedure CipherInverts_Prime
-     (K : Natural; Ws : Round_Keys; State : Block)
+     (K : Key_Size; Ws : Round_Keys; State : Block)
    with
      Pre  => Is_Round_Keys (K, Ws),
-     Post => InvCipher_Prime (K, Ws, Cipher.Cipher (K, Ws, State)) = State;
+     Post =>
+       Dispatch.InvCipher_Prime (K, Ws, Dispatch.Cipher (K, Ws, State))
+       = State;
    --  Cipher.cry: property CipherInverts' ws state = InvCipher'`{k} ws
    --  (Cipher`{k} ws state) == state, for {k} (Key k) and
    --  ws : [Nr k + 1]Block. CipherInverts is proved from it.
@@ -149,10 +163,11 @@ is
    --  @param Ws The Cryptol's ws.
    --  @param State The Cryptol's state.
 
-   procedure CipherInverts (K : Natural; Ws : Round_Keys; State : Block)
+   procedure CipherInverts (K : Key_Size; Ws : Round_Keys; State : Block)
    with
      Pre  => Is_Round_Keys (K, Ws),
-     Post => InvCipher (K, Ws, Cipher.Cipher (K, Ws, State)) = State;
+     Post =>
+       Dispatch.InvCipher (K, Ws, Dispatch.Cipher (K, Ws, State)) = State;
    --  Cipher.cry: property CipherInverts ws state = InvCipher`{k} ws
    --  (Cipher`{k} ws state) == state, for {k} (Key k) and
    --  ws : [Nr k + 1]Block.
@@ -165,10 +180,11 @@ is
    ----------
 
    procedure EncryptInverts
-     (K : Natural; Key : Main.Bits; Input : Main.Block_Bits)
+     (K : Key_Size; Key : Main.Bits; Input : Main.Block_Bits)
    with
      Pre  => Main.Is_Key_Bits (K, Key),
-     Post => Main.Decrypt (K, Key, Main.Encrypt (K, Key, Input)) = Input;
+     Post =>
+       Dispatch.Decrypt (K, Key, Dispatch.Encrypt (K, Key, Input)) = Input;
    --  Main.cry: property EncryptInverts key in = AES`{k}.Decrypt key
    --  (AES`{k}.Encrypt key in) == in, for {k} (Key k) and key : [k]. The
    --  Cryptol's in is Input: in is an Ada reserved word.
@@ -371,16 +387,23 @@ is
    --  @param Z The initial state of foldl Round.
    --  @param Xs The round keys.
 
+   procedure Lemma_Join_Split_Block (Bs : Main.Block_Bits)
+   with Post => Main.Join_Block (Main.Split_Block (Bs)) = Bs;
+   --  Cryptol's join at [16][8] -> [128] undoes its split at [128] ->
+   --  [16][8]. Stated apart from EncryptInverts, whose context holds the
+   --  dispatchers' contracts and timed out on it (spike #74).
+   --  @param Bs The block as 128 bits.
+
    procedure Lemma_Split_Join_Block (B : Block)
    with Post => Main.Split_Block (Main.Join_Block (B)) = B;
    --  Cryptol's split at [128] -> [16][8] undoes its join at [16][8] ->
    --  [128].
    --  @param B The block.
 
-   procedure Lemma_InvCipher_Eq (K : Natural; Ws : Round_Keys; A, B : Block)
+   procedure Lemma_InvCipher_Eq (K : Key_Size; Ws : Round_Keys; A, B : Block)
    with
      Pre  => Is_Round_Keys (K, Ws) and then A = B,
-     Post => InvCipher (K, Ws, A) = InvCipher (K, Ws, B);
+     Post => Dispatch.InvCipher (K, Ws, A) = Dispatch.InvCipher (K, Ws, B);
    --  InvCipher maps equal blocks to equal blocks.
    --  @param K The key size in bits.
    --  @param Ws The round keys.

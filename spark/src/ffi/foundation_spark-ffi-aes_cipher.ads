@@ -11,6 +11,7 @@
 --  Cryptol looks up (see Foundation_Spark.FFI).
 
 with Foundation_Spark.AES.Spec.Cipher;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Types;
 with Foundation_Spark.FFI.AES_Types;
 
@@ -166,8 +167,8 @@ is
      External_Name => "spark_Cipher",
      Pre           => Is_Key_Size (K),
      Post          =>
-       Output = Foundation_Spark.AES.Spec.Cipher.Cipher
-                  (Key_Size (K), Round_Keys_Of (K, W), Input);
+       Output = Foundation_Spark.AES.Spec.Dispatch.Cipher
+                  (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    --  Cipher.cry's Cipher`{k}, as the spec states it, for k = K.
    --  @param K The key size, Cryptol's {k}.
    --  @param W The round keys: the first Nr (K) + 1 blocks are read.
@@ -182,8 +183,8 @@ is
      External_Name => "spark_InvCipher",
      Pre           => Is_Key_Size (K),
      Post          =>
-       Output = Foundation_Spark.AES.Spec.Cipher.InvCipher
-                  (Key_Size (K), Round_Keys_Of (K, W), Input);
+       Output = Foundation_Spark.AES.Spec.Dispatch.InvCipher
+                  (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    --  Cipher.cry's InvCipher`{k}, as the spec states it, for k = K.
    --  @param K The key size, Cryptol's {k}.
    --  @param W The round keys: the first Nr (K) + 1 blocks are read.
@@ -198,8 +199,8 @@ is
      External_Name => "spark_InvCipher_Prime",
      Pre           => Is_Key_Size (K),
      Post          =>
-       Output = Foundation_Spark.AES.Spec.Cipher.InvCipher_Prime
-                  (Key_Size (K), Round_Keys_Of (K, W), Input);
+       Output = Foundation_Spark.AES.Spec.Dispatch.InvCipher_Prime
+                  (Key_Size_Of (K), Round_Keys_Of (K, W), Input);
    --  Cipher.cry's InvCipher'`{k}, as the spec states it (InvCipher_Prime),
    --  for k = K.
    --  @param K The key size, Cryptol's {k}.

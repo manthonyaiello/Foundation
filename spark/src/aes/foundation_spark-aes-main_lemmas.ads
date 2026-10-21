@@ -15,6 +15,7 @@
 
 with Foundation_Spark.AES.Impl.Main;
 with Foundation_Spark.AES.Spec.Cipher;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.KeyExpansion;
 with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.Types;
@@ -30,7 +31,7 @@ is
 
    use type Spec.Types.Byte;
 
-   procedure Lemma_Split_Join_Key (K : Natural; Key : Impl.Main.Key_Bytes)
+   procedure Lemma_Split_Join_Key (K : Key_Size; Key : Impl.Main.Key_Bytes)
    with
      Pre  => Impl.Main.Is_Key_Bytes (K, Key),
      Post =>
@@ -38,7 +39,7 @@ is
        and then
          (for all J in 0 .. Nk (K) - 1 =>
             (for all I in AESWord_Index =>
-               Spec.Main.Split_Key (K, Impl.Main.Join_Key (Key)) (J) (I)
+               Spec.Dispatch.Split_Key (K, Impl.Main.Join_Key (Key)) (J) (I)
                = Key (4 * J + I)));
    --  Main.cry's split (split key) of the key's bits is the key's bytes,
    --  four to a word: Cryptol's split at [k] -> [Nk k][4][8] undoes its
@@ -46,14 +47,14 @@ is
    --  @param K The key size in bits.
    --  @param Key The key, K / 8 bytes.
 
-   procedure Lemma_W_Eq (K : Natural; A, B : Key_Words; I : Natural)
+   procedure Lemma_W_Eq (K : Key_Size; A, B : Key_Words; I : Natural)
    with
      Pre                =>
        Is_Key_Words (K, A) and then Is_Key_Words (K, B) and then A = B
        and then I < Spec.KeyExpansion.Words (K),
      Post               =>
        (for all J in 0 .. I =>
-          Spec.KeyExpansion.W (K, A, J) = Spec.KeyExpansion.W (K, B, J)),
+          Spec.Dispatch.W (K, A, J) = Spec.Dispatch.W (K, B, J)),
      Subprogram_Variant => (Decreases => I);
    --  KeyExpansion.cry's w of equal keys is equal, up to word I. By
    --  induction on I.
@@ -62,12 +63,12 @@ is
    --  @param B A key equal to A.
    --  @param I The last index of w compared.
 
-   procedure Lemma_KeyExpansion_Eq (K : Natural; A, B : Key_Words)
+   procedure Lemma_KeyExpansion_Eq (K : Key_Size; A, B : Key_Words)
    with
      Pre  => Is_Key_Words (K, A) and then Is_Key_Words (K, B) and then A = B,
      Post =>
-       Spec.KeyExpansion.KeyExpansion (K, A)
-       = Spec.KeyExpansion.KeyExpansion (K, B);
+       Spec.Dispatch.KeyExpansion (K, A)
+       = Spec.Dispatch.KeyExpansion (K, B);
    --  KeyExpansion maps equal keys to equal round keys.
    --  @param K The key size in bits.
    --  @param A A key.
@@ -95,12 +96,12 @@ is
    --  @param Xs Round keys.
    --  @param Ys Round keys equal to Xs.
 
-   procedure Lemma_Cipher_Eq (K : Natural; V, W : Round_Keys; A, B : Block)
+   procedure Lemma_Cipher_Eq (K : Key_Size; V, W : Round_Keys; A, B : Block)
    with
      Pre  =>
        Is_Round_Keys (K, V) and then Is_Round_Keys (K, W)
        and then V = W and then A = B,
-     Post => Spec.Cipher.Cipher (K, V, A) = Spec.Cipher.Cipher (K, W, B);
+     Post => Spec.Dispatch.Cipher (K, V, A) = Spec.Dispatch.Cipher (K, W, B);
    --  Cipher maps equal round keys and equal blocks to equal blocks.
    --  @param K The key size in bits.
    --  @param V Round keys.
@@ -108,12 +109,13 @@ is
    --  @param A A block.
    --  @param B A block equal to A.
 
-   procedure Lemma_InvCipher_Eq (K : Natural; V, W : Round_Keys; A, B : Block)
+   procedure Lemma_InvCipher_Eq (K : Key_Size; V, W : Round_Keys; A, B : Block)
    with
      Pre  =>
        Is_Round_Keys (K, V) and then Is_Round_Keys (K, W)
        and then V = W and then A = B,
-     Post => InvCipher (K, V, A) = InvCipher (K, W, B);
+     Post =>
+       Spec.Dispatch.InvCipher (K, V, A) = Spec.Dispatch.InvCipher (K, W, B);
    --  InvCipher maps equal round keys and equal blocks to equal blocks.
    --  @param K The key size in bits.
    --  @param V Round keys.

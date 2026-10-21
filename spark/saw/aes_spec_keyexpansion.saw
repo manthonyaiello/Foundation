@@ -2,7 +2,8 @@
  * The AES spec layer's key schedule, Foundation_Spark.AES.Spec.KeyExpansion
  * (spark/src/aes/foundation_spark-aes-spec-keyexpansion.ads), against
  * algorithms/AES/KeyExpansion.cry. Included by aes_spec.saw after
- * aes_spec_common.saw and aes_spec_gf.saw (whose types_nk it uses).
+ * aes_spec_common.saw and aes_spec_gf.saw (whose types_join it uses).
+ * KeyExpansion and its w are the generic AES_K's, proved per instance.
  */
 
 /* --- AES.Spec.KeyExpansion (KeyExpansion.cry) ------------------------------- */
@@ -16,25 +17,25 @@ ke_subword <- verify_spec "keyexpansion__subword" [] (word_contract {{ SubWord }
 ke_xor <- verify_spec "keyexpansion__Oxor" [] (word_word_contract {{ \a b -> a ^ b }}) rme "rme" "\\a b -> a ^ b : AESWord";
 
 /*
- * W (K, Key, I) = KeyExpansion.cry's w @ i, one lemma per index at each
- * key size, 44, 52 and 60 lemmas (aes_spec_common.saw's w_lemmas says
- * how).
+ * AES<k>.W (Key, I) = KeyExpansion.cry's w @ i, one lemma per index at
+ * each key size, 44, 52 and 60 lemmas (aes_spec_common.saw's w_lemmas
+ * says how), on the instances of the generic AES_K (#80).
  */
-ke_w_128 <- w_lemmas [types_nk, ke_rotword, ke_subword, ke_xor] 128 4 43 0 [] [];
-ke_w_192 <- w_lemmas [types_nk, ke_rotword, ke_subword, ke_xor] 192 6 51 0 [] [];
-ke_w_256 <- w_lemmas [types_nk, ke_rotword, ke_subword, ke_xor] 256 8 59 0 [] [];
+ke_w_128 <- w_lemmas [ke_rotword, ke_subword, ke_xor] 128 4 43 0 [] [];
+ke_w_192 <- w_lemmas [ke_rotword, ke_subword, ke_xor] 192 6 51 0 [] [];
+ke_w_256 <- w_lemmas [ke_rotword, ke_subword, ke_xor] 256 8 59 0 [] [];
 
 /*
- * KeyExpansion = KeyExpansion.cry's KeyExpansion`{k} [FIPS-PUB-197 Section
- * 5.2], at k = 128, 192 and 256: KeyExpansion key = split (split (join
- * (join w))), round key R the Join of w @ (4 * R) .. w @ (4 * R + 3). The
- * result, a Round_Keys, is on the secondary stack (keyexpansion_contract
- * in aes_spec_common.saw). The overrides are the W lemmas at that size
- * (SAW applies the one at each index), Nr's and Join's; z3 with SubWord
- * uninterpreted, as for W.
+ * AES<k>.KeyExpansion = KeyExpansion.cry's KeyExpansion`{k} [FIPS-PUB-197
+ * Section 5.2], at k = 128, 192 and 256: KeyExpansion key = split (split
+ * (join (join w))), round key R the Join of w @ (4 * R) .. w @ (4 * R +
+ * 3). The result, a constrained Round_Keys, is written through sret
+ * (keyexpansion_contract in aes_spec_common.saw). The overrides are the W
+ * lemmas at that size (SAW applies the one at each index) and Join's; z3
+ * with SubWord uninterpreted, as for W.
  */
 let verify_keyexpansion (k : Int) (nk : Int) (nr : Int) (ws : [LLVMSpec]) =
-  verify_spec "keyexpansion__keyexpansion" (concat ws [types_nr, types_join])
+  verify_spec (instance_symbol k "keyexpansion") (concat ws [types_join])
     (keyexpansion_contract k nk nr) (w4_unint_z3 ["SubWord"]) "w4_unint_z3 SubWord"
     (str_concat (str_concat "KeyExpansion::KeyExpansion`{" (show k)) "}");
 ke_keyexpansion_128 <- verify_keyexpansion 128 4 10 ke_w_128;

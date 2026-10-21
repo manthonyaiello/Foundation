@@ -13,12 +13,18 @@
 --  and the FFI check runs them with the spec function.
 --
 --  Encrypt and Decrypt take Cryptol's {k} as K and serve all three key
---  sizes; the AES<n>_ shims are the instances, at a fixed key size.
+--  sizes, through the dispatchers Spec.Dispatch.Encrypt and Decrypt; the
+--  AES<n>_ shims call the instances Spec.AES128, AES192 and AES256 of the
+--  generic AES_K directly, at a fixed key size.
 --
 --  Ghost, because the spec layer is; AES_Main_Exports gives each the name
 --  Cryptol looks up (see Foundation_Spark.FFI).
 
 with Interfaces.C;
+with Foundation_Spark.AES.Spec.AES128;
+with Foundation_Spark.AES.Spec.AES192;
+with Foundation_Spark.AES.Spec.AES256;
+with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Main;
 with Foundation_Spark.AES.Spec.Types;
 with Foundation_Spark.FFI.AES_Types;
@@ -28,6 +34,7 @@ package Foundation_Spark.FFI.AES_Main with
   Ghost
 is
 
+   use Foundation_Spark.AES.Spec;
    use Foundation_Spark.AES.Spec.Main;
    use Foundation_Spark.AES.Spec.Types;
    use Foundation_Spark.FFI.AES_Types;
@@ -64,7 +71,7 @@ is
        else Join_Key_256 (Key))
    with
      Pre  => Is_Key_Size (K),
-     Post => Is_Key_Bits (Key_Size (K), Join_Key'Result);
+     Post => Is_Key_Bits (Key_Size_Of (K), Join_Key'Result);
    --  Cryptol's join at type [k / 8][8] -> [k], for k = K, on the first
    --  K / 8 bytes of Key.
    --  @param K The key size, Cryptol's {k}.
@@ -80,8 +87,8 @@ is
      Pre           => Is_Key_Size (K),
      Post          =>
        Output = Split_Block
-                  (Foundation_Spark.AES.Spec.Main.Encrypt
-                     (Key_Size (K), Join_Key (K, Key), Join_Block (Input)));
+                  (Foundation_Spark.AES.Spec.Dispatch.Encrypt
+                     (Key_Size_Of (K), Join_Key (K, Key), Join_Block (Input)));
    --  Main.cry's AES`{k}.Encrypt, as the spec states it, for k = K, over
    --  bytes.
    --  @param K The key size, Cryptol's {k}.
@@ -99,8 +106,8 @@ is
      Pre           => Is_Key_Size (K),
      Post          =>
        Output = Split_Block
-                  (Foundation_Spark.AES.Spec.Main.Decrypt
-                     (Key_Size (K), Join_Key (K, Key), Join_Block (Input)));
+                  (Foundation_Spark.AES.Spec.Dispatch.Decrypt
+                     (Key_Size_Of (K), Join_Key (K, Key), Join_Block (Input)));
    --  Main.cry's AES`{k}.Decrypt, as the spec states it, for k = K, over
    --  bytes.
    --  @param K The key size, Cryptol's {k}.

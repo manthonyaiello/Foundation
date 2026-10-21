@@ -101,7 +101,7 @@ let word_word_to_word_contract (f : Term) = do {
 };
 
 /*
- * function F (K : Natural) return Positive, with Pre => Key (K):
+ * function F (K : Key_Size) return Positive (Key_Size: 128 | 192 | 256, #80):
  * AES.Spec.Types' Nk and Nr. K is i32. Types.cry has Nk and Nr as type
  * functions (Nk k = k / 32, Nr k = Nk k + 6), so the Cryptol here is
  * their value at the key sizes the constraint Key k allows.

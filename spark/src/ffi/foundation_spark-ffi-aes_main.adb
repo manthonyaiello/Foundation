@@ -10,8 +10,8 @@ is
    begin
       Output :=
         Split_Block
-          (Foundation_Spark.AES.Spec.Main.Encrypt
-             (Key_Size (K), Join_Key (K, Key), Join_Block (Input)));
+          (Foundation_Spark.AES.Spec.Dispatch.Encrypt
+             (Key_Size_Of (K), Join_Key (K, Key), Join_Block (Input)));
    end Encrypt;
 
    procedure Decrypt
@@ -19,8 +19,8 @@ is
    begin
       Output :=
         Split_Block
-          (Foundation_Spark.AES.Spec.Main.Decrypt
-             (Key_Size (K), Join_Key (K, Key), Join_Block (Input)));
+          (Foundation_Spark.AES.Spec.Dispatch.Decrypt
+             (Key_Size_Of (K), Join_Key (K, Key), Join_Block (Input)));
    end Decrypt;
 
    procedure AES128_Encrypt

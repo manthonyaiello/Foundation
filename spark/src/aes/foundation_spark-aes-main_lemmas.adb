@@ -6,12 +6,13 @@ package body Foundation_Spark.AES.Main_Lemmas with
 is
 
    use Spec.KeyExpansion;
+   use Spec.Dispatch;
 
    --------------------------
    -- Lemma_Split_Join_Key --
    --------------------------
 
-   procedure Lemma_Split_Join_Key (K : Natural; Key : Impl.Main.Key_Bytes)
+   procedure Lemma_Split_Join_Key (K : Key_Size; Key : Impl.Main.Key_Bytes)
    is
       Bs : constant Spec.Main.Bits := Impl.Main.Join_Key (Key);
    begin
@@ -28,12 +29,12 @@ is
                = Key (4 * J + I));
             pragma Loop_Invariant
               (for all I2 in 0 .. I =>
-                 Spec.Main.Split_Key (K, Bs) (J) (I2) = Key (4 * J + I2));
+                 Spec.Dispatch.Split_Key (K, Bs) (J) (I2) = Key (4 * J + I2));
          end loop;
          pragma Loop_Invariant
            (for all J2 in 0 .. J =>
               (for all I in AESWord_Index =>
-                 Spec.Main.Split_Key (K, Bs) (J2) (I) = Key (4 * J2 + I)));
+                 Spec.Dispatch.Split_Key (K, Bs) (J2) (I) = Key (4 * J2 + I)));
       end loop;
    end Lemma_Split_Join_Key;
 
@@ -41,11 +42,13 @@ is
    -- Lemma_W_Eq --
    ----------------
 
-   procedure Lemma_W_Eq (K : Natural; A, B : Key_Words; I : Natural) is
+   procedure Lemma_W_Eq (K : Key_Size; A, B : Key_Words; I : Natural) is
    begin
       if I > 0 then
          Lemma_W_Eq (K, A, B, I - 1);
       end if;
+      Lemma_W (K, A, I);
+      Lemma_W (K, B, I);
       if I < Nk (K) then
          pragma Assert (A (I) = B (I));
       else
@@ -59,7 +62,7 @@ is
    -- Lemma_KeyExpansion_Eq --
    ---------------------------
 
-   procedure Lemma_KeyExpansion_Eq (K : Natural; A, B : Key_Words) is
+   procedure Lemma_KeyExpansion_Eq (K : Key_Size; A, B : Key_Words) is
    begin
       Lemma_W_Eq (K, A, B, Words (K) - 1);
       for R in 0 .. Nr (K) loop
@@ -105,7 +108,7 @@ is
    -- Lemma_Cipher_Eq --
    ---------------------
 
-   procedure Lemma_Cipher_Eq (K : Natural; V, W : Round_Keys; A, B : Block)
+   procedure Lemma_Cipher_Eq (K : Key_Size; V, W : Round_Keys; A, B : Block)
    is
       S1 : constant Block := AddRoundKey (A, V (0));
       S2 : constant Block := AddRoundKey (B, W (0));
@@ -124,7 +127,7 @@ is
    -- Lemma_InvCipher_Eq --
    ------------------------
 
-   procedure Lemma_InvCipher_Eq (K : Natural; V, W : Round_Keys; A, B : Block)
+   procedure Lemma_InvCipher_Eq (K : Key_Size; V, W : Round_Keys; A, B : Block)
    is
       S1 : constant Block := AddRoundKey (A, V (Nr (K)));
       S2 : constant Block := AddRoundKey (B, W (Nr (K)));

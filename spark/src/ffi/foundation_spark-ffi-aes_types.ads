@@ -57,30 +57,34 @@ is
    --  @param K The key size Cryptol passed.
    --  @return Whether K is 128, 192 or 256.
 
-   function Key_Size (K : C_Size) return Natural
+   function Key_Size_Of (K : C_Size) return Key_Size
    is (Natural (K))
    with
      Pre  => Is_Key_Size (K),
-     Post => Key (Key_Size'Result) and then Key_Size'Result = Natural (K);
-   --  The key size as the spec takes it, in the place of `{k}.
+     Post => Key_Size_Of'Result = Natural (K);
+   --  The key size as the spec takes it, in the place of `{k}: the
+   --  conversion of K to Types.Key_Size, whose predicate Is_Key_Size
+   --  discharges. Named Key_Size_Of, not Key_Size, so that it does not
+   --  hide (and is not hidden by) Types.Key_Size under the shims' use
+   --  clauses (issue #80, from spike #74).
    --  @param K The key size Cryptol passed.
-   --  @return K, a Natural with Key (K).
+   --  @return K, as a Key_Size.
 
    function Round_Keys_Of (K : C_Size; W : All_Round_Keys) return Round_Keys
-   is (W (0 .. Nr (Key_Size (K))))
+   is (W (0 .. Nr (Key_Size_Of (K))))
    with
      Pre  => Is_Key_Size (K),
-     Post => Is_Round_Keys (Key_Size (K), Round_Keys_Of'Result);
+     Post => Is_Round_Keys (Key_Size_Of (K), Round_Keys_Of'Result);
    --  The caller's [Nr k + 1]Block: the first Nr (K) + 1 blocks of W.
    --  @param K The key size Cryptol passed.
    --  @param W The C buffer.
    --  @return W (0 .. Nr (K)), a Round_Keys for K.
 
    function Key_Words_Of (K : C_Size; W : All_Key_Words) return Key_Words
-   is (W (0 .. Nk (Key_Size (K)) - 1))
+   is (W (0 .. Nk (Key_Size_Of (K)) - 1))
    with
      Pre  => Is_Key_Size (K),
-     Post => Is_Key_Words (Key_Size (K), Key_Words_Of'Result);
+     Post => Is_Key_Words (Key_Size_Of (K), Key_Words_Of'Result);
    --  The caller's [Nk k]AESWord: the first Nk (K) words of W.
    --  @param K The key size Cryptol passed.
    --  @param W The C buffer.

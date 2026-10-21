@@ -1,6 +1,4 @@
 with Foundation_Spark.AES.Main_Lemmas;
-with Foundation_Spark.AES.Spec.Cipher;
-with Foundation_Spark.AES.Spec.KeyExpansion;
 with Foundation_Spark.AES.Spec.Properties;
 
 package body Foundation_Spark.AES.Impl.Main with
@@ -11,7 +9,7 @@ is
    -- Key_Words_Of --
    ------------------
 
-   function Key_Words_Of (K : Natural; Key : Key_Bytes) return Key_Words is
+   function Key_Words_Of (K : Key_Size; Key : Key_Bytes) return Key_Words is
       Ws : Key_Words (0 .. Nk (K) - 1) := [others => [others => 0]];
    begin
       for J in Ws'Range loop
@@ -28,7 +26,7 @@ is
    -- Encrypt --
    -------------
 
-   function Encrypt (K : Natural; Key : Key_Bytes; Input : Block)
+   function Encrypt (K : Key_Size; Key : Key_Bytes; Input : Block)
      return Block
    is
       Ws    : constant Key_Words := Key_Words_Of (K, Key);
@@ -41,23 +39,23 @@ is
       --  The spec's Encrypt applies KeyExpansion to split (split key) and
       --  Cipher to split in: equal to Ws and Input, but other objects.
       AES.Main_Lemmas.Lemma_Split_Join_Key (K, Key);
-      pragma Assert (Ws = Spec.Main.Split_Key (K, Join_Key (Key)));
+      pragma Assert (Ws = Spec.Dispatch.Split_Key (K, Join_Key (Key)));
       AES.Main_Lemmas.Lemma_KeyExpansion_Eq
-        (K, Ws, Spec.Main.Split_Key (K, Join_Key (Key)));
+        (K, Ws, Spec.Dispatch.Split_Key (K, Join_Key (Key)));
       Spec.Properties.Lemma_Split_Join_Block (Input);
       AES.Main_Lemmas.Lemma_Cipher_Eq
         (K,
          W,
-         Spec.KeyExpansion.KeyExpansion
-           (K, Spec.Main.Split_Key (K, Join_Key (Key))),
+         Spec.Dispatch.KeyExpansion
+           (K, Spec.Dispatch.Split_Key (K, Join_Key (Key))),
          Input,
          Spec.Main.Split_Block (Spec.Main.Join_Block (Input)));
       pragma Assert
         (State
-         = Spec.Cipher.Cipher
+         = Spec.Dispatch.Cipher
              (K,
-              Spec.KeyExpansion.KeyExpansion
-                (K, Spec.Main.Split_Key (K, Join_Key (Key))),
+              Spec.Dispatch.KeyExpansion
+                (K, Spec.Dispatch.Split_Key (K, Join_Key (Key))),
               Spec.Main.Split_Block (Spec.Main.Join_Block (Input))));
       return State;
    end Encrypt;
@@ -66,7 +64,7 @@ is
    -- Decrypt --
    -------------
 
-   function Decrypt (K : Natural; Key : Key_Bytes; Input : Block)
+   function Decrypt (K : Key_Size; Key : Key_Bytes; Input : Block)
      return Block
    is
       Ws    : constant Key_Words := Key_Words_Of (K, Key);
@@ -78,23 +76,23 @@ is
 
       --  As in Encrypt, with InvCipher.
       AES.Main_Lemmas.Lemma_Split_Join_Key (K, Key);
-      pragma Assert (Ws = Spec.Main.Split_Key (K, Join_Key (Key)));
+      pragma Assert (Ws = Spec.Dispatch.Split_Key (K, Join_Key (Key)));
       AES.Main_Lemmas.Lemma_KeyExpansion_Eq
-        (K, Ws, Spec.Main.Split_Key (K, Join_Key (Key)));
+        (K, Ws, Spec.Dispatch.Split_Key (K, Join_Key (Key)));
       Spec.Properties.Lemma_Split_Join_Block (Input);
       AES.Main_Lemmas.Lemma_InvCipher_Eq
         (K,
          W,
-         Spec.KeyExpansion.KeyExpansion
-           (K, Spec.Main.Split_Key (K, Join_Key (Key))),
+         Spec.Dispatch.KeyExpansion
+           (K, Spec.Dispatch.Split_Key (K, Join_Key (Key))),
          Input,
          Spec.Main.Split_Block (Spec.Main.Join_Block (Input)));
       pragma Assert
         (State
-         = Spec.Cipher.InvCipher
+         = Spec.Dispatch.InvCipher
              (K,
-              Spec.KeyExpansion.KeyExpansion
-                (K, Spec.Main.Split_Key (K, Join_Key (Key))),
+              Spec.Dispatch.KeyExpansion
+                (K, Spec.Dispatch.Split_Key (K, Join_Key (Key))),
               Spec.Main.Split_Block (Spec.Main.Join_Block (Input))));
       return State;
    end Decrypt;

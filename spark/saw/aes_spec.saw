@@ -20,6 +20,11 @@
  * KeyExpansion) and aes_spec_main.saw (Main.cry's bit-vector Encrypt and
  * Decrypt); aes_spec_common.saw has the contracts. The exhaustive proofs
  * are here.
+ *
+ * The {k} functions are the generic AES_K's, proved on its instances
+ * AES128, AES192 and AES256 (#80), one per key size as before #80, now
+ * with no K argument. Those contracts are UNVERIFIED until the next SAW
+ * session (aes_spec_common.saw's header says what they assume).
  */
 
 include "aes_spec_common.saw";
