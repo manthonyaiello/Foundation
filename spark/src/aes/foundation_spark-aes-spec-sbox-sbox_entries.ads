@@ -3,11 +3,15 @@
 --  sixteen row lemmas, one per value of b / 16, each prove sixteen
 --  entries, so that each is analyzed on its own.
 --
---  For each byte, the body lists the states that GF2.cry's pgcd's inner
---  passes through computing inverse b SBoxPolynomial, one Lemma_Step per
---  step of inner, from the last back to the first. The provers check each
---  step, evaluating pdiv and pmult on constants, and then the affine
---  transformation of the inverse that the final state gives.
+--  Each row is two lemmas. Lemma_Inverse_Row_X states inverse b
+--  SBoxPolynomial for the sixteen bytes of row X as literals. For each
+--  byte, its body lists the states that GF2.cry's pgcd's inner passes
+--  through, one Lemma_Step per step of inner, from the last back to the
+--  first, and the provers check each step, evaluating pdiv and pmult on
+--  constants. Lemma_SBox_Row_X then checks the affine transformation of
+--  those inverses against the table. The inverse lemmas name nothing of
+--  SBox but SBoxPolynomial, so that the goals of the steps, nearly all of
+--  the unit's, do not carry the table and affine (#70).
 --
 --  The unit is a child of SBox, so that what its proof depends on is SBox
 --  and what SBox depends on (Types, GF2, GF28), and nothing else of the
@@ -49,11 +53,63 @@ is
    --  @param T The state one step of inner after S.
    --  @param F The state inner ends in from T.
 
+   procedure Lemma_Inverse_Row_0 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 0,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#00# => 16#00#,
+          when 16#01# => 16#01#,
+          when 16#02# => 16#8D#,
+          when 16#03# => 16#F6#,
+          when 16#04# => 16#CB#,
+          when 16#05# => 16#52#,
+          when 16#06# => 16#7B#,
+          when 16#07# => 16#D1#,
+          when 16#08# => 16#E8#,
+          when 16#09# => 16#4F#,
+          when 16#0A# => 16#29#,
+          when 16#0B# => 16#C0#,
+          when 16#0C# => 16#B0#,
+          when 16#0D# => 16#E1#,
+          when 16#0E# => 16#E5#,
+          when 16#0F# => 16#C7#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#00# .. 16#0F#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_0 (B : Types.Byte)
    with
      Pre  => B / 16 = 0,
      Post => Affine (B) = SBox (B);
    --  The entries 16#00# .. 16#0F# of SBoxCorrect.
+   --  @param B The byte.
+
+   procedure Lemma_Inverse_Row_1 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 1,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#10# => 16#74#,
+          when 16#11# => 16#B4#,
+          when 16#12# => 16#AA#,
+          when 16#13# => 16#4B#,
+          when 16#14# => 16#99#,
+          when 16#15# => 16#2B#,
+          when 16#16# => 16#60#,
+          when 16#17# => 16#5F#,
+          when 16#18# => 16#58#,
+          when 16#19# => 16#3F#,
+          when 16#1A# => 16#FD#,
+          when 16#1B# => 16#CC#,
+          when 16#1C# => 16#FF#,
+          when 16#1D# => 16#40#,
+          when 16#1E# => 16#EE#,
+          when 16#1F# => 16#B2#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#10# .. 16#1F#, by
+   --  evaluating GF2.cry's pgcd.
    --  @param B The byte.
 
    procedure Lemma_SBox_Row_1 (B : Types.Byte)
@@ -63,11 +119,63 @@ is
    --  The entries 16#10# .. 16#1F# of SBoxCorrect.
    --  @param B The byte.
 
+   procedure Lemma_Inverse_Row_2 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 2,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#20# => 16#3A#,
+          when 16#21# => 16#6E#,
+          when 16#22# => 16#5A#,
+          when 16#23# => 16#F1#,
+          when 16#24# => 16#55#,
+          when 16#25# => 16#4D#,
+          when 16#26# => 16#A8#,
+          when 16#27# => 16#C9#,
+          when 16#28# => 16#C1#,
+          when 16#29# => 16#0A#,
+          when 16#2A# => 16#98#,
+          when 16#2B# => 16#15#,
+          when 16#2C# => 16#30#,
+          when 16#2D# => 16#44#,
+          when 16#2E# => 16#A2#,
+          when 16#2F# => 16#C2#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#20# .. 16#2F#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_2 (B : Types.Byte)
    with
      Pre  => B / 16 = 2,
      Post => Affine (B) = SBox (B);
    --  The entries 16#20# .. 16#2F# of SBoxCorrect.
+   --  @param B The byte.
+
+   procedure Lemma_Inverse_Row_3 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 3,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#30# => 16#2C#,
+          when 16#31# => 16#45#,
+          when 16#32# => 16#92#,
+          when 16#33# => 16#6C#,
+          when 16#34# => 16#F3#,
+          when 16#35# => 16#39#,
+          when 16#36# => 16#66#,
+          when 16#37# => 16#42#,
+          when 16#38# => 16#F2#,
+          when 16#39# => 16#35#,
+          when 16#3A# => 16#20#,
+          when 16#3B# => 16#6F#,
+          when 16#3C# => 16#77#,
+          when 16#3D# => 16#BB#,
+          when 16#3E# => 16#59#,
+          when 16#3F# => 16#19#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#30# .. 16#3F#, by
+   --  evaluating GF2.cry's pgcd.
    --  @param B The byte.
 
    procedure Lemma_SBox_Row_3 (B : Types.Byte)
@@ -77,11 +185,63 @@ is
    --  The entries 16#30# .. 16#3F# of SBoxCorrect.
    --  @param B The byte.
 
+   procedure Lemma_Inverse_Row_4 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 4,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#40# => 16#1D#,
+          when 16#41# => 16#FE#,
+          when 16#42# => 16#37#,
+          when 16#43# => 16#67#,
+          when 16#44# => 16#2D#,
+          when 16#45# => 16#31#,
+          when 16#46# => 16#F5#,
+          when 16#47# => 16#69#,
+          when 16#48# => 16#A7#,
+          when 16#49# => 16#64#,
+          when 16#4A# => 16#AB#,
+          when 16#4B# => 16#13#,
+          when 16#4C# => 16#54#,
+          when 16#4D# => 16#25#,
+          when 16#4E# => 16#E9#,
+          when 16#4F# => 16#09#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#40# .. 16#4F#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_4 (B : Types.Byte)
    with
      Pre  => B / 16 = 4,
      Post => Affine (B) = SBox (B);
    --  The entries 16#40# .. 16#4F# of SBoxCorrect.
+   --  @param B The byte.
+
+   procedure Lemma_Inverse_Row_5 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 5,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#50# => 16#ED#,
+          when 16#51# => 16#5C#,
+          when 16#52# => 16#05#,
+          when 16#53# => 16#CA#,
+          when 16#54# => 16#4C#,
+          when 16#55# => 16#24#,
+          when 16#56# => 16#87#,
+          when 16#57# => 16#BF#,
+          when 16#58# => 16#18#,
+          when 16#59# => 16#3E#,
+          when 16#5A# => 16#22#,
+          when 16#5B# => 16#F0#,
+          when 16#5C# => 16#51#,
+          when 16#5D# => 16#EC#,
+          when 16#5E# => 16#61#,
+          when 16#5F# => 16#17#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#50# .. 16#5F#, by
+   --  evaluating GF2.cry's pgcd.
    --  @param B The byte.
 
    procedure Lemma_SBox_Row_5 (B : Types.Byte)
@@ -91,11 +251,63 @@ is
    --  The entries 16#50# .. 16#5F# of SBoxCorrect.
    --  @param B The byte.
 
+   procedure Lemma_Inverse_Row_6 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 6,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#60# => 16#16#,
+          when 16#61# => 16#5E#,
+          when 16#62# => 16#AF#,
+          when 16#63# => 16#D3#,
+          when 16#64# => 16#49#,
+          when 16#65# => 16#A6#,
+          when 16#66# => 16#36#,
+          when 16#67# => 16#43#,
+          when 16#68# => 16#F4#,
+          when 16#69# => 16#47#,
+          when 16#6A# => 16#91#,
+          when 16#6B# => 16#DF#,
+          when 16#6C# => 16#33#,
+          when 16#6D# => 16#93#,
+          when 16#6E# => 16#21#,
+          when 16#6F# => 16#3B#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#60# .. 16#6F#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_6 (B : Types.Byte)
    with
      Pre  => B / 16 = 6,
      Post => Affine (B) = SBox (B);
    --  The entries 16#60# .. 16#6F# of SBoxCorrect.
+   --  @param B The byte.
+
+   procedure Lemma_Inverse_Row_7 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 7,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#70# => 16#79#,
+          when 16#71# => 16#B7#,
+          when 16#72# => 16#97#,
+          when 16#73# => 16#85#,
+          when 16#74# => 16#10#,
+          when 16#75# => 16#B5#,
+          when 16#76# => 16#BA#,
+          when 16#77# => 16#3C#,
+          when 16#78# => 16#B6#,
+          when 16#79# => 16#70#,
+          when 16#7A# => 16#D0#,
+          when 16#7B# => 16#06#,
+          when 16#7C# => 16#A1#,
+          when 16#7D# => 16#FA#,
+          when 16#7E# => 16#81#,
+          when 16#7F# => 16#82#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#70# .. 16#7F#, by
+   --  evaluating GF2.cry's pgcd.
    --  @param B The byte.
 
    procedure Lemma_SBox_Row_7 (B : Types.Byte)
@@ -105,11 +317,63 @@ is
    --  The entries 16#70# .. 16#7F# of SBoxCorrect.
    --  @param B The byte.
 
+   procedure Lemma_Inverse_Row_8 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 8,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#80# => 16#83#,
+          when 16#81# => 16#7E#,
+          when 16#82# => 16#7F#,
+          when 16#83# => 16#80#,
+          when 16#84# => 16#96#,
+          when 16#85# => 16#73#,
+          when 16#86# => 16#BE#,
+          when 16#87# => 16#56#,
+          when 16#88# => 16#9B#,
+          when 16#89# => 16#9E#,
+          when 16#8A# => 16#95#,
+          when 16#8B# => 16#D9#,
+          when 16#8C# => 16#F7#,
+          when 16#8D# => 16#02#,
+          when 16#8E# => 16#B9#,
+          when 16#8F# => 16#A4#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#80# .. 16#8F#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_8 (B : Types.Byte)
    with
      Pre  => B / 16 = 8,
      Post => Affine (B) = SBox (B);
    --  The entries 16#80# .. 16#8F# of SBoxCorrect.
+   --  @param B The byte.
+
+   procedure Lemma_Inverse_Row_9 (B : Types.Byte)
+   with
+     Pre  => B / 16 = 9,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#90# => 16#DE#,
+          when 16#91# => 16#6A#,
+          when 16#92# => 16#32#,
+          when 16#93# => 16#6D#,
+          when 16#94# => 16#D8#,
+          when 16#95# => 16#8A#,
+          when 16#96# => 16#84#,
+          when 16#97# => 16#72#,
+          when 16#98# => 16#2A#,
+          when 16#99# => 16#14#,
+          when 16#9A# => 16#9F#,
+          when 16#9B# => 16#88#,
+          when 16#9C# => 16#F9#,
+          when 16#9D# => 16#DC#,
+          when 16#9E# => 16#89#,
+          when 16#9F# => 16#9A#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#90# .. 16#9F#, by
+   --  evaluating GF2.cry's pgcd.
    --  @param B The byte.
 
    procedure Lemma_SBox_Row_9 (B : Types.Byte)
@@ -119,11 +383,63 @@ is
    --  The entries 16#90# .. 16#9F# of SBoxCorrect.
    --  @param B The byte.
 
+   procedure Lemma_Inverse_Row_A (B : Types.Byte)
+   with
+     Pre  => B / 16 = 10,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#A0# => 16#FB#,
+          when 16#A1# => 16#7C#,
+          when 16#A2# => 16#2E#,
+          when 16#A3# => 16#C3#,
+          when 16#A4# => 16#8F#,
+          when 16#A5# => 16#B8#,
+          when 16#A6# => 16#65#,
+          when 16#A7# => 16#48#,
+          when 16#A8# => 16#26#,
+          when 16#A9# => 16#C8#,
+          when 16#AA# => 16#12#,
+          when 16#AB# => 16#4A#,
+          when 16#AC# => 16#CE#,
+          when 16#AD# => 16#E7#,
+          when 16#AE# => 16#D2#,
+          when 16#AF# => 16#62#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#A0# .. 16#AF#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_A (B : Types.Byte)
    with
      Pre  => B / 16 = 10,
      Post => Affine (B) = SBox (B);
    --  The entries 16#A0# .. 16#AF# of SBoxCorrect.
+   --  @param B The byte.
+
+   procedure Lemma_Inverse_Row_B (B : Types.Byte)
+   with
+     Pre  => B / 16 = 11,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#B0# => 16#0C#,
+          when 16#B1# => 16#E0#,
+          when 16#B2# => 16#1F#,
+          when 16#B3# => 16#EF#,
+          when 16#B4# => 16#11#,
+          when 16#B5# => 16#75#,
+          when 16#B6# => 16#78#,
+          when 16#B7# => 16#71#,
+          when 16#B8# => 16#A5#,
+          when 16#B9# => 16#8E#,
+          when 16#BA# => 16#76#,
+          when 16#BB# => 16#3D#,
+          when 16#BC# => 16#BD#,
+          when 16#BD# => 16#BC#,
+          when 16#BE# => 16#86#,
+          when 16#BF# => 16#57#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#B0# .. 16#BF#, by
+   --  evaluating GF2.cry's pgcd.
    --  @param B The byte.
 
    procedure Lemma_SBox_Row_B (B : Types.Byte)
@@ -133,11 +449,63 @@ is
    --  The entries 16#B0# .. 16#BF# of SBoxCorrect.
    --  @param B The byte.
 
+   procedure Lemma_Inverse_Row_C (B : Types.Byte)
+   with
+     Pre  => B / 16 = 12,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#C0# => 16#0B#,
+          when 16#C1# => 16#28#,
+          when 16#C2# => 16#2F#,
+          when 16#C3# => 16#A3#,
+          when 16#C4# => 16#DA#,
+          when 16#C5# => 16#D4#,
+          when 16#C6# => 16#E4#,
+          when 16#C7# => 16#0F#,
+          when 16#C8# => 16#A9#,
+          when 16#C9# => 16#27#,
+          when 16#CA# => 16#53#,
+          when 16#CB# => 16#04#,
+          when 16#CC# => 16#1B#,
+          when 16#CD# => 16#FC#,
+          when 16#CE# => 16#AC#,
+          when 16#CF# => 16#E6#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#C0# .. 16#CF#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_C (B : Types.Byte)
    with
      Pre  => B / 16 = 12,
      Post => Affine (B) = SBox (B);
    --  The entries 16#C0# .. 16#CF# of SBoxCorrect.
+   --  @param B The byte.
+
+   procedure Lemma_Inverse_Row_D (B : Types.Byte)
+   with
+     Pre  => B / 16 = 13,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#D0# => 16#7A#,
+          when 16#D1# => 16#07#,
+          when 16#D2# => 16#AE#,
+          when 16#D3# => 16#63#,
+          when 16#D4# => 16#C5#,
+          when 16#D5# => 16#DB#,
+          when 16#D6# => 16#E2#,
+          when 16#D7# => 16#EA#,
+          when 16#D8# => 16#94#,
+          when 16#D9# => 16#8B#,
+          when 16#DA# => 16#C4#,
+          when 16#DB# => 16#D5#,
+          when 16#DC# => 16#9D#,
+          when 16#DD# => 16#F8#,
+          when 16#DE# => 16#90#,
+          when 16#DF# => 16#6B#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#D0# .. 16#DF#, by
+   --  evaluating GF2.cry's pgcd.
    --  @param B The byte.
 
    procedure Lemma_SBox_Row_D (B : Types.Byte)
@@ -147,11 +515,63 @@ is
    --  The entries 16#D0# .. 16#DF# of SBoxCorrect.
    --  @param B The byte.
 
+   procedure Lemma_Inverse_Row_E (B : Types.Byte)
+   with
+     Pre  => B / 16 = 14,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#E0# => 16#B1#,
+          when 16#E1# => 16#0D#,
+          when 16#E2# => 16#D6#,
+          when 16#E3# => 16#EB#,
+          when 16#E4# => 16#C6#,
+          when 16#E5# => 16#0E#,
+          when 16#E6# => 16#CF#,
+          when 16#E7# => 16#AD#,
+          when 16#E8# => 16#08#,
+          when 16#E9# => 16#4E#,
+          when 16#EA# => 16#D7#,
+          when 16#EB# => 16#E3#,
+          when 16#EC# => 16#5D#,
+          when 16#ED# => 16#50#,
+          when 16#EE# => 16#1E#,
+          when 16#EF# => 16#B3#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#E0# .. 16#EF#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_E (B : Types.Byte)
    with
      Pre  => B / 16 = 14,
      Post => Affine (B) = SBox (B);
    --  The entries 16#E0# .. 16#EF# of SBoxCorrect.
+   --  @param B The byte.
+
+   procedure Lemma_Inverse_Row_F (B : Types.Byte)
+   with
+     Pre  => B / 16 = 15,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+          when 16#F0# => 16#5B#,
+          when 16#F1# => 16#23#,
+          when 16#F2# => 16#38#,
+          when 16#F3# => 16#34#,
+          when 16#F4# => 16#68#,
+          when 16#F5# => 16#46#,
+          when 16#F6# => 16#03#,
+          when 16#F7# => 16#8C#,
+          when 16#F8# => 16#DD#,
+          when 16#F9# => 16#9C#,
+          when 16#FA# => 16#7D#,
+          when 16#FB# => 16#A0#,
+          when 16#FC# => 16#CD#,
+          when 16#FD# => 16#1A#,
+          when 16#FE# => 16#41#,
+          when 16#FF# => 16#1C#,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#F0# .. 16#FF#, by
+   --  evaluating GF2.cry's pgcd.
    --  @param B The byte.
 
    procedure Lemma_SBox_Row_F (B : Types.Byte)

@@ -15,6 +15,18 @@
 # checks every step against the spec layer's GF2, so a wrong state here is
 # an unproved check, not a wrong proof.
 #
+# The unit is split in two kinds of lemma per row of 16 bytes (#70):
+#   * Lemma_Inverse_Row_X evaluates inner, and states inverse b
+#     SBoxPolynomial for each b of the row as a literal. It names nothing of
+#     SBox but the constant SBoxPolynomial, so its proof context is GF2's;
+#   * Lemma_SBox_Row_X takes those inverses and checks affine b == SBox @ b.
+# Every goal's proof task carries the declarations its subprogram names.
+# When one subprogram did both, each of the ~150 pgcd steps per row carried
+# the 256-entry SBox aggregate and affine's definition, which no step uses:
+# measured on rows 3 and C, the split cut gnatprove's wall-clock from 237 s
+# to 73 s at -j6, its gnatwhy3 time from 369 s to 125 s and its prover time
+# from 1350 s to 354 s.
+#
 # Usage (from spark/):
 #   python3 scripts/gen-sbox-entries.py src/aes/foundation_spark-aes-spec-sbox-sbox_entries
 # writes that path's .ads and .adb.
@@ -68,6 +80,11 @@ def lit(s):
     return 'State (' + ', '.join('%d' % v for v in s) + ')'
 
 
+def inverse(b):
+    """inverse b SBoxPolynomial: the tail of u in inner's final state."""
+    return trace(b)[-1][1] & 0xFF
+
+
 def branch(b):
     t = trace(b)
     f = lit(t[-1])
@@ -82,8 +99,7 @@ def branch(b):
             '               %s);' % lit(t[0]),
             '            pragma Assert',
             '              (GF2.Pgcd (B, SBoxPolynomial) (1) = %d);'
-            % t[-1][1],
-            '            pragma Assert (Affine (B) = SBox (B));']
+            % t[-1][1]]
     return out
 
 
@@ -93,11 +109,15 @@ SPEC_HEADER = '''\
 --  sixteen row lemmas, one per value of b / 16, each prove sixteen
 --  entries, so that each is analyzed on its own.
 --
---  For each byte, the body lists the states that GF2.cry's pgcd's inner
---  passes through computing inverse b SBoxPolynomial, one Lemma_Step per
---  step of inner, from the last back to the first. The provers check each
---  step, evaluating pdiv and pmult on constants, and then the affine
---  transformation of the inverse that the final state gives.
+--  Each row is two lemmas. Lemma_Inverse_Row_X states inverse b
+--  SBoxPolynomial for the sixteen bytes of row X as literals. For each
+--  byte, its body lists the states that GF2.cry's pgcd's inner passes
+--  through, one Lemma_Step per step of inner, from the last back to the
+--  first, and the provers check each step, evaluating pdiv and pmult on
+--  constants. Lemma_SBox_Row_X then checks the affine transformation of
+--  those inverses against the table. The inverse lemmas name nothing of
+--  SBox but SBoxPolynomial, so that the goals of the steps, nearly all of
+--  the unit's, do not carry the table and affine (#70).
 --
 --  The unit is a child of SBox, so that what its proof depends on is SBox
 --  and what SBox depends on (Types, GF2, GF28), and nothing else of the
@@ -189,14 +209,27 @@ is
 def main(out):
     spec = [SPEC_HEADER]
     for r in range(16):
+        alts = ',\n'.join('          when 16#%02X# => 16#%02X#' % (b, inverse(b))
+                          for b in range(16 * r, 16 * r + 16))
         spec.append('''\
+   procedure Lemma_Inverse_Row_%X (B : Types.Byte)
+   with
+     Pre  => B / 16 = %d,
+     Post => GF2.Inverse (B, SBoxPolynomial) =
+       (case B is
+%s,
+          when others => 0);
+   --  inverse b SBoxPolynomial for the bytes 16#%X0# .. 16#%XF#, by
+   --  evaluating GF2.cry's pgcd.
+   --  @param B The byte.
+
    procedure Lemma_SBox_Row_%X (B : Types.Byte)
    with
      Pre  => B / 16 = %d,
      Post => Affine (B) = SBox (B);
    --  The entries 16#%X0# .. 16#%XF# of SBoxCorrect.
    --  @param B The byte.
-''' % (r, r, r, r))
+''' % (r, r, alts, r, r, r, r, r, r))
     spec.append('''\
    procedure Lemma_SBox_Entry (B : Types.Byte)
    with Post => Affine (B) = SBox (B);
@@ -210,7 +243,7 @@ end Foundation_Spark.AES.Spec.SBox.SBox_Entries;
 
     body = [BODY_HEADER]
     for r in range(16):
-        name = 'Lemma_SBox_Row_%X' % r
+        name = 'Lemma_Inverse_Row_%X' % r
         rule = '   ' + '-' * (len(name) + 6)
         lines = [rule, '   -- %s --' % name, rule, '',
                  '   procedure %s (B : Types.Byte) is' % name,
@@ -218,6 +251,17 @@ end Foundation_Spark.AES.Spec.SBox.SBox_Entries;
         for b in range(16 * r, 16 * r + 16):
             lines.append('         when 16#%02X# =>' % b)
             lines += branch(b)
+        lines += ['         when others =>', '            null;',
+                  '      end case;', '   end %s;' % name, '']
+        name = 'Lemma_SBox_Row_%X' % r
+        rule = '   ' + '-' * (len(name) + 6)
+        lines += [rule, '   -- %s --' % name, rule, '',
+                  '   procedure %s (B : Types.Byte) is' % name,
+                  '   begin', '      Lemma_Inverse_Row_%X (B);' % r,
+                  '      case B is']
+        for b in range(16 * r, 16 * r + 16):
+            lines += ['         when 16#%02X# =>' % b,
+                      '            pragma Assert (Affine (B) = SBox (B));']
         lines += ['         when others =>', '            null;',
                   '      end case;', '   end %s;' % name, '']
         body.append('\n'.join(lines))
