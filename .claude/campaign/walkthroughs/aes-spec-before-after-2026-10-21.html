@@ -1,0 +1,1189 @@
+<title>AES Spec Before and After</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one prose column (~68ch) that widens to a two-pane comparison (old SPARK left, new SPARK right) for every pair of code excerpts. */
+:root {
+  --bg: #f5f6f4;
+  --surface: #ffffff;
+  --fg: #1d2321;
+  --muted: #5b6662;
+  --rule: #d9dedb;
+  --cry: #0f6e66;        /* Cryptol / prelude accent */
+  --cry-wash: #eef6f4;
+  --ada: #3d4fa8;        /* SPARK accent */
+  --ada-wash: #f0f2fa;
+  --old: #86642a;        /* "before" pane accent: muted amber */
+  --old-wash: #f6f1e7;
+  --new: #3d4fa8;        /* "after" pane accent: the crosswalk's SPARK blue */
+  --new-wash: #f0f2fa;
+  --type: #7a3d8f;
+  --same: #2c7a3f;
+  --spell: #3d4fa8;
+  --dev: #a35a00;
+  --dev-wash: #fff3e0;
+  --mark: rgba(214, 140, 20, .28);
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151918; --surface: #1c2120; --fg: #e3e8e6; --muted: #9aa6a1; --rule: #2e3634;
+    --cry: #5cc7b9; --cry-wash: #18272a; --ada: #9aa8f0; --ada-wash: #1d2133;
+    --old: #d6b47a; --old-wash: #29241a; --new: #9aa8f0; --new-wash: #1d2133; --type: #cf9be0;
+    --same: #6fcf86; --spell: #9aa8f0; --dev: #f0a64a; --dev-wash: #2d2416; --mark: rgba(240, 166, 74, .30);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151918; --surface: #1c2120; --fg: #e3e8e6; --muted: #9aa6a1; --rule: #2e3634;
+  --cry: #5cc7b9; --cry-wash: #18272a; --ada: #9aa8f0; --ada-wash: #1d2133;
+  --old: #d6b47a; --old-wash: #29241a; --new: #9aa8f0; --new-wash: #1d2133; --type: #cf9be0;
+  --same: #6fcf86; --spell: #9aa8f0; --dev: #f0a64a; --dev-wash: #2d2416; --mark: rgba(240, 166, 74, .30);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 16px/1.6 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 80px;
+  overflow-x: hidden;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+.prose { max-width: 70ch; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 600; letter-spacing: -.01em; }
+h2 { font-size: 1.7rem; font-weight: 600; padding-top: 28px; border-top: 1px solid var(--rule); }
+h3 { font-size: 1.2rem; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+p { margin: 0; }
+.prose p + p, .prose p + ul, .prose ul + p { margin-top: .8em; }
+ul { margin: 0; padding-left: 1.2em; }
+li + li { margin-top: .35em; }
+a { color: var(--ada); }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: 0 .3em; overflow-wrap: anywhere; }
+.eyebrow { font: 600 .75rem/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 1.12rem; color: var(--fg); }
+.muted { color: var(--muted); }
+
+/* section and item */
+section { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.item { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.item > .prose { font-size: .98rem; }
+
+/* chips */
+.chip { font: 600 .7rem/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; padding: 5px 8px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
+.chip.same, .chip.unchanged { color: var(--same); }
+.chip.spell { color: var(--spell); }
+.chip.dev, .chip.inline { color: var(--dev); }
+.chip.generic, .chip.new { color: var(--new); }
+.chip.prelude { color: var(--cry); }
+.chip.type { color: var(--type); }
+.chip.moved { color: var(--muted); }
+
+/* side-by-side */
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; background: var(--surface); }
+.pair.single { grid-template-columns: minmax(0, 1fr); }
+.pane { min-width: 0; display: flex; flex-direction: column; }
+.pane + .pane { border-left: 1px solid var(--rule); }
+.pane header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 12px; font: 600 .72rem/1.3 var(--font-body); letter-spacing: .06em; text-transform: uppercase; }
+.pane header .src { font: 400 .72rem/1.3 var(--font-mono); letter-spacing: 0; text-transform: none; color: var(--muted); overflow-wrap: anywhere; text-align: right; min-width: 0; }
+.pane.cry header { background: var(--cry-wash); color: var(--cry); border-bottom: 2px solid var(--cry); }
+.pane.ada header { background: var(--ada-wash); color: var(--ada); border-bottom: 2px solid var(--ada); }
+.pane.old header { background: var(--old-wash); color: var(--old); border-bottom: 2px solid var(--old); }
+.pane.new header { background: var(--new-wash); color: var(--new); border-bottom: 2px solid var(--new); }
+pre { margin: 0; padding: 12px 14px; overflow-x: auto; font: 400 .8rem/1.55 var(--font-mono); tab-size: 4; flex: 1; max-width: 100%; }
+pre .c { color: var(--muted); }
+pre + pre { border-top: 1px dashed var(--rule); }
+mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+.note { font-size: .92rem; border-left: 3px solid var(--dev); background: var(--dev-wash); padding: 10px 14px; border-radius: 0 4px 4px 0; max-width: 78ch; }
+.note b { color: var(--dev); }
+.note.plain { border-left-color: var(--rule); background: var(--surface); }
+.note.plain b { color: var(--fg); }
+
+/* verdict / counts */
+.verdict { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.verdict > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.verdict .k { font: 600 1.6rem/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.verdict .k.same { color: var(--same); } .verdict .k.spell { color: var(--spell); } .verdict .k.dev { color: var(--dev); }
+.verdict .k.new { color: var(--new); } .verdict .k .from { color: var(--old); }
+.verdict p { font-size: .9rem; color: var(--muted); }
+
+/* tables */
+.tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 .72rem/1.3 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+td code { white-space: nowrap; }
+td.k { font-family: var(--font-mono); font-size: .82rem; white-space: nowrap; }
+
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .9rem; }
+nav.toc a { text-decoration: none; border-bottom: 1px solid var(--rule); color: var(--fg); }
+nav.toc a:hover, nav.toc a:focus-visible { border-color: var(--ada); color: var(--ada); }
+a:focus-visible { outline: 2px solid var(--ada); outline-offset: 2px; }
+
+@media (max-width: 760px) {
+  .pair { grid-template-columns: minmax(0, 1fr); }
+  .pane + .pane { border-left: 0; border-top: 1px solid var(--rule); }
+  .verdict { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<div class="wrap">
+
+<header class="prose" style="display:flex;flex-direction:column;gap:14px">
+  <div class="eyebrow">Foundation · AES · spec layer · 2026-10-20/21</div>
+  <h1>AES Spec Before and After</h1>
+  <p class="lede">Foundation's AES SPARK spec layer as you reviewed it against the Cryptol (<code>3c956c1</code>, the tree behind the published crosswalk of 2026-10-20) and as it is on <code>main</code> now (<code>4431a75</code>). Old SPARK on the left, new SPARK on the right, definition by definition.</p>
+  <p class="muted">The sections follow the crosswalk's order (Types, GF28, SBox, KeyExpansion, Cipher, Main, Properties), so the two pages can be read side by side. Then come the units that have no "before": the generic <code>AES_K</code> and its instances, <code>Dispatch</code>, and the Cryptol prelude in SPARK. Excerpts are copied from the named commit with comments removed (except the <code>Folds</code> unit, shown in full) and trimmed with <code>…</code>. <mark>Highlighted</mark> lines are the ones that differ. The Cryptol (<code>algorithms/AES/*.cry</code>) did not change between the two commits.</p>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <a href="#summary">What changed</a><a href="#types">Types</a><a href="#gf28">GF28</a><a href="#sbox">SBox</a><a href="#keyexp">KeyExpansion</a><a href="#cipher">Cipher</a><a href="#main">Main</a><a href="#props">Properties</a><a href="#aes_k">AES_K</a><a href="#dispatch">Dispatch</a><a href="#prelude">The prelude</a><a href="#inline">Still written out</a><a href="#sparklib">SPARKlib</a>
+</nav>
+
+<!-- ============================================================ -->
+<section id="summary">
+  <h2>What changed</h2>
+  <div class="prose"><ul>
+    <li><b>The key size is a subtype.</b> <code>Types.Key (K)</code> is gone. Every <code>K</code> that stands for Cryptol's <code>k</code> is a <code>Key_Size</code>, a <code>Natural</code> with <code>Static_Predicate =&gt; Key_Size in 128 | 192 | 256</code>. <code>Nk</code> and <code>Nr</code> are <code>Static</code> functions with no <code>Pre</code>. (<a href="https://github.com/manthonyaiello/Foundation/issues/73">#73</a> item 1, <a href="https://github.com/manthonyaiello/Foundation/issues/80">#80</a>, PR <a href="https://github.com/manthonyaiello/Foundation/pull/82">#82</a>)</li>
+    <li><b>The <code>{k}</code> functions are one generic.</b> <code>W</code>, <code>KeyExpansion</code>, <code>Cipher</code>, <code>InvCipher</code>, <code>InvCipher_Prime</code>, <code>Split_Key</code>, <code>Encrypt</code> and <code>Decrypt</code> moved into <code>Spec.AES_K</code> (formal <code>K : Key_Size</code>), with no <code>K</code> argument and no precondition. <code>Spec.AES128</code>/<code>192</code>/<code>256</code> are library-level instances, as Main.cry's <code>AES128 = AES`{128}</code>. The ghost <code>Spec.Dispatch</code> selects an instance by a run-time <code>K</code> for the implementation, and its postconditions carry the old explicit-<code>K</code> formulas. (PR #82)</li>
+    <li><b>The bodies call a Cryptol prelude in SPARK.</b> <code>@@</code>, <code>foldl</code>, <code>@</code>/<code>head</code>, <code>join</code>/<code>split</code> on bits and <code>pmult</code> at <code>[8] x [8]</code> are now instances of generics under <code>spark/src/cryptol/</code>. Five AES statements stay written out, each with a measured reason. Public functions and contracts did not change. (<a href="https://github.com/manthonyaiello/Foundation/issues/75">#75</a>, PRs <a href="https://github.com/manthonyaiello/Foundation/pull/83">#83</a>, <a href="https://github.com/manthonyaiello/Foundation/pull/85">#85</a>)</li>
+    <li><b><code>Main.Bit_Index</code> is <code>range 0 .. 256</code></b>, down from <code>0 .. 2 ** 127 - 1</code>. (<a href="https://github.com/manthonyaiello/Foundation/issues/68">#68</a>, PR <a href="https://github.com/manthonyaiello/Foundation/pull/77">#77</a>)</li>
+    <li><b><code>SBox_Entries</code> moved under <code>Spec.SBox</code></b>, so its slow proof's closure dropped from 17 source inputs to 10. Each row lemma is now split into an inverse lemma that names nothing of the S-box and an S-box lemma, which took its cold proof from 1148 s to 493 s. <code>SBoxCorrect</code>'s statement did not change. (<a href="https://github.com/manthonyaiello/Foundation/issues/70">#70</a>, PRs <a href="https://github.com/manthonyaiello/Foundation/pull/79">#79</a>, <a href="https://github.com/manthonyaiello/Foundation/pull/86">#86</a>)</li>
+    <li><b>No spec unit changed in #76 or #84.</b> <a href="https://github.com/manthonyaiello/Foundation/pull/76">#76</a> removed the unused SPARKlib dependency (no change under <code>spark/src</code>). <a href="https://github.com/manthonyaiello/Foundation/pull/84">#84</a>, the constant-time S-box, changed only <code>AES.Impl</code> and its FFI unit.</li>
+  </ul></div>
+  <div class="verdict">
+    <div><span class="k new"><span class="from">10</span> → 15</span><p>AES spec units (<code>aes-spec*.ads</code>). Added: <code>AES_K</code>, <code>AES128</code>, <code>AES192</code>, <code>AES256</code>, <code>Dispatch</code>. <code>SBox_Entries</code> moved. Plus 12 new prelude units in <code>spark/src/cryptol/</code>.</p></div>
+    <div><span class="k new"><span class="from">3554</span> → 4231</span><p>Default-gate checks, whole crate, all proved (PLAN.md at each commit). This includes SHA-2, HMAC, the prelude's instances and #84's constant-time S-box, not only the AES spec.</p></div>
+    <div><span class="k new"><span class="from">7</span> → 0</span><p>Uses of <code>Key (K)</code> in <code>spark/src</code>, comments excluded: three <code>Pre =&gt; Key (K)</code> and four conjuncts in <code>Is_Key_Words</code>, <code>Is_Round_Keys</code>, <code>Main.Is_Key_Bits</code> and <code>Impl.Main.Is_Key_Bytes</code>.</p></div>
+    <div><span class="k new"><span class="from">50</span> → 2</span><p>Parameters <code>K : Natural</code> in <code>spark/src</code>. The two left are <code>Dispatch.Lemma_Key_Size</code>'s spec and body, which relate any <code>Natural</code> to <code>Key_Size</code>. <code>K : Key_Size</code>: 0 → 53.</p></div>
+    <div><span class="k new"><span class="from">13</span> → 2</span><p><code>Pre</code> aspects in <code>Types</code>, <code>KeyExpansion</code>, <code>Cipher</code> and <code>Main</code>; the two left are <code>Byte_At</code>'s and <code>Bit_Of</code>'s. <code>AES_K</code> has none. <code>Dispatch</code> adds 10, where the implementation meets the spec.</p></div>
+    <div><span class="k new"><span class="from">19</span> → 12</span><p><code>Subprogram_Variant</code>s in the AES spec units: the folds, <code>Pmult_Fold</code> and the fold lemmas no longer recurse. <code>SBox_Entries</code> (slow unit): 2482 → 2565 checks.</p></div>
+  </div>
+  <p class="muted" style="font-size:.9rem">How the counts were taken: <code>git archive</code> of each commit's <code>spark/src</code>, comments stripped with <code>sed 's/--.*$//'</code>, then <code>grep -cP</code> on lines. <code>Is_Key_Words</code> went from 9 lines to 11 and <code>Is_Round_Keys</code> and <code>Is_Key_Bits</code> stayed at 15 and 8: they are now pure typing predicates, used as the dispatchers' and the implementation's preconditions, since a subtype cannot tie an array's length to another parameter. The gate counts are the ones PLAN.md records at <code>3c956c1</code> and <code>4431a75</code> (and PRs #76 and #86); I did not re-run the gate. The slow-unit counts are from PRs #77 and #86.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="types">
+  <h2>Types</h2>
+
+  <div class="item">
+    <h3>Key, Nk, Nr <span class="chip type">Type</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-types.ads:63–85 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-types.ads"><mark>function Key (K : Natural) return Boolean</mark>
+<mark>is (K mod 64 = 0 and then K / 64 &gt;= 2 and then K / 64 &lt;= 4);</mark>
+
+<mark>function Nk (K : Natural) return Positive</mark>
+is (K / 32)
+<mark>with Pre =&gt; Key (K);</mark>
+
+<mark>function Nr (K : Natural) return Positive</mark>
+is (Nk (K) + 6)
+<mark>with Pre =&gt; Key (K);</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-types.ads:87–114 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-types.ads"><mark>subtype Key_Size is Natural</mark>
+<mark>with Static_Predicate =&gt; Key_Size in 128 | 192 | 256;</mark>
+
+<mark>function Nk (K : Key_Size) return Positive</mark>
+is (K / 32)
+<mark>with Static;</mark>
+
+<mark>function Nr (K : Key_Size) return Positive</mark>
+is (Nk (K) + 6)
+<mark>with Static;</mark></pre></div>
+    </div>
+    <div class="prose"><p>Types.cry's <code>type constraint Key k = (fin k, k % 64 == 0, k / 64 &gt;= 2, k / 64 &lt;= 4)</code> is now a subtype rather than a Boolean. The predicate lists the three values because it must be static (a static predicate cannot use <code>mod</code>, RM 3.2.4), and a <code>Pure</code> instance needs static bounds for <code>AES_K</code>'s subtypes. <code>Dispatch.Lemma_Key_Size</code> proves the list equal to the Cryptol's clauses (shown <a href="#dispatch">below</a>). <code>Nk</code>/<code>Nr</code> are <code>Static</code> for the same reason, and a static function cannot have a <code>Pre</code>, so the constraint moved into the parameter's subtype. (#73, #80, PR #82)</p></div>
+  </div>
+
+  <div class="item">
+    <h3>Block, AESWord, Byte_Table, Key_Words, Round_Keys <span class="chip unchanged">Unchanged</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-types.ads:52–70, 122–141 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-types.ads">type Byte_Table is array (Byte) of Byte;
+subtype Block_Index is Natural range 0 .. 15;
+type Block is array (Block_Index) of Byte;
+subtype AESWord_Index is Natural range 0 .. 3;
+type AESWord is array (AESWord_Index) of Byte;
+type Columns is array (AESWord_Index) of AESWord;
+…
+type Key_Words is array (Key_Word_Index range &lt;&gt;) of AESWord;
+…
+type Round_Keys is array (Round_Key_Index range &lt;&gt;) of Block;</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> Same declarations at <code>3c956c1</code> (lines 28–46, 93–112). The unconstrained <code>Key_Words</code> and <code>Round_Keys</code> stay: <code>AES_K</code> takes constrained subtypes of them, and the implementation still uses them with a run-time <code>K</code>.</div>
+  </div>
+
+  <div class="item">
+    <h3 id="d-keysize">The key size: <code>Key (K)</code> → <code>Key_Size</code> <span class="chip type">Type</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-types.ads:101–118 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-types.ads"><mark>function Is_Key_Words (K : Natural; W : Key_Words) return Boolean</mark>
+<mark>is (Key (K) and then W'First = 0 and then W'Length = Nk (K));</mark>
+…
+<mark>function Is_Round_Keys (K : Natural; W : Round_Keys) return Boolean</mark>
+<mark>is (Key (K) and then W'First = 0 and then W'Length = Nr (K) + 1);</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-types.ads:130–147 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-types.ads"><mark>function Is_Key_Words (K : Key_Size; W : Key_Words) return Boolean</mark>
+<mark>is (W'First = 0 and then W'Length = Nk (K));</mark>
+…
+<mark>function Is_Round_Keys (K : Key_Size; W : Round_Keys) return Boolean</mark>
+<mark>is (W'First = 0 and then W'Length = Nr (K) + 1);</mark></pre></div>
+    </div>
+    <div class="note"><b>Why.</b> The crosswalk called this the main deviation: Cryptol's <code>[Nk k]AESWord</code> became an unconstrained array plus a precondition on an explicit <code>K</code>. The <code>Key (K)</code> conjunct is now the parameter's subtype. The typing predicates stay, but only for a <code>K</code> that is not static: the dispatchers and the implementation use them. Inside <code>AES_K</code> the length is in the type (<code>Key_Words (0 .. Nk - 1)</code>), so the <code>{k}</code> functions need no precondition at all. (#73 item 1, #80, PR #82)</div>
+  </div>
+
+  <div class="item">
+    <h3>split and join on a block <span class="chip unchanged">Unchanged</span> <span class="chip inline">Kept inline</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-types.ads:74–82 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-types.ads">function Split (Bs : Block) return Columns
+is [for J in AESWord_Index =&gt; [for I in AESWord_Index =&gt; Bs (4 * J + I)]];
+
+function Join (Ws : Columns) return Block
+is [for I in Block_Index =&gt; Ws (I / 4) (I mod 4)];</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> Same text at <code>3c956c1</code> (lines 50–58). One of the five statements that stay written out: the prelude's <code>Join_Split</code> goes between words and bits, not a block and its columns, and <code>Types</code> is not ghost (the implementation calls these), while the prelude is. (PR #85)</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="gf28">
+  <h2>GF28: byte multiplication</h2>
+
+  <div class="item">
+    <h3>(•) and xTimes <span class="chip unchanged">Unchanged</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-gf28.ads:136–149 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-gf28.ads">M : constant Poly := 16#11B#;
+
+function Dot (B, C : Byte) return Byte
+is (Pmod (Pmult (B, C), M));
+
+function xTimes (B : Byte) return Byte
+is (Interfaces.Shift_Left (B, 1) xor (if Head (B) then 16#1b# else 16#00#));</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> Same text at <code>3c956c1</code> (lines 117–130). GF28.cry: <code>(•) b c = pmod (pmult b c) m</code>. What changed is underneath: <code>Head</code> and <code>Pmult</code>, next.</div>
+  </div>
+
+  <div class="item">
+    <h3>@ and head on a [8] and a [15] <span class="chip prelude">Prelude</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-gf28.ads:33–51 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-gf28.ads">function Bit (B : Byte; I : Bit_Index) return Boolean
+<mark>is ((Interfaces.Shift_Right (B, 7 - I) and 1) = 1);</mark>
+
+function Head (B : Byte) return Boolean
+<mark>is (Bit (B, 0));</mark>
+
+subtype Product_Index is Natural range 0 .. 14;
+
+function Product_Bit (X : Poly; I : Product_Index) return Boolean
+<mark>is ((Interfaces.Shift_Right (X, 14 - I) and 1) = 1);</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-gf28.ads:44–70 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-gf28.ads"><mark>package Byte_Bits is new Cryptol.Words</mark>
+<mark>  (Byte, 8, Interfaces.Shift_Right);</mark>
+
+function Bit (B : Byte; I : Bit_Index) return Boolean
+<mark>is (Byte_Bits.Bit (B, I));</mark>
+
+function Head (B : Byte) return Boolean
+<mark>is (Byte_Bits.Head (B));</mark>
+
+subtype Product_Index is Natural range 0 .. 14;
+
+<mark>package Product_Bits is new Cryptol.Words</mark>
+<mark>  (Poly, 15, Interfaces.Shift_Right);</mark>
+
+function Product_Bit (X : Poly; I : Product_Index) return Boolean
+<mark>is (Product_Bits.Bit (X, I));</mark></pre></div>
+    </div>
+    <div class="prose"><p>The shift-and-mask formula is now stated once, in the prelude's <code>Words.Bit</code> (<code>Shift_Right (X, Width - 1 - J) and 1</code>), and instantiated at the widths GF28 reads. Names and contracts are unchanged. GF2's <code>Bit</code> on a <code>[9]</code> moved the same way (<code>Poly_Bits</code>, gf2.ads:107–112). (#75, PR #85)</p></div>
+  </div>
+
+  <div class="item">
+    <h3 id="d-prims">pmult at [8] x [8] <span class="chip prelude">Prelude</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-gf28.ads:58–74 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-gf28.ads">function Pmult_Fold (B, C : Byte; N : Natural) return Poly
+<mark>is (if N = 0 then 0</mark>
+<mark>    else Interfaces.Shift_Left (Pmult_Fold (B, C, N - 1), 1)</mark>
+<mark>         xor (if Bit (C, N - 1) then Poly (B) else 0))</mark>
+<mark>with</mark>
+<mark>  Pre                =&gt; N &lt;= 8,</mark>
+<mark>  Subprogram_Variant =&gt; (Decreases =&gt; N);</mark>
+
+function Pmult (B, C : Byte) return Poly
+<mark>is (Pmult_Fold (B, C, 8));</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-gf28.ads:77–93 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-gf28.ads"><mark>package Products is new Cryptol.Polynomial_Products</mark>
+<mark>  (Poly, 7, 7, Interfaces.Shift_Right);</mark>
+
+function Pmult_Fold (B, C : Byte; N : Natural) return Poly
+<mark>is (Products.Products (Poly (B), Poly (C), N))</mark>
+<mark>with Pre =&gt; N &lt;= 8;</mark>
+
+function Pmult (B, C : Byte) return Poly
+<mark>is (Products.Pmult (Poly (B), Poly (C)));</mark></pre></div>
+    </div>
+    <div class="prose"><p>Cryptol's <code>pmult : {u, v} [1 + u] -&gt; [1 + v] -&gt; [1 + u + v]</code> at <code>{7, 7}</code>. The fold is the same shift-and-xor over the multiplier's bits, most significant first; it now lives in <code>Polynomial_Products</code> (shown <a href="#prelude">below</a>), and the FFI checks that generic at exactly <code>{7, 7}</code>. The recursion and its variant are in the prelude. (#75, PR #85)</p></div>
+  </div>
+
+  <div class="item">
+    <h3>pmod into a Byte <span class="chip unchanged">Unchanged</span> <span class="chip inline">Kept inline</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-gf28.ads:100–128 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-gf28.ads">function Reduce (R : Poly; Y : Poly) return Byte
+is (if R &gt;= 256 then Byte (R xor Y) else Byte (R))
+with Pre =&gt; R &lt; 512 and then Y in 256 .. 511;
+
+function Pmod_Fold (X : Poly; Y : Poly; N : Natural) return Byte
+is (if N = 0 then 0
+    else Reduce
+           (Interfaces.Shift_Left (Poly (Pmod_Fold (X, Y, N - 1)), 1)
+            or (if Product_Bit (X, N - 1) then 1 else 0),
+            Y))
+with
+  Pre                =&gt; N &lt;= 15 and then Y in 256 .. 511,
+  Subprogram_Variant =&gt; (Decreases =&gt; N);
+
+function Pmod (X : Poly; Y : Poly) return Byte
+is (Pmod_Fold (X, Y, 15))
+with Pre =&gt; Y in 256 .. 511;</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> Same text at <code>3c956c1</code> (lines 81–109); only <code>Product_Bit</code> underneath now comes from the prelude. Kept inline because GF28's <code>Pmod</code> returns the <code>[8]</code> as a <code>Byte</code>, while the prelude's returns a <code>Poly</code> whose bound below 2 ** 8 is an induction no expression function can call, and GF28's takes any <code>Poly</code> dividend where the prelude's requires a <code>[15]</code>. Not tried, for those two reasons. (PR #85)</div>
+  </div>
+
+  <div class="item">
+    <h3>GF2: pmult and pdiv at [9] <span class="chip unchanged">Unchanged</span> <span class="chip inline">Kept inline</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-gf2.ads:68–74, 174–176 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-gf2.ads">function Pmult (X, Y : Poly) return Product
+is (Term (X, 0, Y) xor Term (X, 1, Y) xor Term (X, 2, Y)
+    xor Term (X, 3, Y) xor Term (X, 4, Y) xor Term (X, 5, Y)
+    xor Term (X, 6, Y) xor Term (X, 7, Y) xor Term (X, 8, Y))
+with
+  Pre  =&gt; Is_Poly9 (X) and then Is_Poly9 (Y),
+  Post =&gt; Pmult'Result &lt; 2 ** 17;
+…
+function Pdiv (X, Y : Poly) return Poly
+is (Pdiv_Fold (X, Y, 9))
+with Pre =&gt; Is_Poly9 (X) and then Is_Poly9 (Y) and then Y /= 0;</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> Same text at <code>3c956c1</code> (lines 54–60, 156–158), as are <code>Pmod_Fold</code>, <code>Pdiv_Fold</code>, <code>Inner</code>, <code>Pgcd</code> and <code>Inverse</code>; the unit's header comment now records why. Both tried and reverted: through <code>Polynomial_Products</code> at <code>{8, 8}</code>, GF2 proved but <code>SBox_Entries</code> had finished 9 of its 32 subprograms after 77 minutes at -j6 (about 26 minutes for the whole unit before). Through <code>Polynomial_Quotients</code> at <code>{9, 9}</code>, <code>Inner_Step</code>'s postcondition does not prove at level 4, because it rests on <code>Pdiv_Fold</code> reducing by <code>Lead (y)</code>, not the prelude's <code>Top (y)</code>. (PR #85)</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="sbox">
+  <h2>SBox</h2>
+
+  <div class="item">
+    <h3>The tables, affine, inverse <span class="chip unchanged">Unchanged</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-sbox.ads:19–123 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-sbox.ads">SBox : constant Types.Byte_Table :=
+  [16#63#, 16#7c#, 16#77#, 16#7b#, 16#f2#, 16#6b#, 16#6f#, 16#c5#,
+…
+InvSBox : constant Types.Byte_Table :=
+  [16#52#, 16#09#, 16#6a#, 16#d5#, 16#30#, 16#36#, 16#a5#, 16#38#,
+…
+SBoxPolynomial : constant GF2.Poly := 2#1_0001_1011#;
+…
+function Affine (B : Types.Byte) return Types.Byte
+is ((if Affine_Bit (GF2.Inverse (B, SBoxPolynomial), 0) then 16#01#
+     else 0)
+…</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> <code>git diff 3c956c1 4431a75</code> on <code>spec-sbox.ads</code> touches only the header comment, which now says <code>SBoxCorrect</code> is proved from the child <code>SBox_Entries</code>. GF2's <code>Inverse</code>, <code>Pgcd</code> and <code>Inner</code> are unchanged too. The move of <code>SBox_Entries</code> is under <a href="#props">Properties</a>.</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="keyexp">
+  <h2>KeyExpansion</h2>
+
+  <div class="item">
+    <h3>Rcon, RotWord, SubWord <span class="chip unchanged">Unchanged</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-keyexpansion.ads:37–61 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-keyexpansion.ads">Rcon : constant Rcon_Table :=
+  [[16#01#, 16#00#, 16#00#, 16#00#],
+…
+function RotWord (A : AESWord) return AESWord
+is [A (1), A (2), A (3), A (0)];
+
+function SubWord (A : AESWord) return AESWord
+is [SBox.SBox (A (0)), SBox.SBox (A (1)),
+    SBox.SBox (A (2)), SBox.SBox (A (3))];</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> Same text at <code>3c956c1</code> (lines 44–69), including <code>Rcon</code>'s index range <code>1 .. 10</code>. These have no <code>{k}</code>, so they stay in the non-generic unit and are proved once.</div>
+  </div>
+
+  <div class="item">
+    <h3>Words <span class="chip type">Type</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-keyexpansion.ads:75–77 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-keyexpansion.ads"><mark>function Words (K : Natural) return Positive</mark>
+is (4 * (Nr (K) + 1))
+<mark>with Pre =&gt; Types.Key (K);</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-keyexpansion.ads:68–69 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-keyexpansion.ads"><mark>function Words (K : Key_Size) return Positive</mark>
+<mark>is (4 * (Nr (K) + 1));</mark></pre></div>
+    </div>
+    <div class="prose"><p>The precondition is the parameter's subtype. <code>Words</code> stays here because <code>Dispatch</code> uses it to bound <code>W</code>'s index; inside <code>AES_K</code> the bound is the subtype <code>Word_Index</code>. (PR #82)</p></div>
+  </div>
+
+  <div class="item">
+    <h3 id="d-w">The expanded key w, and KeyExpansion <span class="chip generic">Generic</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-keyexpansion.ads:83–112 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-keyexpansion.ads"><mark>function W (K : Natural; Key : Key_Words; I : Natural) return AESWord</mark>
+<mark>is (if I &lt; Nk (K) then Key (I)</mark>
+<mark>    elsif I mod Nk (K) = 0</mark>
+<mark>    then W (K, Key, I - Nk (K))</mark>
+<mark>         xor SubWord (RotWord (W (K, Key, I - 1)))</mark>
+<mark>         xor Rcon (I / Nk (K))</mark>
+<mark>    elsif I mod Nk (K) = 4 and then Nk (K) &gt; 6</mark>
+<mark>    then W (K, Key, I - Nk (K)) xor SubWord (W (K, Key, I - 1))</mark>
+<mark>    else W (K, Key, I - Nk (K)) xor W (K, Key, I - 1))</mark>
+with
+<mark>  Pre                =&gt; Is_Key_Words (K, Key) and then I &lt; Words (K),</mark>
+  Subprogram_Variant =&gt; (Decreases =&gt; I);
+
+<mark>function KeyExpansion (K : Natural; Key : Key_Words) return Round_Keys</mark>
+<mark>is [for R in 0 .. Nr (K) =&gt; Join ([for J in AESWord_Index =&gt;</mark>
+<mark>                                     W (K, Key, 4 * R + J)])]</mark>
+<mark>with</mark>
+<mark>  Pre  =&gt; Is_Key_Words (K, Key),</mark>
+<mark>  Post =&gt; Is_Round_Keys (K, KeyExpansion'Result);</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-aes_k.ads:59–82 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-aes_k.ads"><mark>function W (Key : Key_Words; I : Word_Index) return AESWord</mark>
+<mark>is (if I &lt; Nk then Key (I)</mark>
+<mark>    elsif I mod Nk = 0</mark>
+<mark>    then W (Key, I - Nk) xor SubWord (RotWord (W (Key, I - 1)))</mark>
+<mark>         xor Rcon (I / Nk)</mark>
+<mark>    elsif I mod Nk = 4 and then Nk &gt; 6</mark>
+<mark>    then W (Key, I - Nk) xor SubWord (W (Key, I - 1))</mark>
+<mark>    else W (Key, I - Nk) xor W (Key, I - 1))</mark>
+<mark>with Subprogram_Variant =&gt; (Decreases =&gt; I);</mark>
+
+<mark>function KeyExpansion (Key : Key_Words) return Round_Keys</mark>
+<mark>is [for R in 0 .. Nr =&gt; Join ([for J in AESWord_Index =&gt;</mark>
+<mark>                                     W (Key, 4 * R + J)])];</mark></pre></div>
+    </div>
+    <div class="prose"><p>KeyExpansion.cry: <code>KeyExpansion : {k} (Key k) =&gt; [Nk k]AESWord -&gt; [Nr k + 1]Block</code>. In the generic, <code>Key_Words</code> and <code>Round_Keys</code> are <code>AES_K</code>'s constrained subtypes, so the case analysis reads <code>Nk</code> where the Cryptol reads <code>Nk</code>, there is no <code>K</code> argument, and both preconditions and the postcondition are gone. <code>Nk</code> and <code>Nr</code> are the generic's constants, because GNAT 16.1 crashes on a call of the static <code>Types.Nk</code> inside an expression function of an instance (the bug and its reproducer are in PR #82). (#80, PR #82)</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="cipher">
+  <h2>Cipher</h2>
+
+  <div class="item">
+    <h3>SubBytes, ShiftRows (and inverses) via @@ <span class="chip prelude">Prelude</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-cipher.ads:48–85 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-cipher.ads">function SubBytes (Bs : Block) return Block
+<mark>is [for I in Block_Index =&gt; SBox.SBox (Bs (I))];</mark>
+
+function InvSubBytes (Bs : Block) return Block
+<mark>is [for I in Block_Index =&gt; SBox.InvSBox (Bs (I))];</mark>
+
+ShiftRows_Indices : constant Permutation :=
+  [0, 5, 10, 15,
+…
+function ShiftRows (Bs : Block) return Block
+<mark>is [for I in Block_Index =&gt; Bs (ShiftRows_Indices (I))];</mark>
+…
+function InvShiftRows (Bs : Block) return Block
+<mark>is [for I in Block_Index =&gt; Bs (InvShiftRows_Indices (I))];</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-cipher.ads:51–108 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-cipher.ads"><mark>package Table_Indexing is new Cryptol.Bulk_Indexing</mark>
+<mark>  (Index     =&gt; Byte,</mark>
+<mark>   Element   =&gt; Byte,</mark>
+<mark>   Seq       =&gt; Byte_Table,</mark>
+<mark>   Out_Index =&gt; Block_Index,</mark>
+<mark>   Indices   =&gt; Block,</mark>
+<mark>   Out_Seq   =&gt; Block);</mark>
+
+<mark>package Block_Indexing is new Cryptol.Bulk_Indexing</mark>
+<mark>  (Index     =&gt; Block_Index,</mark>
+<mark>   Element   =&gt; Byte,</mark>
+<mark>   Seq       =&gt; Block,</mark>
+<mark>   Out_Index =&gt; Block_Index,</mark>
+<mark>   Indices   =&gt; Permutation,</mark>
+<mark>   Out_Seq   =&gt; Block);</mark>
+
+function SubBytes (Bs : Block) return Block
+<mark>is (Table_Indexing.Bulk_Index (SBox.SBox, Bs));</mark>
+
+function InvSubBytes (Bs : Block) return Block
+<mark>is (Table_Indexing.Bulk_Index (SBox.InvSBox, Bs));</mark>
+
+ShiftRows_Indices : constant Permutation :=
+  [0, 5, 10, 15,
+…
+function ShiftRows (Bs : Block) return Block
+<mark>is (Block_Indexing.Bulk_Index (Bs, ShiftRows_Indices));</mark>
+…
+function InvShiftRows (Bs : Block) return Block
+<mark>is (Block_Indexing.Bulk_Index (Bs, InvShiftRows_Indices));</mark></pre></div>
+    </div>
+    <div class="prose"><p>Cipher.cry reads <code>SubBytes bs = SBox @@ bs</code> and <code>ShiftRows bs = bs @@ [0, 5, 10, 15, …]</code>. The new bodies have the same shape, argument order included: table first for <code>SubBytes</code>, block first for <code>ShiftRows</code>. The comprehension <code>[ xs @ i | i &lt;- is ]</code> is written once, in <code>Bulk_Indexing</code>. The index tables are unchanged. (#75, PR #85)</p></div>
+  </div>
+
+  <div class="item">
+    <h3>MixColumns, AddRoundKey, Round, InvRound, InvRound' <span class="chip unchanged">Unchanged</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-cipher.ads:124–178 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-cipher.ads">function MixColumns (Bs : Block) return Block
+is (Join ([for J in AESWord_Index =&gt; MixColumnsStep (Split (Bs) (J))]));
+…
+function AddRoundKey (Bs : Block; W : Block) return Block
+is [for I in Block_Index =&gt; Bs (I) xor W (I)];
+
+function Round (Xs : Block; Ki : Block) return Block
+is (AddRoundKey (MixColumns (ShiftRows (SubBytes (Xs))), Ki));
+
+function InvRound (Xs : Block; Ki : Block) return Block
+is (InvMixColumns (AddRoundKey (InvSubBytes (InvShiftRows (Xs)), Ki)));</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> <code>MixColumnsStep</code>, <code>MixColumns</code>, their inverses, <code>AddRoundKey</code> and the three round functions are the same text at <code>3c956c1</code> (lines 91–162).</div>
+  </div>
+
+  <div class="item">
+    <h3 id="d-folds">foldl Round (and the two inverse folds) <span class="chip prelude">Prelude</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-cipher.ads:163–197 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-cipher.ads">function Foldl_Round (Z : Block; Xs : Round_Keys) return Block
+<mark>is (if Xs'Length = 0 then Z</mark>
+<mark>    else Foldl_Round (Round (Z, Xs (Xs'First)),</mark>
+<mark>                      Xs (Xs'First + 1 .. Xs'Last)))</mark>
+<mark>with Subprogram_Variant =&gt; (Decreases =&gt; Xs'Length);</mark>
+
+function Foldl_InvRound (Z : Block; Xs : Round_Keys) return Block
+<mark>is (if Xs'Length = 0 then Z</mark>
+<mark>    else Foldl_InvRound (InvRound (Z, Xs (Xs'First)),</mark>
+<mark>                         Xs (Xs'First + 1 .. Xs'Last)))</mark>
+<mark>with Subprogram_Variant =&gt; (Decreases =&gt; Xs'Length);</mark>
+
+function Foldl_InvRound_Prime (Z : Block; Xs : Round_Keys) return Block
+<mark>is (if Xs'Length = 0 then Z</mark>
+<mark>    else Foldl_InvRound_Prime (InvRound_Prime (Z, Xs (Xs'First)),</mark>
+<mark>                               Xs (Xs'First + 1 .. Xs'Last)))</mark>
+<mark>with Subprogram_Variant =&gt; (Decreases =&gt; Xs'Length);</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-cipher.ads:186–234 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-cipher.ads"><mark>package Round_Folds is new Cryptol.Folds</mark>
+<mark>  (Acc     =&gt; Block,</mark>
+<mark>   Index   =&gt; Round_Key_Index,</mark>
+<mark>   Element =&gt; Block,</mark>
+<mark>   Seq     =&gt; Round_Keys,</mark>
+<mark>   F       =&gt; Round);</mark>
+…
+function Foldl_Round (Z : Block; Xs : Round_Keys) return Block
+<mark>is (Round_Folds.Foldl (Z, Xs));</mark>
+
+function Foldl_InvRound (Z : Block; Xs : Round_Keys) return Block
+<mark>is (InvRound_Folds.Foldl (Z, Xs));</mark>
+
+function Foldl_InvRound_Prime (Z : Block; Xs : Round_Keys) return Block
+<mark>is (InvRound_Prime_Folds.Foldl (Z, Xs));</mark></pre></div>
+    </div>
+    <div class="note"><b>Why, and what it cost.</b> The crosswalk listed "<code>foldl Round</code> → one <code>Foldl_Round</code> per function" as a deviation. Now the three folds are instances of one generic, <code>Folds</code>, with <code>Round</code>, <code>InvRound</code> and <code>InvRound_Prime</code> as the formal <code>F</code>. The recursion direction changed: the old functions recursed from the first element, and the prelude recurses from the last (<code>foldl f z (take`{N} xs) = f (foldl f z (take`{N-1} xs)) (xs @ (N-1))</code>), which is how the implementation's loop invariant reads. So <code>AES.Lemmas</code> gained three <code>Lemma_Foldl_*_Take_Eq</code> lemmas, and Properties' <code>Lemma_Foldl_Equivalence</code>/<code>_Inverts</code> now induct from the last step. No lemma lost its proof. (#75, PR #85)</div>
+  </div>
+
+  <div class="item">
+    <h3>reverse: Reverse_Keys <span class="chip unchanged">Unchanged</span> <span class="chip inline">Kept inline</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After (identical before)<span class="src">spark/src/aes/foundation_spark-aes-spec-cipher.ads:236–237 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-cipher.ads">function Reverse_Keys (Xs : Round_Keys) return Round_Keys
+is [for I in Xs'Range =&gt; Xs (Xs'First + Xs'Last - I)];</pre></div>
+    </div>
+    <div class="note plain"><b>Checked.</b> Same text at <code>3c956c1</code> (lines 198–199). Through the prelude's <code>Sequences.Reverse_Of</code>, <code>AES.Impl.Decrypt_Block_Prime</code>'s <code>pragma Assert (RK (J) = W (Nr (K) - J))</code> timed out at level 2. It keeps its old formula, <code>Xs (Xs'First + Xs'Last - I)</code>, not the prelude's <code>Xs (Xs'Last - (I - Xs'First))</code>; the two are equal and the old one proves. (PR #85)</div>
+  </div>
+
+  <div class="item">
+    <h3 id="d-cipher">Cipher and InvCipher <span class="chip generic">Generic</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-cipher.ads:206–232 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-cipher.ads"><mark>function Cipher (K : Natural; W : Round_Keys; Input : Block) return Block</mark>
+is (AddRoundKey (ShiftRows (SubBytes
+                   (Foldl_Round (AddRoundKey (Input, W (0)),
+<mark>                                 W (1 .. Nr (K) - 1)))),</mark>
+<mark>                 W (Nr (K))))</mark>
+<mark>with Pre =&gt; Is_Round_Keys (K, W);</mark>
+
+function InvCipher
+<mark>  (K : Natural; W : Round_Keys; Input : Block) return Block</mark>
+is (AddRoundKey (InvSubBytes (InvShiftRows
+<mark>                   (Foldl_InvRound (AddRoundKey (Input, W (Nr (K))),</mark>
+<mark>                                    Reverse_Keys (W (1 .. Nr (K) - 1))))),</mark>
+                 W (0)))
+<mark>with Pre =&gt; Is_Round_Keys (K, W);</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-aes_k.ads:92–114 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-aes_k.ads"><mark>function Cipher (W : Round_Keys; Input : Block) return Block</mark>
+is (AddRoundKey (ShiftRows (SubBytes
+                   (Foldl_Round (AddRoundKey (Input, W (0)),
+<mark>                                 W (1 .. Nr - 1)))),</mark>
+<mark>                 W (Nr)));</mark>
+…
+<mark>function InvCipher (W : Round_Keys; Input : Block) return Block</mark>
+is (AddRoundKey (InvSubBytes (InvShiftRows
+<mark>                   (Foldl_InvRound (AddRoundKey (Input, W (Nr)),</mark>
+<mark>                                    Reverse_Keys (W (1 .. Nr - 1))))),</mark>
+<mark>                 W (0)));</mark></pre></div>
+    </div>
+    <div class="prose"><p>Cipher.cry: <code>Cipher : {k} (Key k) =&gt; [Nr k + 1]Block -&gt; Block -&gt; Block</code>. The body is the same expression; <code>Nr (K)</code> becomes the generic's <code>Nr</code>, the explicit <code>K</code> and the precondition go. <code>InvCipher_Prime</code> (aes_k.ads:127–132) moved the same way. The explicit-<code>K</code> formula survives as <code>Dispatch.Cipher</code>'s postcondition. (#80, PR #82)</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="main">
+  <h2>Main: the cipher over bit strings</h2>
+
+  <div class="item">
+    <h3>Bit_Index and Is_Key_Bits <span class="chip type">Type</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-main.ads:32–47 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-main.ads"><mark>type Bit_Index is range 0 .. 2 ** 127 - 1;</mark>
+type Bits is array (Bit_Index range &lt;&gt;) of Boolean;
+subtype Block_Bits is Bits (0 .. 127);
+
+<mark>function Is_Key_Bits (K : Natural; Key : Bits) return Boolean</mark>
+<mark>is (Types.Key (K) and then Key'First = 0</mark>
+<mark>    and then Key'Last = Bit_Index (K - 1));</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-main.ads:38–59 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-main.ads"><mark>type Bit_Index is range 0 .. 256;</mark>
+type Bits is array (Bit_Index range &lt;&gt;) of Boolean;
+subtype Block_Bits is Bits (0 .. 127);
+
+<mark>function Is_Key_Bits (K : Key_Size; Key : Bits) return Boolean</mark>
+<mark>is (Key'First = 0 and then Key'Last = Bit_Index (K - 1));</mark></pre></div>
+    </div>
+    <div class="note"><b>Why <code>0 .. 256</code>.</b> AES's longest bit sequence is a 256-bit key: indices 0 .. 255 and length 256, which <code>Impl.Main.Join_Key</code> computes. 256 also needs nine bits (<code>Bit_Index'Value_Size</code> 9, <code>'Object_Size</code> 16 under GNAT 16.1), so no index is read as a negative 8-bit GEP offset. It retires the <code>gep64</code> rewrite for AES; the SAW edits are unverified until the IOD session. SHA-2's 128-bit <code>Bit_Index</code> is unchanged. (#68, PR #77; the <code>Key_Size</code> parameter from PR #82)</div>
+  </div>
+
+  <div class="item">
+    <h3>Byte_At, Bit_Of, Split_Block, Join_Block <span class="chip prelude">Prelude</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-main.ads:54–91 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-main.ads">function Byte_At (Bs : Bits; From : Bit_Index) return Byte
+<mark>is ((if Bs (From) then 16#80# else 0)</mark>
+<mark>    or (if Bs (From + 1) then 16#40# else 0)</mark>
+<mark>    …</mark>
+<mark>    or (if Bs (From + 7) then 16#01# else 0))</mark>
+with Pre =&gt; Bs'Last &gt;= 7 and then From &gt;= Bs'First
+            and then From &lt;= Bs'Last - 7;
+
+function Bit_Of (B : Byte; J : Natural) return Boolean
+<mark>is ((B and 2 ** (7 - J)) /= 0)</mark>
+with Pre =&gt; J &lt;= 7;
+
+function Split_Block (Bs : Block_Bits) return Block
+<mark>is [for I in Block_Index =&gt; Byte_At (Bs, Bit_Index (8 * I))];</mark>
+
+function Join_Block (B : Block) return Block_Bits
+<mark>is [for N in Block_Bits'Range =&gt;</mark>
+<mark>      Bit_Of (B (Natural (N / 8)), Natural (N mod 8))];</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-main.ads:68–116 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-main.ads"><mark>subtype Byte_Index is Natural range 0 .. 31;</mark>
+<mark>type Bytes is array (Byte_Index range &lt;&gt;) of Byte;</mark>
+
+<mark>package Byte_Bits is new Cryptol.Join_Split</mark>
+<mark>  (Word        =&gt; Byte,</mark>
+<mark>   Width       =&gt; 8,</mark>
+<mark>   Shift_Right =&gt; Interfaces.Shift_Right,</mark>
+<mark>   Word_Index  =&gt; Byte_Index,</mark>
+<mark>   Words       =&gt; Bytes,</mark>
+<mark>   Bit_Index   =&gt; Bit_Index,</mark>
+<mark>   Bits        =&gt; Bits);</mark>
+
+function Byte_At (Bs : Bits; From : Bit_Index) return Byte
+<mark>is (Byte_Bits.Value (Bs, From, 8))</mark>
+with Pre =&gt; Bs'Last &gt;= 7 and then From &gt;= Bs'First
+            and then From &lt;= Bs'Last - 7;
+
+function Bit_Of (B : Byte; J : Natural) return Boolean
+<mark>is (Byte_Bits.Word_Bits.Bit (B, J))</mark>
+with Pre =&gt; J &lt;= 7;
+
+function Split_Block (Bs : Block_Bits) return Block
+<mark>is [for I in Block_Index =&gt; Byte_Bits.Split_At (Bs, Bit_Index (I))];</mark>
+
+function Join_Block (B : Block) return Block_Bits
+<mark>is (Byte_Bits.Join (Bytes (B)));</mark></pre></div>
+    </div>
+    <div class="prose"><p>Main.cry's <code>split in</code> and <code>join (…)</code> at <code>[128] ↔ [16][8]</code> are now the prelude's <code>Split_At</code> and <code>Join</code> at <code>[8]</code>. Note <code>Split_At</code> takes the byte's index <code>I</code>, not the bit offset <code>8 * I</code>. Contracts are unchanged. The new <code>Properties.Lemma_Join_Split_Block</code> states the round trip separately, since <code>EncryptInverts</code>' context timed out on it (spike #74). (#75, PR #85)</p></div>
+  </div>
+
+  <div class="item">
+    <h3 id="d-main">Split_Key, Encrypt, Decrypt, AES128/192/256 <span class="chip generic">Generic</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-main.ads:98–163 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-main.ads"><mark>function Split_Key (K : Natural; Key : Bits) return Key_Words</mark>
+<mark>is [for J in 0 .. Nk (K) - 1 =&gt; [for I in AESWord_Index =&gt; Byte_At</mark>
+<mark>                                   (Key, Bit_Index (32 * J + 8 * I))]]</mark>
+<mark>with</mark>
+<mark>  Pre  =&gt; Is_Key_Bits (K, Key),</mark>
+<mark>  Post =&gt; Is_Key_Words (K, Split_Key'Result);</mark>
+
+<mark>function Encrypt (K : Natural; Key : Bits; Input : Block_Bits)</mark>
+<mark>  return Block_Bits</mark>
+<mark>is (Join_Block</mark>
+<mark>      (Cipher.Cipher</mark>
+<mark>         (K, KeyExpansion.KeyExpansion (K, Split_Key (K, Key)),</mark>
+<mark>          Split_Block (Input))))</mark>
+<mark>with Pre =&gt; Is_Key_Bits (K, Key);</mark>
+…
+<mark>package AES128 is</mark>
+<mark>   subtype Key_Bits is Bits (0 .. 127);</mark>
+<mark>   function Encrypt (Key : Key_Bits; Input : Block_Bits) return Block_Bits</mark>
+<mark>   is (Main.Encrypt (128, Key, Input));</mark>
+<mark>   function Decrypt (Key : Key_Bits; Input : Block_Bits) return Block_Bits</mark>
+<mark>   is (Main.Decrypt (128, Key, Input));</mark>
+<mark>end AES128;</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-aes_k.ads:145–160 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-aes_k.ads"><mark>subtype Key_Bits is Bits (0 .. Bit_Index (K - 1));</mark>
+
+<mark>function Split_Key (Key : Key_Bits) return Key_Words</mark>
+<mark>is [for J in 0 .. Nk - 1 =&gt; [for I in AESWord_Index =&gt; Byte_Bits.Split_At</mark>
+<mark>                               (Key, Bit_Index (4 * J + I))]];</mark>
+
+<mark>function Encrypt (Key : Key_Bits; Input : Block_Bits) return Block_Bits</mark>
+<mark>is (Join_Block (Cipher (KeyExpansion (Split_Key (Key)),</mark>
+<mark>                        Split_Block (Input))));</mark></pre>
+<pre data-src="new:foundation_spark-aes-spec-aes128.ads"><span class="c">-- spark/src/aes/foundation_spark-aes-spec-aes128.ads:1–6</span>
+pragma SPARK_Mode (On);
+
+with Foundation_Spark.AES.Spec.AES_K;
+
+<mark>package Foundation_Spark.AES.Spec.AES128 is new</mark>
+<mark>  Foundation_Spark.AES.Spec.AES_K (K =&gt; 128);</mark></pre></div>
+    </div>
+    <div class="note"><b>Why.</b> Main.cry: <code>Encrypt key in = join (Cipher`{k} (KeyExpansion`{k} (split (split key))) (split in))</code> and <code>AES128 = AES`{128}</code>. Before, <code>AES128</code> was a nested wrapper that called the explicit-<code>K</code> function with 128. Now <code>Spec.AES128</code> is the instance, so <code>Spec.AES128.Encrypt</code> is Main.cry's <code>AES128.Encrypt</code>, and the body reads like the Cryptol's with no <code>K</code>. <code>Spec.Main</code> keeps only what has no <code>{k}</code>. (#80, PR #82; <code>Split_At</code> from PR #85)</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="props">
+  <h2>Properties</h2>
+
+  <div class="item">
+    <h3>K-explicit properties now state the dispatchers <span class="chip type">Type</span> <span class="chip moved">Restated</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-properties.ads:130–172 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-properties.ads"><mark>procedure InvCipherEquivalence (K : Natural; Ws : Round_Keys; State : Block)</mark>
+with
+  Pre  =&gt; Is_Round_Keys (K, Ws),
+<mark>  Post =&gt; InvCipher (K, Ws, State) = InvCipher_Prime (K, Ws, State);</mark>
+…
+procedure EncryptInverts
+<mark>  (K : Natural; Key : Main.Bits; Input : Main.Block_Bits)</mark>
+with
+  Pre  =&gt; Main.Is_Key_Bits (K, Key),
+<mark>  Post =&gt; Main.Decrypt (K, Key, Main.Encrypt (K, Key, Input)) = Input;</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-properties.ads:159–208 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-properties.ads">procedure InvCipherEquivalence
+<mark>  (K : Key_Size; Ws : Round_Keys; State : Block)</mark>
+with
+  Pre  =&gt; Is_Round_Keys (K, Ws),
+<mark>  Post =&gt;</mark>
+<mark>    Dispatch.InvCipher (K, Ws, State)</mark>
+<mark>    = Dispatch.InvCipher_Prime (K, Ws, State);</mark>
+…
+procedure EncryptInverts
+<mark>  (K : Key_Size; Key : Main.Bits; Input : Main.Block_Bits)</mark>
+with
+  Pre  =&gt; Main.Is_Key_Bits (K, Key),
+<mark>  Post =&gt;</mark>
+<mark>    Dispatch.Decrypt (K, Key, Dispatch.Encrypt (K, Key, Input)) = Input;</mark></pre></div>
+    </div>
+    <div class="prose"><p>The four properties that take <code>k</code> (<code>InvCipherEquivalence</code>, <code>CipherInverts</code>, <code>CipherInverts'</code>, <code>EncryptInverts</code>) stay K-explicit, over the dispatchers. Moving them into <code>AES_K</code> would read like the Cryptol but prove each theorem three times, and they are kept only as the CI-checked cross-check while SAW is off CI. The reason is in the unit's header. (#80, PR #82)</p></div>
+  </div>
+
+  <div class="item">
+    <h3>GF28MultiplicationCorrect's fold <span class="chip prelude">Prelude</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-properties.ads:48–54 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-properties.ads">function Foldl_Mult (B, C : Byte; N : Natural) return Byte
+<mark>is (if N = 0 then 16#00#</mark>
+<mark>    else GF28.xTimes (Foldl_Mult (B, C, N - 1))</mark>
+<mark>         xor (if GF28.Bit (B, N - 1) then C else 16#00#))</mark>
+<mark>with</mark>
+<mark>  Pre                =&gt; N &lt;= 8,</mark>
+<mark>  Subprogram_Variant =&gt; (Decreases =&gt; N);</mark></pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-properties.ads:57–82 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-properties.ads"><mark>type Mult_Env is record</mark>
+<mark>   B : Byte;</mark>
+<mark>   C : Byte;</mark>
+<mark>end record;</mark>
+
+<mark>function Mult_Step</mark>
+<mark>  (E : Mult_Env; A : Byte; I : GF28.Bit_Index) return Byte</mark>
+<mark>is (GF28.xTimes (A) xor (if GF28.Bit (E.B, I) then E.C else 16#00#));</mark>
+
+<mark>package Mult_Folds is new Cryptol.Enumeration_Folds</mark>
+<mark>  (Env =&gt; Mult_Env, Acc =&gt; Byte, Index =&gt; GF28.Bit_Index, F =&gt; Mult_Step);</mark>
+
+function Foldl_Mult (B, C : Byte; N : Natural) return Byte
+<mark>is (Mult_Folds.Foldl ((B =&gt; B, C =&gt; C), 16#00#, 0, N))</mark>
+<mark>with Pre =&gt; N &lt;= 8;</mark></pre></div>
+    </div>
+    <div class="prose"><p>GF28.cry: <code>b • c == foldl (\a bi -&gt; xTimes a ^ if bi then c else 0x00) 0x00 b</code>. The lambda closes over <code>c</code>, and Ada has no closures, so the closed-over values travel in <code>Mult_Env</code> and the fold runs over the bits' indices <code>[0 ..&lt; 8]</code>. Its step function is the lambda's body word for word. (#75, PR #85)</p></div>
+  </div>
+
+  <div class="item">
+    <h3>SBox_Entries: moved under SBox, row lemmas split <span class="chip moved">Moved</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before<span class="src">spark/src/aes/foundation_spark-aes-spec-properties-sbox_entries.ads:14–24, .adb:26–39 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-properties-sbox_entries.ads"><mark>package Foundation_Spark.AES.Spec.Properties.SBox_Entries with</mark>
+…
+procedure Lemma_SBox_Row_0 (B : Types.Byte)
+with
+  Pre  =&gt; B / 16 = 0,
+<mark>  Post =&gt; SBox.Affine (B) = SBox.SBox (B);</mark></pre>
+<pre data-src="old:foundation_spark-aes-spec-properties-sbox_entries.adb"><span class="c">-- body</span>
+procedure Lemma_SBox_Row_0 (B : Types.Byte) is
+begin
+   case B is
+      when 16#00# =&gt;
+         Lemma_Step
+           (State (0, 1, 0, 283, 0, 1),
+            State (283, 0, 1, 0, 1, 0),
+            State (283, 0, 1, 0, 1, 0));
+<mark>         Lemma_Inner_Eq</mark>
+<mark>           ([GF2.Poly (B), 1, 0, SBox.SBoxPolynomial, 0, 1],</mark>
+            State (0, 1, 0, 283, 0, 1));
+         pragma Assert
+<mark>           (GF2.Pgcd (B, SBox.SBoxPolynomial) (1) = 0);</mark>
+<mark>         pragma Assert (SBox.Affine (B) = SBox.SBox (B));</mark>
+      …</pre></div>
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-sbox-sbox_entries.ads:26–85, .adb:48–60, 384–389 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-sbox-sbox_entries.ads"><mark>package Foundation_Spark.AES.Spec.SBox.SBox_Entries with</mark>
+…
+<mark>procedure Lemma_Inverse_Row_0 (B : Types.Byte)</mark>
+<mark>with</mark>
+<mark>  Pre  =&gt; B / 16 = 0,</mark>
+<mark>  Post =&gt; GF2.Inverse (B, SBoxPolynomial) =</mark>
+<mark>    (case B is</mark>
+<mark>       when 16#00# =&gt; 16#00#,</mark>
+<mark>       when 16#01# =&gt; 16#01#,</mark>
+<mark>       when 16#02# =&gt; 16#8D#,</mark>
+<mark>       …</mark>
+<mark>       when others =&gt; 0);</mark>
+
+procedure Lemma_SBox_Row_0 (B : Types.Byte)
+with
+  Pre  =&gt; B / 16 = 0,
+<mark>  Post =&gt; Affine (B) = SBox (B);</mark></pre>
+<pre data-src="new:foundation_spark-aes-spec-sbox-sbox_entries.adb"><span class="c">-- body: the pgcd steps are in Lemma_Inverse_Row_0 (lines 48–60) …</span>
+         Lemma_Inner_Eq
+<mark>           ([GF2.Poly (B), 1, 0, SBoxPolynomial, 0, 1],</mark>
+            State (0, 1, 0, 283, 0, 1));
+         pragma Assert
+<mark>           (GF2.Pgcd (B, SBoxPolynomial) (1) = 0);</mark>
+<span class="c">-- … and the S-box row lemma only checks affine (lines 384–389)</span>
+procedure Lemma_SBox_Row_0 (B : Types.Byte) is
+begin
+<mark>   Lemma_Inverse_Row_0 (B);</mark>
+   case B is
+      when 16#00# =&gt;
+<mark>         pragma Assert (Affine (B) = SBox (B));</mark></pre></div>
+    </div>
+    <div class="note"><b>Why.</b> As a child of <code>Properties</code>, the slow unit's closure took in <code>Cipher</code>, <code>KeyExpansion</code>, <code>Main</code>, <code>Properties</code> and <code>AES.Lemmas</code>; any edit there forced a re-proof (about 26 minutes; 1h40m cold in CI). Under <code>SBox</code> it depends on <code>Types</code>, <code>GF2</code>, <code>GF28</code> and <code>SBox</code> only: 17 source inputs → 10 (PR #79). <code>Lemma_Inner_Eq</code> and <code>Lemma_Step</code> moved with it, unchanged. Inside a child of <code>SBox</code>, the name <code>SBox</code> is the table, so the text reads <code>Affine (B) = SBox (B)</code>, as SBox.cry's <code>affine b == SBox @ b</code>. Then PR #86 split each row: every pgcd step's goal had carried the 256-entry <code>SBox</code> aggregate and <code>affine</code>, which no step uses. Cold proof 1148 s → 493 s at -j6, 2501 → 2565 checks. <code>Lemma_SBox_Entry</code> and <code>SBoxCorrect</code> are unchanged. (#70)</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="aes_k">
+  <h2>New: the generic AES_K and its instances</h2>
+  <div class="prose"><p>No "before": in <code>3c956c1</code> every <code>{k}</code> function was a non-generic function of an explicit <code>K</code> (shown in the pairs above). The generic's header reads:</p></div>
+  <div class="item">
+    <h3>AES_K <span class="chip new">New</span> <span class="chip generic">Generic</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-aes_k.ads:23–57 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-aes_k.ads">with Foundation_Spark.AES.Spec.Cipher;
+with Foundation_Spark.AES.Spec.KeyExpansion;
+with Foundation_Spark.AES.Spec.Main;
+with Foundation_Spark.AES.Spec.Types;
+
+generic
+   K : Types.Key_Size;
+package Foundation_Spark.AES.Spec.AES_K with
+  SPARK_Mode,
+  Pure,
+  Ghost
+is
+
+   use Types;
+   use KeyExpansion;
+   use Spec.Cipher;
+   use Main;
+
+   Nk : constant Positive := Types.Nk (K);
+   Nr : constant Positive := Types.Nr (K);
+
+   subtype Key_Words is Types.Key_Words (0 .. Nk - 1);
+   subtype Round_Keys is Types.Round_Keys (0 .. Nr);
+   subtype Word_Index is Natural range 0 .. 4 * (Nr + 1) - 1;
+   …
+   function W (Key : Key_Words; I : Word_Index) return AESWord …
+   function KeyExpansion (Key : Key_Words) return Round_Keys …
+   function Cipher (W : Round_Keys; Input : Block) return Block …
+   function InvCipher (W : Round_Keys; Input : Block) return Block …
+   function InvCipher_Prime (W : Round_Keys; Input : Block) return Block …
+   subtype Key_Bits is Bits (0 .. Bit_Index (K - 1));
+   function Split_Key (Key : Key_Bits) return Key_Words …
+   function Encrypt (Key : Key_Bits; Input : Block_Bits) return Block_Bits …
+   function Decrypt (Key : Key_Bits; Input : Block_Bits) return Block_Bits …</pre></div>
+    </div>
+    <div class="prose"><p>The formal <code>K</code> is Cryptol's <code>k</code> and its subtype is <code>Key k</code>. <code>[Nk k]AESWord</code>, <code>[Nr k + 1]Block</code> and <code>[k]</code> are the subtypes <code>Key_Words</code>, <code>Round_Keys</code> and <code>Key_Bits</code>, so each function takes the Cryptol's arguments and has no precondition. Everything without a <code>{k}</code> stays non-generic and is proved once. The instances <code>AES128</code>, <code>AES192</code>, <code>AES256</code> are ten-line library units (<code>pragma SPARK_Mode (On)</code>, one <code>is new</code>), shown under <a href="#d-main">Main</a>. <code>AES_K</code> itself has 0 checks; its instances have 35, 35 and 34 at PR #82's head. The generic was declined earlier on 2026-10-20 on the belief that proof time would triple; spike #74 measured no wall-clock change. (#80, PR #82)</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="dispatch">
+  <h2>New: Dispatch, where the explicit K now lives</h2>
+  <div class="prose"><p>The implementation serves all three key sizes with one body and a run-time <code>K</code>. It cannot name a generic's instance by a value, so <code>Spec.Dispatch</code> has one ghost dispatcher per <code>{k}</code> function: a <code>case</code> over <code>K</code> that calls the instance. Each dispatcher's postcondition is the old explicit-<code>K</code> formula, stated uniformly in <code>K</code> and proved once per instance. <code>Impl</code>, <code>Impl.Main</code>, <code>Main_Lemmas</code>, <code>Properties</code> and the FFI shims see the spec only through these, and no client cases on <code>K</code>. These functions are not in the Cryptol.</p></div>
+  <div class="item">
+    <h3>Dispatch.Cipher <span class="chip new">New</span></h3>
+    <div class="pair">
+      <div class="pane old"><header>Before: the spec function itself<span class="src">spark/src/aes/foundation_spark-aes-spec-cipher.ads:206–211 · 3c956c1</span></header>
+<pre data-src="old:foundation_spark-aes-spec-cipher.ads">function Cipher (K : Natural; W : Round_Keys; Input : Block) return Block
+is (AddRoundKey (ShiftRows (SubBytes
+                   (Foldl_Round (AddRoundKey (Input, W (0)),
+                                 W (1 .. Nr (K) - 1)))),
+                 W (Nr (K))))
+with Pre =&gt; Is_Round_Keys (K, W);</pre></div>
+      <div class="pane new"><header>After: a dispatcher, with that formula as its Post<span class="src">spark/src/aes/foundation_spark-aes-spec-dispatch.ads:112–124 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-dispatch.ads">function Cipher (K : Key_Size; W : Round_Keys; Input : Block) return Block
+<mark>is (case K is</mark>
+<mark>      when 128 =&gt; AES128.Cipher (W, Input),</mark>
+<mark>      when 192 =&gt; AES192.Cipher (W, Input),</mark>
+<mark>      when 256 =&gt; AES256.Cipher (W, Input))</mark>
+with
+  Pre  =&gt; Is_Round_Keys (K, W),
+<mark>  Post =&gt;</mark>
+<mark>    Cipher'Result</mark>
+<mark>    = AddRoundKey (ShiftRows (SubBytes</mark>
+<mark>                     (Foldl_Round (AddRoundKey (Input, W (0)),</mark>
+<mark>                                   W (1 .. Nr (K) - 1)))),</mark>
+<mark>                   W (Nr (K)));</mark></pre></div>
+    </div>
+    <div class="prose"><p>Put plainly: the explicit-<code>K</code> body you reviewed in <code>Spec.Cipher</code> is now <code>Dispatch.Cipher</code>'s postcondition, character for character, and the instance's body is the Cryptol with <code>Nr</code> fixed. The negative control in PR #82 (the 128 arm of <code>Dispatch.Encrypt</code> calling <code>AES128.Decrypt</code>) made <code>prop_Encrypt128</code> fail on this postcondition while <code>prop_Encrypt192</code> still passed.</p></div>
+  </div>
+  <div class="item">
+    <h3>Dispatch.Encrypt and Lemma_Key_Size <span class="chip new">New</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After<span class="src">spark/src/aes/foundation_spark-aes-spec-dispatch.ads:38–42, 196–209 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-aes-spec-dispatch.ads">procedure Lemma_Key_Size (K : Natural)
+with
+  Post =&gt;
+    (K in Key_Size)
+    = (K mod 64 = 0 and then K / 64 &gt;= 2 and then K / 64 &lt;= 4);
+…
+function Encrypt
+  (K : Key_Size; Key : Main.Bits; Input : Main.Block_Bits)
+   return Main.Block_Bits
+is (case K is
+      when 128 =&gt; AES128.Encrypt (Key, Input),
+      when 192 =&gt; AES192.Encrypt (Key, Input),
+      when 256 =&gt; AES256.Encrypt (Key, Input))
+with
+  Pre  =&gt; Main.Is_Key_Bits (K, Key),
+  Post =&gt;
+    Encrypt'Result
+    = Main.Join_Block
+        (Cipher (K, KeyExpansion (K, Split_Key (K, Key)),
+                 Main.Split_Block (Input)));</pre></div>
+    </div>
+    <div class="prose"><p><code>Lemma_Key_Size</code> is where Types.cry's <code>Key k</code> clauses now appear verbatim, proved equal to the subtype's list (its body is <code>null</code>). The other dispatchers are <code>W</code> (with <code>Lemma_W</code> for the recursive definition, since a recursive function's body is not a postcondition), <code>KeyExpansion</code> (via <code>Round_Key</code>, a workaround for a GNAT 16.1 aggregate bug under <code>-gnata</code>), <code>InvCipher</code>, <code>InvCipher_Prime</code>, <code>Split_Key</code> and <code>Decrypt</code>. (#80, PR #82)</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="prelude">
+  <h2>New: the Cryptol prelude generics AES uses</h2>
+  <div class="prose"><p><code>spark/src/cryptol/</code> (<code>Foundation_Spark.Cryptol</code>, PR #83) is a set of ghost, <code>Pure</code> generics, each stating one Cryptol prelude function from its documented meaning, since most are primitives with no Cryptol body. SHA-2 and HMAC were migrated in #83, AES in #85. The FFI checks each generic against Cryptol at the types AES instantiates. AES uses six of them: <code>Folds</code>, <code>Enumeration_Folds</code>, <code>Bulk_Indexing</code>, <code>Join_Split</code>, <code>Words</code> and <code>Polynomial_Products</code>.</p></div>
+
+  <div class="item">
+    <h3>Folds, in full <span class="chip new">New</span> <span class="chip prelude">Prelude</span></h3>
+    <div class="pair single">
+      <div class="pane new"><header>After<span class="src">spark/src/cryptol/foundation_spark-cryptol-folds.ads:1–62 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-cryptol-folds.ads"><span class="c">--  Cryptol's left fold over a sequence, `foldl : {n, a, b} (fin n) =&gt;
+--  (a -&gt; b -&gt; a) -&gt; a -&gt; [n]b -&gt; a` (Cryptol.cry:1146). It is a primitive,
+--  with no Cryptol body; the prelude documents it by example, `foldl (+) 0
+--  [1,2,3] = ((0 + 1) + 2) + 3`: the function is applied to the
+--  accumulator and each element in turn, from the first, so the outermost
+--  application is to the last element. Foldl_Take states that by
+--  recursion on the number of elements folded, `foldl f z (take`{N} xs) =
+--  f (foldl f z (take`{N - 1} xs)) (xs @ (N - 1))`, and Foldl is the fold
+--  of the whole sequence.
+--
+--  The recursion runs from the last element because that is how the
+--  implementation layer runs a fold, one element at a time in a loop: its
+--  invariant after N elements is the fold of the first N, and the next
+--  step is the definition. The equivalent recursion from the first
+--  element, `foldl f z ([x] # xs) = foldl f (f z x) xs`, is a theorem
+--  about this one; nothing in the spec layers needs it yet.
+--
+--  For a fold whose function closes over other values, as SHA-2's step3
+--  closes over the block, see Enumeration_Folds.
+--
+--  @formal Acc The accumulator, Cryptol's `a`.
+--  @formal Index The index type of the sequence.
+--  @formal Element The elements, Cryptol's `b`.
+--  @formal Seq A sequence of elements, Cryptol's `[n]b`.
+--  @formal F The function folded, Cryptol's `f : a -&gt; b -&gt; a`, with its
+--  arguments in Cryptol's order: the accumulator, then the element.</span>
+
+generic
+   type Acc is private;
+   type Index is range &lt;&gt;;
+   type Element is private;
+   type Seq is array (Index range &lt;&gt;) of Element;
+   with function F (Z : Acc; X : Element) return Acc;
+package Foundation_Spark.Cryptol.Folds with
+  SPARK_Mode,
+  Pure
+is
+
+   function Foldl_Take (Z : Acc; Xs : Seq; N : Index'Base) return Acc is
+     (if N &lt;= 0 then Z
+      else F (Foldl_Take (Z, Xs, N - 1), Xs (Xs'First + (N - 1))))
+   with
+     Pre                =&gt; N &lt;= Xs'Length,
+     Subprogram_Variant =&gt; (Decreases =&gt; N);
+<span class="c">   --  Cryptol's `foldl f z (take`{N} xs)`: Z when N is 0, and otherwise F
+   --  applied to the fold of the first N - 1 elements and element N - 1.
+   --  @param Z The initial accumulator, Cryptol's `z`.
+   --  @param Xs The sequence, Cryptol's `xs`, with any bounds.
+   --  @param N The number of elements folded, from the first.
+   --  @return The accumulator after F has been applied to each of the
+   --  first N elements of Xs, in order.</span>
+
+   function Foldl (Z : Acc; Xs : Seq) return Acc is
+     (Foldl_Take (Z, Xs, Xs'Length))
+   with Pre =&gt; Xs'Length &lt;= Index'Base'Last;
+<span class="c">   --  Cryptol's `foldl f z xs`: the fold of every element of Xs.
+   --  @param Z The initial accumulator, Cryptol's `z`.
+   --  @param Xs The sequence, Cryptol's `xs`, with any bounds.
+   --  @return The accumulator after F has been applied to each element of
+   --  Xs, in order.</span>
+
+end Foundation_Spark.Cryptol.Folds;</pre></div>
+    </div>
+    <div class="prose"><p>Instantiated three times in <code>Spec.Cipher</code> (<code>Round_Folds</code>, <code>InvRound_Folds</code>, <code>InvRound_Prime_Folds</code>). The first draft recursed from the head and stated the last-element equation as a postcondition; that did not prove at level 2, because a postcondition gives array <code>=</code> where a definition gives logical equality (PR #83).</p></div>
+  </div>
+
+  <div class="item">
+    <h3>Bulk_Indexing, Words <span class="chip new">New</span> <span class="chip prelude">Prelude</span></h3>
+    <div class="pair">
+      <div class="pane new"><header>Bulk_Indexing<span class="src">spark/src/cryptol/foundation_spark-cryptol-bulk_indexing.ads:18–31 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-cryptol-bulk_indexing.ads">generic
+   type Index is (&lt;&gt;);
+   type Element is private;
+   type Seq is array (Index) of Element;
+   type Out_Index is (&lt;&gt;);
+   type Indices is array (Out_Index) of Index;
+   type Out_Seq is array (Out_Index) of Element;
+package Foundation_Spark.Cryptol.Bulk_Indexing with
+  SPARK_Mode,
+  Pure
+is
+
+   function Bulk_Index (Xs : Seq; Ixs : Indices) return Out_Seq is
+     ([for J in Out_Index =&gt; Xs (Ixs (J))]);</pre></div>
+      <div class="pane new"><header>Words<span class="src">spark/src/cryptol/foundation_spark-cryptol-words.ads:18–41 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-cryptol-words.ads">generic
+   type Word is mod &lt;&gt;;
+   Width : Natural;
+   with function Shift_Right (Value : Word; Amount : Natural) return Word;
+package Foundation_Spark.Cryptol.Words with
+  SPARK_Mode,
+  Pure
+is
+   …
+   function Bit (X : Word; J : Natural) return Boolean is
+     ((Shift_Right (X, Width - 1 - J) and 1) = 1)
+   with Pre =&gt; J &lt; Width;
+   …
+   function Head (X : Word) return Boolean is
+     (Bit (X, 0))
+   with Pre =&gt; Width &gt; 0;</pre></div>
+    </div>
+    <div class="prose"><p><code>Bulk_Indexing</code> is Cryptol.cry:906's body <code>xs @@ is = [ xs @ i | i &lt;- is ]</code> (<code>is</code> is reserved in Ada, hence <code>Ixs</code>). <code>Words</code> is <code>@</code> and <code>head</code> on a <code>[w]</code> held in a modular type, most significant bit first. AES instantiates <code>Words</code> at <code>[8]</code>, <code>[9]</code> and <code>[15]</code>.</p></div>
+  </div>
+
+  <div class="item">
+    <h3>Join_Split, Polynomial_Products <span class="chip new">New</span> <span class="chip prelude">Prelude</span></h3>
+    <div class="pair">
+      <div class="pane new"><header>Join_Split<span class="src">spark/src/cryptol/foundation_spark-cryptol-join_split.ads:44–84 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-cryptol-join_split.ads">function Join (Xs : Words) return Bits is
+  ([for I in 0 .. Bit_Index (Xs'Length) * Bit_Index (Width) - 1 =&gt;
+      Word_Bits.Bit
+        (Xs (Xs'First + Word_Index (I / Bit_Index (Width))),
+         Natural (I mod Bit_Index (Width)))])
+…
+function Value
+  (P : Bits; First : Bit_Index; Count : Natural) return Word
+is
+  (if Count = 0 then 0
+   else 2 * Value (P, First, Count - 1)
+        + (if P (First + Bit_Index (Count) - 1) then 1 else 0))
+…
+function Split_At (P : Bits; K : Bit_Index) return Word is
+  (Value (P, K * Bit_Index (Width), Width))</pre></div>
+      <div class="pane new"><header>Polynomial_Products<span class="src">spark/src/cryptol/foundation_spark-cryptol-polynomial_products.ads:26–59 · 4431a75</span></header>
+<pre data-src="new:foundation_spark-cryptol-polynomial_products.ads">generic
+   type Poly is mod &lt;&gt;;
+   U : Natural;
+   V : Natural;
+   with function Shift_Right (Value : Poly; Amount : Natural) return Poly;
+…
+function Products (X, Y : Poly; N : Natural) return Poly is
+  (if N = 0 then 0
+   else 2 * Products (X, Y, N - 1)
+        xor (if Second_Factor.Bit (Y, N - 1) then X else 0))
+with
+  Pre                =&gt; N &lt;= 1 + V,
+  Subprogram_Variant =&gt; (Decreases =&gt; N);
+…
+function Pmult (X, Y : Poly) return Poly is
+  (Products (X, Y, 1 + V))
+with Pre =&gt; X &lt; 2 ** (1 + U) and then Y &lt; 2 ** (1 + V);</pre></div>
+    </div>
+    <div class="prose"><p><code>Join_Split</code> is <code>join</code> and <code>split</code> between <code>[n][w]</code> and <code>[n * w]</code>; AES instantiates it at <code>[8]</code> in <code>Main</code> (<code>Byte_Bits</code>). <code>Polynomial_Products</code> is <code>pmult : {u, v} [1 + u] -&gt; [1 + v] -&gt; [1 + u + v]</code>; GF28 instantiates it at <code>{7, 7}</code>. AES does not use the prelude's <code>Polynomial_Remainders</code>, <code>Polynomial_Quotients</code> or <code>Sequences</code>, for the reasons in the table below. <code>Enumeration_Folds</code> (a fold over <code>[From ..&lt; To]</code> with an environment, for closures) is used once, by <code>Properties.Foldl_Mult</code>.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="inline">
+  <h2>Still written out, and why</h2>
+  <div class="prose"><p>AES's five statements that have a prelude counterpart but stay inline. Each blocker would have to go before the statement can move. (From PR #85, which measured them; <code>Types.Split</code>/<code>Join</code> also from #83's scoping of the prelude.)</p></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Statement</th><th>Cryptol</th><th>Prelude generic it would use</th><th>Why it stays, as measured</th></tr></thead>
+    <tbody>
+      <tr><td><code>Cipher.Reverse_Keys</code></td><td><code>reverse</code></td><td><code>Sequences.Reverse_Of</code></td><td>Through it, <code>AES.Impl.Decrypt_Block_Prime</code>'s <code>pragma Assert (RK (J) = W (Nr (K) - J))</code> timed out at level 2. Inline, it proves. Proof cost.</td></tr>
+      <tr><td><code>GF28.Pmod_Fold</code>, <code>Reduce</code>, <code>Pmod</code></td><td><code>pmod</code></td><td><code>Polynomial_Remainders</code></td><td>GF28 returns the remainder as a <code>Byte</code>; the prelude returns a <code>Poly</code> whose bound below 2 ** 8 is an induction no expression function can call. GF28's also takes any <code>Poly</code> dividend, the prelude's a <code>[15]</code>. Not tried.</td></tr>
+      <tr><td><code>GF2.Pmult</code></td><td><code>pmult</code> at <code>[9] x [9]</code></td><td><code>Polynomial_Products</code> at {8, 8}</td><td>GF2 proved at level 4, but <code>SBox_Entries</code> had done 9 of 32 subprograms after 77 min at -j6, against about 26 min for the whole unit before. Reverted to the closed form. Proof cost.</td></tr>
+      <tr><td><code>GF2.Pdiv</code></td><td><code>pdiv</code></td><td><code>Polynomial_Quotients</code> at {9, 9}</td><td><code>Inner_Step</code>'s postcondition <code>Inner_Step'Result (3) &lt; Lead (S (3))</code> does not prove at level 4: it rests on <code>Pdiv_Fold</code>'s, which reduces by <code>Lead (y)</code>, not the prelude's <code>Top (y)</code>.</td></tr>
+      <tr><td><code>Types.Split</code>, <code>Join</code></td><td><code>split</code>/<code>join</code> at <code>[16][8] ↔ [4][4][8]</code></td><td>none</td><td>Not in the prelude, whose <code>Join_Split</code> goes between words and bits. <code>Types</code> is not ghost (the implementation calls them), and the prelude is.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ -->
+<section id="sparklib">
+  <h2>Where is SPARKlib used?</h2>
+  <div class="prose"><p><b>Nowhere: it's gone.</b> PR <a href="https://github.com/manthonyaiello/Foundation/pull/76">#76</a> (issue #72) removed <code>sparklib</code> from <code>spark/alire.toml</code> and <code>with "sparklib";</code> from both GPR files; no file under <code>spark/src</code> changed, and <code>git grep -i sparklib</code> on <code>spark/src</code>, the GPRs and <code>alire.toml</code> at <code>4431a75</code> finds nothing. The folds it was added for are now the prelude's own <code>Folds</code>, above.</p></div>
+</section>
+
+</div>
