@@ -1475,10 +1475,10 @@ spec layer failing as they must. `aes_spec.saw` takes 393 s,
 and `Word_Of`), the whole `check-saw.sh` 3516 s. At `65ee4c2`, before
 #67's `Parse`: 2798, 3707 s. Before #75 and #80 (at
 `d874133`): 2742, of which AES 1083 and SHA-256 and HMAC 1659; peak
-memory then 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at `a4ea138`): 3578
-proofs of the spec layer, `sha256_spec.saw` 6785 s, the whole 7857 s;
-not re-run since #67 added `Parse` (4 more results with `SAW_LONG=1`, at
-1 to 4 blocks), so `board.py` reports it stale (before #75, at `c31472e`: 3522, 7784 s, peak 7.2 GB; below, "Running
+memory then 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at `a3e7c74`): 3582
+proofs of the spec layer (2178 lax; `Parse` at 1 to 4 blocks, 4, 15, 33
+and 53 s), `sha256_spec.saw` 6523 s, the whole 7708 s (at `a4ea138`,
+before #67's `Parse`: 3578, 7857 s; before #75, at `c31472e`: 3522, 7784 s, peak 7.2 GB; below, "Running
 it").
 
 **Not proved by SAW**, and why:
@@ -1672,8 +1672,7 @@ what SPARK adds:
   default run, 24 implementation-layer results (the 4 top-level ones:
   `Hash` at 0, 64 and 128 bytes and `HMAC_SHA256` at (0, 0); and the 19
   leaves and `Compress` re-proved in that module as their overrides) and
-  1396 spec-layer results (2174 under `SAW_LONG=1` at `a4ea138`, before
-  #67's `Parse`) are proved in the
+  1396 spec-layer results (2178 under `SAW_LONG=1`) are proved in the
   module loaded with lax arithmetic. There, absence of overflow rests on
   gnatprove (AoRTE), not on SAW.
 - **The subprograms SAW leaves out** (above): gnatprove covers them.
