@@ -91,8 +91,12 @@ A64_BRANCH = re.compile(r"^(b\.[a-z]+|cbn?z|tbn?z)$")
 A64_INDIRECT = re.compile(r"^(br|blr)$")
 A64_INDEXED = re.compile(r"\[\s*x\d+|sp\s*,\s*[xw]\d+")
 A64_MEM = re.compile(r"^(ld|st)")
-X86_BRANCH = re.compile(r"^j(?!mp)[a-z]+$")
+X86_BRANCH = re.compile(r"^(j(?!mp)[a-z]+|loopn?[ez]?)$")
 X86_INDEXED = re.compile(r"\(%?[a-z0-9]*,%[a-z0-9]+(,\d)?\)")
+X86_PREFIXES = {"data16", "addr32", "cs", "ds", "es", "fs", "gs", "ss",
+                "notrack", "bnd", "lock", "rep", "repz", "repe", "repnz",
+                "repne", "rex", "rex.W", "rex.WB", "rex.WR", "rex.WRB",
+                "rex.B", "rex.R", "rex.RB", "rex.X", "rex.WX"}
 
 FUNC = re.compile(r"^[0-9a-f]+ <([^>]+)>:$")
 INSN = re.compile(r"^\s+([0-9a-f]+):\s+(\S+)\s*(.*)$")
@@ -124,6 +128,14 @@ def scan(lines, arch):
                     if len(parts) >= 2 and re.match(r"^[xw]\d+$", parts[1]):
                         yield func, off, "indexed", text
         else:
+            # Instruction prefixes print as their own word: objdump shows
+            # the alignment padding `data16 cs nopw 0x0(%rax,%rax,1)`, and
+            # a CET build `notrack jmp *%rax`. Classify the instruction
+            # after them, or padding reads as an indexed load and an
+            # indirect jump escapes.
+            while op in X86_PREFIXES and args:
+                op, _, args = args.partition(" ")
+                args = args.strip()
             if X86_BRANCH.match(op):
                 yield func, off, "branch", text
             elif op in ("jmp", "call", "jmpq", "callq") and "*" in args:
