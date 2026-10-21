@@ -283,3 +283,25 @@ property prop_Block_CipherExample =
     input  = split 0x3243f6a8885a308d313198a2e0370734
     key    = KeyExpansion`{128} (split (split 0x2b7e151628aed2a6abf7158809cf4f3c))
     output = split 0x3925841d02dc09fbdc118597196a0b32
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Sub_Bytes: the executable AES.Impl.Sub_Bytes,
+ * the S-box circuit on two words of eight byte lanes (issue #50), proved
+ * equal to the spec's SubBytes.
+ */
+foreign spark_Impl_SubBytes : Block -> Block
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Inv_Sub_Bytes: the executable
+ * AES.Impl.Inv_Sub_Bytes (issue #50), proved equal to the spec's
+ * InvSubBytes.
+ */
+foreign spark_Impl_InvSubBytes : Block -> Block
+
+/** The executable Sub_Bytes is Cipher.cry's SubBytes. */
+prop_Impl_SubBytes : Block -> Bit
+property prop_Impl_SubBytes bs = spark_Impl_SubBytes bs == SubBytes bs
+
+/** The executable Inv_Sub_Bytes is Cipher.cry's InvSubBytes. */
+prop_Impl_InvSubBytes : Block -> Bit
+property prop_Impl_InvSubBytes bs = spark_Impl_InvSubBytes bs == InvSubBytes bs

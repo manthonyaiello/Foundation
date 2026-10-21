@@ -2,14 +2,16 @@
  * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
  *
  * Sub_Bytes against Cipher.cry's InvSubBytes instead of SubBytes, with
- * the same Sub_Byte override as aes_impl.saw. The proof must fail with a
+ * the same SBox_Lanes override as aes_impl.saw (since #50 Sub_Bytes calls
+ * the bitsliced SBox_Lanes, not Sub_Byte). The proof must fail with a
  * counterexample state, which shows the override does not make the
- * Sub_Bytes proof vacuous.
+ * Sub_Bytes proof vacuous. UNVERIFIED since #50: the IOD session runs it.
  */
 
 include "../aes_impl_common.saw";
 
-sub_byte <- verify_impl "sub_byte" [] (byte_to_byte_contract {{ \b -> SBox @ b }})
-                        "\\b -> SBox::SBox @ b";
-verify_impl "sub_bytes" [sub_byte] (block_in_out_contract {{ InvSubBytes }})
+sbox_lanes <- verify_impl "sbox_lanes" []
+                (lanes_contract {{ \(x : [64]) -> join [ SBox @ b | b <- (split x : [8][8]) ] }})
+                "\\x -> join [SBox::SBox @ b | b <- split x]";
+verify_impl "sub_bytes" [sbox_lanes] (block_in_out_contract {{ InvSubBytes }})
             "Cipher::InvSubBytes";

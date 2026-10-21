@@ -13,6 +13,9 @@ Foundation algorithms, proved against the Cryptol specifications in
   that stays semantically close to the Cryptol, plus refinement layers
   proved against it
 - `src/ffi/` – the FFI export shims, see "The FFI harness"
+- `ct/` – the constant-time harness (#50): a throughput benchmark, a
+  dudect-style timing test and a ctgrind-style Memcheck test, built at the
+  release level outside the library; see "Constant time"
 - `cryptol/` – our Cryptol: the modules that call the SPARK exports by
   `foreign` and state the properties, and `properties.txt`
 - `saw/` – SAW scripts proving the implementation's bitcode against the
@@ -659,6 +662,186 @@ so it never lengthens the FFI gate: on `ubuntu-24.04` (x86_64), on a PR or a
 push to `main` that touches the sources, the properties or the coverage
 tooling, and by hand (`workflow_dispatch`). The report is the artifact
 `spark-coverage`, and the table goes in the job summary.
+
+## Constant time
+
+Issue #50 (M5.2), after SPARKNaCl: the executable code must take the same
+time, and touch the same memory, whatever the secrets are. Functional proof
+says nothing about timing: a table-driven AES is correct, and its table
+lookups leak the key through the cache.
+
+**What is secret, what is public.** Secret: AES keys, round keys, plaintext
+and ciphertext blocks; SHA-256 message bytes and the hash state; HMAC keys
+and message bytes. Public: every length (of a key, a message, a chunk), the
+key size `K`, `Nk (K)` and `Nr (K)`, loop counters and round numbers, and
+whatever is computed from public values only.
+
+**The rule.** In code that handles secrets:
+
+1. no branch on a secret: no `if`, `case`, `while` or `exit when`
+   condition, no `and then`/`or else`, and no `if` expression, whose value
+   depends on a secret;
+2. no index on a secret: no array index, and so no memory address, computed
+   from a secret (a table lookup, `T (B)`, is the classic case);
+3. no early exit on a secret, such as a comparison that returns at the
+   first difference (compare by OR-ing the XORs of all bytes instead);
+4. no operation whose time depends on its operands on the targets:
+   division and `mod` by a secret, and shift or rotate amounts that are
+   secret. Bitwise operations, addition, and multiplication on aarch64 and
+   x86_64 are fine.
+
+Where a value must be chosen by a secret, select with a mask: `0 - Bit`
+is all ones or all zeros, and `(A and M) or (B and not M)` picks without a
+branch.
+
+**The audit** (the source at `b967ebb`, every executable unit):
+
+| site | secret? | outcome |
+|---|---|---|
+| `AES.Impl.Sub_Byte`, `Inv_Sub_Byte`: `S_Box (B)`, `Inv_S_Box (B)` | index on the state and key bytes | **removed**: a bitsliced circuit, below |
+| `Sub_Bytes`, `Inv_Sub_Bytes`, `Sub_Word` (and so `Round`, `Inv_Round`, `Inv_Round_Prime`, `Expand_Key`, the ciphers) | the same lookups, through `Sub_Byte` | **removed** with it |
+| `AES.Impl.X_Times`: `if B >= 16#80# then 16#1b# else 0` | a branch on a state byte, in every `MixColumns` | **removed**: `16#1b# and (0 - B >> 7)` (the old code compiled to a select on aarch64 at `-O3`, but nothing in the source required it) |
+| `AES.Impl.Dot`: `if` on each bit of `C`, `if T >= 256` | branches on both operands (not on any cipher path; exported to callers) | **removed**: masks. At `-O3` on aarch64 the old code was selects, except one real branch: `tbz w1, #0` on `C`'s low bit |
+| `AES.Impl.Expand_Key`: `if I < Nk`, `I mod Nk = 0`, `I mod Nk = 4 and Nk > 6`, `Rcon (I / Nk)`, `Ws (I - Nk)` | `I` and `K` | public: kept |
+| `Encrypt_Block`, `Decrypt_Block`, `Decrypt_Block_Prime`: the round loop, `W (R)` | `Nr (K)`, `R` | public: kept |
+| `SHA256_Stream.Compress`: two loops of 64, `K_256 (T)`, `Sched (T - 2)` ... | `T` | public: kept; `Ch`, `Maj`, `Σ`, `σ` are bitwise with constant rotations |
+| `SHA256_Stream.Update`, `Final`, `Hash`, `Hash_Chunked`, `Load_Block`: buffer fill, `Count mod 64`, `if R < 56`, the block loop | lengths and offsets | public: kept |
+| `HMAC.SHA256_Impl.Init_Key`: `if Key'Length > 64` | the key's length | public: kept |
+| HMAC: no tag comparison exists | | a future `Verify` must follow rule 3 |
+
+The ghost code (spec layer, lemmas) does not run and is out of scope.
+
+**The S-box.** `Sub_Byte` and `Inv_Sub_Byte` compute the S-box with Boyar
+and Peralta's depth-16 circuit ("A small depth-16 circuit for the AES
+S-box", SEC 2012: 128 gates, 34 AND and 94 XOR/XNOR), and the inverse as
+`A⁻¹ ∘ SBox ∘ A⁻¹` with `A⁻¹` the inverse of the S-box's affine map, as
+BearSSL's `aes_ct` does. Each gate is a bitwise operation on a 64-bit word
+holding eight byte lanes (SWAR bitslicing: bit `k` of each lane is moved to
+the lane's bit 0 by a shift and a mask), so one evaluation gives eight
+S-box entries: `Sub_Bytes` evaluates it twice per round, `Sub_Word` once.
+Why this one:
+
+* *a full-table scan with masking* reads all 256 entries per byte: easy to
+  prove, but 256 loads per byte, 4096 per round;
+* *an arithmetic S-box* (`b^254` by square-and-multiply in GF(2^8), then
+  the affine map) needs a constant-time multiplier and a proof that `b^254`
+  is the spec's `GF2.Inverse`, which is the slow `SBoxCorrect` proof over
+  again;
+* *the bitsliced circuit* is the fastest of the three, the standard choice
+  (BearSSL, the Käsper–Schwabe line of work), and, as it turned out, the
+  cheapest to prove: gnatprove proves it equal to the spec's tables
+  directly.
+
+The proof: the body-local `SBox_Lanes` and `Inv_SBox_Lanes` have the
+postcondition that each lane of the result is `Spec.SBox.SBox`
+(`InvSBox`) of the same lane of the input; the provers bit-blast the
+circuit against the table, at level 2. `Sub_Byte`, `Inv_Sub_Byte`,
+`Sub_Bytes`, `Inv_Sub_Bytes` and `Sub_Word` keep their contracts, so
+nothing above them changed. The executable tables `S_Box` and `Inv_S_Box`
+are gone.
+
+**The cost** (`ct_bench`, release build, on `foundation` (aarch64) with the
+scheduler pool idle, the better of two runs of best-of-7; before = `main`
+at `b967ebb`, table S-box):
+
+| ns per call | before | after | ratio |
+|---|---:|---:|---:|
+| AES-128 `Encrypt_Block` | 233.1 | 382.1 | 1.64 |
+| AES-128 `Decrypt_Block` | 426.3 | 607.4 | 1.42 |
+| AES-128 `Expand_Key` | 57.7 | 168.1 | 2.91 |
+| AES-192 `Encrypt_Block` | 280.1 | 460.0 | 1.64 |
+| AES-192 `Decrypt_Block` | 519.3 | 735.0 | 1.42 |
+| AES-192 `Expand_Key` | 49.4 | 138.7 | 2.81 |
+| AES-256 `Encrypt_Block` | 328.4 | 538.2 | 1.64 |
+| AES-256 `Decrypt_Block` | 612.4 | 864.0 | 1.41 |
+| AES-256 `Expand_Key` | 70.1 | 212.6 | 3.03 |
+| SHA-256, per byte of 64 KiB (unchanged code) | 3.08 | 3.08 | 1.00 |
+
+AES-128 encryption goes from 14.6 to 23.9 ns per byte. `Expand_Key`
+pays most, relatively: each `Sub_Word` evaluates the whole 8-lane circuit
+for 4 bytes, against 4 loads before. The x86_64 numbers wait for the IOD
+session (#51).
+
+**Checking it.** `scripts/check-ct.sh` builds `ct/ct.gpr` (the crate's AES,
+SHA-256 and HMAC sources at Alire's release level, `-O3 -gnatn`, default
+runtime checks) and:
+
+1. **the object code**: disassembles the release objects (`objdump -d -r`)
+   and runs `scripts/check-ct-asm.py`, which fails if any of the 21
+   straight-line AES functions (`X_Times`, the S-box functions, the round
+   functions; they see secrets and have no public loop) has a conditional
+   or indirect branch or an indexed load or store, and lists the sites of
+   the loop functions for review;
+2. **secret taint** (ctgrind-style, when `valgrind` is on `PATH`):
+   `ct_grind` marks the secrets undefined for Memcheck through its client
+   requests, and Memcheck must report no branch and no address computed
+   from them; a control run with one deliberate table lookup must report
+   one;
+3. **timing** (dudect-style): `ct_dudect TARGET SAMPLES` compares a
+   fixed-input class with a random-input class by Welch's t-test (Reparaz,
+   Balasch and Verbauwhede, DATE 2017); `|t|` above 4.5 is evidence of a
+   leak. Reported, not enforced: timing on a shared machine is evidence,
+   and a `|t|` below 4.5 shows only that this many samples saw nothing.
+
+Results on `foundation` (aarch64, GNAT 16.1 at `-O3 -gnatn`), before
+(`b967ebb`) and after #50:
+
+* **Object code.** Before: 86 indexed loads in the straight-line
+  functions (`ldrb w0, [x1, w0, uxtw]` in `Sub_Byte`, 16 in each of
+  `Sub_Bytes`, `Inv_Sub_Bytes`, `Round`, `Inv_Round`, `Inv_Round_Prime`,
+  4 in `Sub_Word`), and the same lookups inlined into `Encrypt_Block`,
+  `Decrypt_Block` and `Expand_Key`; and in `Dot`, a `tbz` on a bit of its
+  secret operand: the compiler turned seven of the source's eight `if`s
+  into selects and kept the last one as a branch. After: **0** in the
+  straight-line functions, and no conditional branch. `X_Times` is `sbfx`,
+  `and`, `eor`; `Dot` has no branch or indexed access left. In the
+  loop functions every remaining site tests or indexes by a public value:
+  the round loop and `W (R)` in the ciphers, `I`, `Nk` and the `Rcon`
+  switch table (indexed by `I / Nk`) in `Expand_Key`, the two loop
+  back-edges of SHA-256 `Compress`, and lengths and offsets in `Update`,
+  `Final`, `Load_Block`, `Hash_Chunked` and HMAC's `Init_Key`.
+* **Timing** (`ct_dudect`, max `|t|` over the raw and six cropped tests):
+
+  | target | samples | before | after |
+  |---|---:|---:|---:|
+  | `aes128_encrypt` (plaintext secret) | 2 000 000 | **17.6** | 1.2 |
+  | `aes128_decrypt` (ciphertext secret) | 2 000 000 | **6.5** | 2.1 |
+  | `aes128_key` (key secret) | 1 000 000 | **6.5** | 1.9 |
+  | `sha256` (64-byte message) | 1 000 000 | 1.5 (2 000 000) | 0.6 |
+  | `hmac_key` (32-byte key) | 1 000 000 | | 0.9 |
+
+  The table S-box leaks measurably here even with its 256-byte tables hot
+  in L1 (a fixed input reuses the same lines and banks); the bitsliced one
+  shows nothing at these sample counts. The `evict` mode (64 MiB written
+  before each measurement) saw nothing in 20 000 samples of the table
+  version: eviction makes every measurement slow and noisy, and only the
+  first of a batch of four calls starts cold.
+* **Secret taint** (`ct_grind`): not run. There is no Valgrind on
+  `foundation` (and no system C toolchain to build one); `ct_grind` builds
+  and runs natively, where its requests do nothing. It waits for the
+  x86_64 IOD session.
+
+**What SPARK can and cannot say about it.** gnatprove proves values, not
+time or addresses: no contract states "this runs in constant time", and
+there is no secret/public label on data. What it does give:
+
+* the rewrite is free of functional risk: the circuit is proved equal to
+  the table it replaces, so a constant-time rewrite cannot break AES;
+* absence of run-time errors, so the release build may suppress checks
+  (`-gnatp`) and lose the compare-and-branch of each check on a secret
+  value (none survives in the straight-line functions anyway, at `-O3` with
+  checks on);
+* `Depends` contracts state which outputs depend on which inputs, but not
+  how: they do not tell a data flow from a control flow, so they cannot
+  forbid rule 1.
+
+What could be enforced in Ada itself, and is not done here: a private
+"secret byte" type exporting only bitwise and arithmetic operations, with
+no relational operators and no conversion to an index type, would make
+rules 1 and 2 compile-time errors. It would touch every executable unit
+and its bridge to the spec, so it is left as a follow-up. The rule is
+checked instead on the object code (`check-ct-asm.py`), by Memcheck
+(`ct_grind`), and by statistics (`ct_dudect`).
 
 ## Gates
 
@@ -1673,9 +1856,12 @@ What `llvm-gcc -O0` makes of `AES.Impl`, which M4.2 (#23) builds on:
   exactly how `Expand_Key` fills `W (R)` from its words; and a `Block`'s
   byte `I` is `Block`'s element `i`, column `I / 4`, row `I mod 4`, as
   `split`/`join` in `MixColumns` take it.
-- **Constant tables** (`S_Box`, `Inv_S_Box`) are constant globals; at
-  `-O0` the body reads a private copy (`@foundation_spark-aes-impl.for.ref`).
-  SAW initializes constant globals itself: no `llvm_alloc_global` needed.
+- **Constant tables.** Until #50, `S_Box` and `Inv_S_Box` were constant
+  globals (at `-O0` the body read a private copy,
+  `@foundation_spark-aes-impl.for.ref`, and SAW initialized it itself). #50
+  replaced them by the bitsliced `SBox_Lanes`/`Inv_SBox_Lanes` (i64 to
+  i64, "Constant time"); the only constant table left in `AES.Impl` is
+  `Rcon`'s, indexed by a public round number.
 - **Calls into `AES.Spec.Types`** (`Nk`, `Nr`, `Split`, `Join`: non-ghost
   expression functions, from `Expand_Key`, `Encrypt_Block`, `Decrypt_*`,
   `Mix_Columns`, `Inv_Mix_Columns`) are external declarations in

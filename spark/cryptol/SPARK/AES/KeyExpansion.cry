@@ -161,3 +161,14 @@ property prop_Expand_Key_FIPS =
  /\ Example128KeyExpansion
  /\ Example192KeyExpansion
  /\ Example256KeyExpansion
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Sub_Word: the executable AES.Impl.Sub_Word,
+ * four lanes of the S-box circuit (issue #50), proved equal to the spec's
+ * SubWord.
+ */
+foreign spark_Impl_SubWord : AESWord -> AESWord
+
+/** The executable Sub_Word is KeyExpansion.cry's SubWord. */
+prop_Impl_SubWord : AESWord -> Bit
+property prop_Impl_SubWord a = spark_Impl_SubWord a == SubWord a

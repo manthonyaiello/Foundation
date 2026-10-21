@@ -33,3 +33,30 @@ property prop_SBox b = spark_SBox b == SBox @ b
  */
 prop_InvSBox : [8] -> Bit
 property prop_InvSBox b = spark_InvSBox b == InvSBox @ b
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Sub_Byte: the executable AES.Impl.Sub_Byte,
+ * the bitsliced S-box circuit (issue #50), proved equal to the spec's SBox
+ * table.
+ */
+foreign spark_Impl_SBox : [8] -> [8]
+
+/**
+ * Foundation_Spark.FFI.AES_Impl.Inv_Sub_Byte: the executable
+ * AES.Impl.Inv_Sub_Byte (issue #50), proved equal to the spec's InvSBox
+ * table.
+ */
+foreign spark_Impl_InvSBox : [8] -> [8]
+
+/**
+ * The executable S-box is SBox.cry's SBox at every byte (256 tests).
+ */
+prop_Impl_SBox : [8] -> Bit
+property prop_Impl_SBox b = spark_Impl_SBox b == SBox @ b
+
+/**
+ * The executable inverse S-box is SBox.cry's InvSBox at every byte (256
+ * tests).
+ */
+prop_Impl_InvSBox : [8] -> Bit
+property prop_Impl_InvSBox b = spark_Impl_InvSBox b == InvSBox @ b
