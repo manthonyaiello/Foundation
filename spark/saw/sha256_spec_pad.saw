@@ -175,11 +175,10 @@ let verify_zero (k : Int) = verify_zero_at 0 0 0 k;
  * Sequences_Of_Bits.Literal (Cryptol.Bit_Sequences) with the same
  * arguments, so these lemmas are Literal's, and Pad reaches the one at 64
  * through To_Bits, which SAW executes; likewise Zero now calls
- * Sequences_Of_Bits.Zero. Unverified until the next SAW session (PLAN
- * step 7), and the secondary-stack accounting is the part to check
- * first: if GNAT copies a wrapper's unconstrained result on the
- * secondary stack, rather than passing the callee's through, the byte
- * counts here and in Pad's contract move.
+ * Sequences_Of_Bits.Zero. The wrappers pass their callee's fat pointer
+ * through, with no copy on the secondary stack (GNAT-LLVM 27's IR,
+ * 2026-10-21), so the byte counts here and in Pad's contract are as
+ * before #75.
  */
 let to_bits_used (w : Int) = eval_int {{ sum [ ((32 + j + 15) / 16) * 16 | j <- [0 .. w] ] : [64] }};
 /*

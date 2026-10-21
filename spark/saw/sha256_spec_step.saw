@@ -104,8 +104,7 @@ i_step3 <- round_lemmas 0 [] [];
  * on its bound. So the per-N lemmas are Rounds.Foldl's, for each N in
  * 0 .. 64, with the lemma at N - 1 and Step3's (SAW applies the one at
  * round N - 1) as the overrides, and Foldl_Step3 is proved once, at 64,
- * over the lemma at 64. (#75: these symbol and argument changes are
- * unverified until the next SAW session; PLAN step 7.)
+ * over the lemma at 64.
  */
 let rounds_foldl_contract (n : Int) = do {
   m <- llvm_fresh_var "m" block_t;
