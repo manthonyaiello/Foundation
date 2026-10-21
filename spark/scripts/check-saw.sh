@@ -70,6 +70,11 @@
 #                  leaves them out. The
 #                  record says which ran (line "options"); a SAW_LONG=1
 #                  run writes saw/results-long.txt, not saw/results.txt.
+#   SAW_LAYERS     optional: which layers to compile and prove: all (the
+#                  default), impl (MODULES, their scripts, and the negative
+#                  controls not named spec_*) or spec (SPEC_MODULES, their
+#                  scripts, and the spec_* controls). Anything but all is a
+#                  partial run, never a record: it needs --print.
 #   saw, cryptol and z3 must be on PATH (the x86_64 bootstrap's env.sh).
 #
 # Exit status: 0 when every proof passed and every negative control failed;
@@ -99,6 +104,16 @@ case "${1:-}" in
   -h|--help) sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d'; exit 0 ;;
   *) echo "check-saw.sh: unknown argument: $1" >&2; exit 2 ;;
 esac
+
+SAW_LAYERS="${SAW_LAYERS:-all}"
+case "$SAW_LAYERS" in
+  all|impl|spec) ;;
+  *) echo "check-saw.sh: SAW_LAYERS must be all, impl or spec, not $SAW_LAYERS" >&2; exit 2 ;;
+esac
+if [ "$SAW_LAYERS" != all ] && [ "$PRINT" -eq 0 ]; then
+  echo "check-saw.sh: SAW_LAYERS=$SAW_LAYERS is a partial run, not a record: add --print" >&2
+  exit 2
+fi
 
 # --- the toolchain -------------------------------------------------------------
 
@@ -155,6 +170,7 @@ fi
 # linked by llvm-link into saw/obj/<module>.bc, and the script of proofs
 # run on it, saw/<module>_impl.saw.
 MODULES=(aes sha256)
+[ "$SAW_LAYERS" != spec ] || MODULES=()
 
 # aes: AES.Impl, and the non-ghost AES.Spec.Types whose expression
 # functions (Nk, Nr, Split, Join) AES.Impl calls, and which -O0 leaves as
@@ -188,6 +204,7 @@ SWITCHES=(-c -gnat2022 -gnatp -gnatVn -O0 -emit-llvm)
 # saw/obj/spec/<module>.bc, and the script of proofs run on it,
 # saw/<module>.saw.
 SPEC_MODULES=(aes_spec sha256_spec)
+[ "$SAW_LAYERS" != impl ] || SPEC_MODULES=()
 
 # aes_spec: the AES spec layer's units whose functions the script proves
 # (all ghost but AES.Spec.Types), with the instances AES128, AES192 and
@@ -348,6 +365,7 @@ done
 
 # The secondary stack, compiled once and linked into each spec module.
 SS_BC=()
+[ "${#SPEC_MODULES[@]}" -gt 0 ] || RTS_UNITS=() HARNESS_UNITS=()
 for u in "${RTS_UNITS[@]}"; do
   echo ">> llvm-gcc ${RTS_SWITCHES[*]} <runtime>/adainclude/$u"
   (cd "$SPEC_OBJ_DIR" && "$LLVM_GCC" "${RTS_SWITCHES[@]}" "$RTS_SRC/$u")
@@ -478,6 +496,11 @@ done
 
 NEGATIVE=()
 for f in "$SAW_DIR"/negative/*.saw; do
+  case "$SAW_LAYERS:$(basename "$f")" in
+    impl:spec_*) continue ;;
+    spec:spec_*) ;;
+    spec:*) continue ;;
+  esac
   name="negative/$(basename "$f")"
   log="$LOG_DIR/$(basename "$f" .saw).log"
   echo ">> saw $name (must fail)"
@@ -522,6 +545,7 @@ record() {
   echo "solvers     rme (SAW's built-in); z3 on PATH: $V_Z3 (each proof's below)"
   echo "memory cap  $CAP_NOTE"
   echo "options     $OPTIONS_NOTE"
+  echo "layers      SAW_LAYERS=$SAW_LAYERS"
   echo "switches    ${SWITCHES[*]}"
   echo "spec layer  ${SPEC_SWITCHES[*]/#-gnatec=$SAW_DIR\//-gnatec=saw/}"
   echo "spec.adc    $(sha "$SPEC_ADC") saw/spec.adc: $(grep '^pragma' "$SPEC_ADC" | tr '\n' ' ' | sed 's/ $//')"
