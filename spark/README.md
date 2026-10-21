@@ -788,8 +788,28 @@ at `b967ebb`, table S-box):
 
 AES-128 encryption goes from 14.6 to 23.9 ns per byte. `Expand_Key`
 pays most, relatively: each `Sub_Word` evaluates the whole 8-lane circuit
-for 4 bytes, against 4 loads before. The x86_64 numbers wait for the IOD
-session (#51).
+for 4 bytes, against 4 loads before.
+
+On the x86_64 IOD (Intel Xeon 6975P-C, 8 CPUs, GNAT 16.1 at `-O3
+-gnatn`; the better of two runs of best-of-7, on 2026-10-21, with a
+sibling SAW job on one core, load average 1.3–1.9):
+
+| ns per call | before | after | ratio |
+|---|---:|---:|---:|
+| AES-128 `Encrypt_Block` | 310.6 | 510.1 | 1.64 |
+| AES-128 `Decrypt_Block` | 656.9 | 1013.6 | 1.54 |
+| AES-128 `Expand_Key` | 129.6 | 274.7 | 2.12 |
+| AES-192 `Encrypt_Block` | 374.4 | 614.5 | 1.64 |
+| AES-192 `Decrypt_Block` | 795.3 | 1225.3 | 1.54 |
+| AES-192 `Expand_Key` | 138.1 | 257.5 | 1.86 |
+| AES-256 `Encrypt_Block` | 440.0 | 717.6 | 1.63 |
+| AES-256 `Decrypt_Block` | 934.2 | 1439.0 | 1.54 |
+| AES-256 `Expand_Key` | 163.2 | 344.1 | 2.11 |
+| SHA-256, per byte of 64 KiB (unchanged code) | 4.09 | 4.09 | 1.00 |
+
+AES-128 encryption goes from 19.4 to 31.9 ns per byte. The encryption
+ratio is the same as on aarch64; decryption and `Expand_Key` cost
+relatively less here.
 
 **Checking it.** `scripts/check-ct.sh` builds `ct/ct.gpr` (the crate's AES,
 SHA-256 and HMAC sources at Alire's release level, `-O3 -gnatn`, default
@@ -845,10 +865,54 @@ Results on `foundation` (aarch64, GNAT 16.1 at `-O3 -gnatn`), before
   before each measurement) saw nothing in 20 000 samples of the table
   version: eviction makes every measurement slow and noisy, and only the
   first of a batch of four calls starts cold.
-* **Secret taint** (`ct_grind`): not run. There is no Valgrind on
-  `foundation` (and no system C toolchain to build one); `ct_grind` builds
-  and runs natively, where its requests do nothing. It waits for the
-  x86_64 IOD session.
+* **Secret taint** (`ct_grind`): not run on aarch64. There is no
+  Valgrind on `foundation` (and no system C toolchain to build one);
+  `ct_grind` builds and runs natively, where its requests do nothing.
+  See x86_64 below.
+
+Results on the x86_64 IOD (Intel Xeon 6975P-C, Ubuntu 24.04, GNAT 16.1 at
+`-O3 -gnatn`, GNAT Pro 27's `objdump` 2.46, Valgrind 3.22.0), before
+(`b967ebb`, with `ct/` and the two scripts copied in) and after #50, on
+2026-10-21. The machine was shared with a SAW job on one of its 8 cores
+(load average 0.3–1.9 during the runs):
+
+* **Object code.** Before: the same **86** indexed loads in the
+  straight-line functions as on aarch64 (`movzbl (%rax,%rdi,1),%eax` in
+  `Sub_Byte` and `Inv_Sub_Byte`, 16 in each of `Sub_Bytes`,
+  `Inv_Sub_Bytes`, `Round`, `Inv_Round`, `Inv_Round_Prime`, 4 in
+  `Sub_Word`), the lookups inlined into the ciphers and `Expand_Key`, and
+  in `Dot` one `je` on its secret operand. The old `X_Times` compiled to
+  `cmovs`, a select, as on aarch64. After: **0** in the straight-line
+  functions, no conditional branch, and `Dot` has no site left. The loop
+  functions' sites are the same public ones as on aarch64 (the `Rcon`
+  switch table, `CSWTCH`, indexed by `I / Nk`). The first x86 run showed that `check-ct-asm.py` read
+  objdump's prefix words (`data16 cs nopw 0x0(%rax,%rax,1)`, alignment
+  padding) as opcodes: it listed the padding as indexed accesses in the
+  loop functions, and would have missed a `notrack jmp *%rax`. It now
+  skips the prefixes, and counts `loop`/`loope`/`loopne` as branches.
+* **Secret taint** (`ct_grind` under Memcheck). After: **0 errors** on the
+  secrets, and the control run reports its table lookup (1 error, "Use of
+  uninitialised value of size 8"). Before: **1855 errors from 107
+  contexts**, in `Sub_Byte`, `Inv_Sub_Byte`, `Round`, `Inv_Round`,
+  `Inv_Round_Prime`, `Expand_Key`, `Encrypt_Block`, `Decrypt_Block` and
+  `Decrypt_Block_Prime` ("Use of uninitialised value of size 8": an
+  address from a secret), and one in `Dot` ("Conditional jump or move
+  depends on uninitialised value(s)": the `je` above). This is the first
+  run of `ct_grind`'s x86_64 client requests: they work.
+* **Timing** (`ct_dudect`, max `|t|` over the raw and six cropped tests;
+  `check-ct.sh` at 1 000 000 samples, then three more runs at 2 000 000):
+
+  | target | before, 1M | before, 2M (4 runs) | after, 1M | after, 2M (4 runs) |
+  |---|---:|---:|---:|---:|
+  | `aes128_encrypt` | 3.0 | **30.9**, **19.1**, 2.2, **32.9** | 2.2 | 1.4, 1.3, 1.4, 1.4 |
+  | `aes128_decrypt` | **13.1** | 2.7, 3.3, 1.5, **7.9** | 1.3 | 0.9, 1.9, 1.6, 1.9 |
+  | `aes128_key` | **15.2** | **9.4**, **11.8**, **93.4**, **111.9** | 1.4 | 1.7, 2.0, 1.3, 2.1 |
+  | `sha256` | 1.3 | 1.3, 1.2, 2.3 (3 runs) | 1.3 | 1.1, 1.2, 0.8 (3 runs) |
+  | `hmac_key` | 1.6 | 1.4, 1.6, 1.4 (3 runs) | 1.3 | 1.3, 1.1, 1.3 (3 runs) |
+
+  The table S-box leaks on x86_64 too, but not in every run: 10 of its
+  15 AES runs exceed 4.5. The bitsliced one stays below 2.3 in all 15
+  of its AES runs.
 
 **What SPARK can and cannot say about it.** gnatprove proves values, not
 time or addresses: no contract states "this runs in constant time", and

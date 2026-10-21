@@ -3,8 +3,9 @@
 --  and 51 bits (128 in all: rdi is unchanged), then xchg rbx, rbx.
 --  Outside Valgrind the sequence leaves every register as it was.
 --
---  UNTESTED: written on aarch64 (issue #50); the x86_64 IOD session
---  compiles and runs it first.
+--  Written on aarch64 (issue #50); first run on the x86_64 IOD on
+--  2026-10-21 under Valgrind 3.22.0: the control's table lookup is
+--  reported, and so is the table S-box at b967ebb.
 
 with Interfaces;
 with System.Machine_Code;
