@@ -9,13 +9,20 @@
 --  Cipher.cry's properties (M1.5) are not stated here. Ada has no primes
 --  in names, so InvRound' is InvRound_Prime.
 --
---  Cipher.cry's foldl over the middle round keys is a recursive ghost
---  fold per round function (Foldl_Round, Foldl_InvRound,
---  Foldl_InvRound_Prime), each stated as the Cryptol prelude's foldl:
---  foldl f z [] = z and foldl f z ([x] # xs) = foldl f (f z x) xs. Their
---  lists of round keys are Round_Keys of any length, as the prelude's foldl
---  takes any [n].
+--  Cryptol's built-ins come from the Cryptol prelude in SPARK
+--  (Foundation_Spark.Cryptol, #75), instantiated here at AES's types:
+--  * @@ in SubBytes, InvSubBytes, ShiftRows and InvShiftRows is
+--    Bulk_Indexing's Bulk_Index;
+--  * foldl over the middle round keys, one fold per round function
+--    (Foldl_Round, Foldl_InvRound, Foldl_InvRound_Prime), is Folds' Foldl.
+--    Its lists of round keys are Round_Keys of any length, as foldl takes
+--    any [n]. The prelude's fold recurses from the last element, as the
+--    implementation's loops run (see Folds);
+--  * reverse, in InvCipher and InvCipher', stays inline (Reverse_Keys
+--    says why).
 
+with Foundation_Spark.Cryptol.Bulk_Indexing;
+with Foundation_Spark.Cryptol.Folds;
 with Foundation_Spark.AES.Spec.GF28;
 with Foundation_Spark.AES.Spec.SBox;
 with Foundation_Spark.AES.Spec.Types;
@@ -41,14 +48,34 @@ is
    --  A list of 16 indices into a Block, the right operand of Cryptol's
    --  @@ in ShiftRows and InvShiftRows.
 
+   package Table_Indexing is new Cryptol.Bulk_Indexing
+     (Index     => Byte,
+      Element   => Byte,
+      Seq       => Byte_Table,
+      Out_Index => Block_Index,
+      Indices   => Block,
+      Out_Seq   => Block);
+   --  The prelude's @@ on an S-box [256][8], indexed by the 16 bytes of a
+   --  block: SBox @@ bs.
+
+   package Block_Indexing is new Cryptol.Bulk_Indexing
+     (Index     => Block_Index,
+      Element   => Byte,
+      Seq       => Block,
+      Out_Index => Block_Index,
+      Indices   => Permutation,
+      Out_Seq   => Block);
+   --  The prelude's @@ on a block, indexed by a Permutation: bs @@ [0, 5,
+   --  10, ...].
+
    function SubBytes (Bs : Block) return Block
-   is [for I in Block_Index => SBox.SBox (Bs (I))];
+   is (Table_Indexing.Bulk_Index (SBox.SBox, Bs));
    --  Cipher.cry: SubBytes bs = SBox @@ bs [FIPS-PUB-197 Section 5.1.1].
    --  @param Bs The state.
    --  @return The state with the S-box applied to each byte.
 
    function InvSubBytes (Bs : Block) return Block
-   is [for I in Block_Index => SBox.InvSBox (Bs (I))];
+   is (Table_Indexing.Bulk_Index (SBox.InvSBox, Bs));
    --  Cipher.cry: InvSubBytes bs = InvSBox @@ bs [FIPS-PUB-197 Section
    --  5.3.2].
    --  @param Bs The state.
@@ -62,7 +89,7 @@ is
    --  The index list of Cipher.cry's ShiftRows: bs @@ [0, 5, 10, 15, ...].
 
    function ShiftRows (Bs : Block) return Block
-   is [for I in Block_Index => Bs (ShiftRows_Indices (I))];
+   is (Block_Indexing.Bulk_Index (Bs, ShiftRows_Indices));
    --  Cipher.cry: ShiftRows bs = bs @@ [0, 5, 10, 15, 4, 9, 14, 3, 8, 13,
    --  2, 7, 12, 1, 6, 11], ShiftRows as a permutation of the bytes of the
    --  block [FIPS-PUB-197 Section 5.1.2].
@@ -78,7 +105,7 @@ is
    --  ...].
 
    function InvShiftRows (Bs : Block) return Block
-   is [for I in Block_Index => Bs (InvShiftRows_Indices (I))];
+   is (Block_Indexing.Bulk_Index (Bs, InvShiftRows_Indices));
    --  Cipher.cry: InvShiftRows bs = bs @@ [0, 13, 10, 7, 4, 1, 14, 11, 8,
    --  5, 2, 15, 12, 9, 6, 3] [FIPS-PUB-197 Section 5.3.1].
    --  @param Bs The state.
@@ -156,37 +183,52 @@ is
    --  @param Ki The round key.
    --  @return The state after the round.
 
+   package Round_Folds is new Cryptol.Folds
+     (Acc     => Block,
+      Index   => Round_Key_Index,
+      Element => Block,
+      Seq     => Round_Keys,
+      F       => Round);
+   --  The prelude's foldl over round keys, with Round as its function.
+
+   package InvRound_Folds is new Cryptol.Folds
+     (Acc     => Block,
+      Index   => Round_Key_Index,
+      Element => Block,
+      Seq     => Round_Keys,
+      F       => InvRound);
+   --  The prelude's foldl over round keys, with InvRound as its function.
+
+   package InvRound_Prime_Folds is new Cryptol.Folds
+     (Acc     => Block,
+      Index   => Round_Key_Index,
+      Element => Block,
+      Seq     => Round_Keys,
+      F       => InvRound_Prime);
+   --  The prelude's foldl over round keys, with InvRound' as its function.
+
    function Foldl_Round (Z : Block; Xs : Round_Keys) return Block
-   is (if Xs'Length = 0 then Z
-       else Foldl_Round (Round (Z, Xs (Xs'First)),
-                         Xs (Xs'First + 1 .. Xs'Last)))
-   with Subprogram_Variant => (Decreases => Xs'Length);
+   is (Round_Folds.Foldl (Z, Xs));
    --  Cipher.cry: foldl Round, the fold in Cipher's state_rounds = foldl
-   --  Round state_initial ws. As the prelude's foldl: Z when Xs is empty,
-   --  and otherwise the fold of the rest of Xs from Round (Z, x) for its
-   --  first element x.
+   --  Round state_initial ws, as the prelude's Folds.Foldl.
    --  @param Z The initial state.
    --  @param Xs The round keys to apply, in order.
    --  @return The state after one Round per element of Xs.
 
    function Foldl_InvRound (Z : Block; Xs : Round_Keys) return Block
-   is (if Xs'Length = 0 then Z
-       else Foldl_InvRound (InvRound (Z, Xs (Xs'First)),
-                            Xs (Xs'First + 1 .. Xs'Last)))
-   with Subprogram_Variant => (Decreases => Xs'Length);
+   is (InvRound_Folds.Foldl (Z, Xs));
    --  Cipher.cry: foldl InvRound, the fold in InvCipher's state_rounds =
-   --  foldl InvRound state_initial (reverse ws), stated as Foldl_Round.
+   --  foldl InvRound state_initial (reverse ws), as the prelude's
+   --  Folds.Foldl.
    --  @param Z The initial state.
    --  @param Xs The round keys to apply, in order.
    --  @return The state after one InvRound per element of Xs.
 
    function Foldl_InvRound_Prime (Z : Block; Xs : Round_Keys) return Block
-   is (if Xs'Length = 0 then Z
-       else Foldl_InvRound_Prime (InvRound_Prime (Z, Xs (Xs'First)),
-                                  Xs (Xs'First + 1 .. Xs'Last)))
-   with Subprogram_Variant => (Decreases => Xs'Length);
+   is (InvRound_Prime_Folds.Foldl (Z, Xs));
    --  Cipher.cry: foldl InvRound', the fold in InvCipher''s state_rounds
-   --  = foldl InvRound' state_initial (reverse ws), stated as Foldl_Round.
+   --  = foldl InvRound' state_initial (reverse ws), as the prelude's
+   --  Folds.Foldl.
    --  @param Z The initial state.
    --  @param Xs The round keys to apply, in order.
    --  @return The state after one InvRound' per element of Xs.
@@ -195,7 +237,11 @@ is
    is [for I in Xs'Range => Xs (Xs'First + Xs'Last - I)];
    --  Cryptol's reverse at type [n]Block -> [n]Block, as InvCipher and
    --  InvCipher' apply it to ws. Reverse is an Ada reserved word. The
-   --  result has the bounds of Xs.
+   --  result has the bounds of Xs. Stated inline, as the prelude's
+   --  Sequences.Reverse_Of states it (element I is element Xs'Last - (I -
+   --  Xs'First)), not through an instance: through one, Impl's
+   --  Decrypt_Block_Prime loses an assertion (RK (J) = W (Nr (K) - J)) to
+   --  a timeout at level 2 (#75).
    --  @param Xs The round keys.
    --  @return Xs in reverse order.
 

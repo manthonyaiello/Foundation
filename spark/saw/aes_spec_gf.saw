@@ -65,33 +65,44 @@ gf28_product_bit <- verify_spec "gf28__product_bit" []
                        }) z3 "z3" "\\x i -> (drop`{1} x : [15]) @ i, i < 15";
 
 /*
- * Pmult_Fold (B, C, N): the first N steps of pmult b c, the product of B
- * with the leading N bits of C, one lemma per N in 0 .. 8, each with the
- * lemma at N - 1 as the override for its recursive call:
- *   Pmult_Fold (B, C, 0) = 0
- *   Pmult_Fold (B, C, N) = zext (pmult b (take`{N} c))
+ * Since #75, Head, Bit and Product_Bit call the prelude's Words.Head and
+ * Words.Bit (instances Byte_Bits and Product_Bits), which SAW executes;
+ * their contracts above are unchanged. (Unverified until the next SAW
+ * session; PLAN step 7.)
+ *
+ * Pmult_Fold and Pmult are the prelude's Polynomial_Products (instance
+ * Products at {u, v} = {7, 7}), so the recursion is Products.Products (X,
+ * Y, N) on Polys: the product of X with the leading N bits of the [8] Y,
+ * one lemma per N in 0 .. 8, each with the lemma at N - 1 as the override
+ * for its recursive call, for X and Y below 2 ** 8 (Pmult_Fold and Pmult
+ * pass bytes, zero-extended):
+ *   Products (X, Y, 0) = 0
+ *   Products (X, Y, N) = zext (pmult x (take`{N} y))
+ * Pmult (B, C) calls Products.Pmult, which calls Products at N = 8.
+ * (Unverified until the next SAW session; PLAN step 7.)
  */
-let pmult_fold_contract (n : Int) (rhs : Term) = do {
-  b <- llvm_fresh_var "b" byte_t;
-  c <- llvm_fresh_var "c" byte_t;
-  llvm_execute_func [llvm_term b, llvm_term c, llvm_term {{ `n : [32] }}];
-  llvm_return (llvm_term {{ rhs b c }});
+let products_contract (n : Int) (rhs : Term) = do {
+  x <- llvm_fresh_var "x" poly_t;
+  y <- llvm_fresh_var "y" poly_t;
+  llvm_precond {{ x < 256 /\ y < 256 }};
+  llvm_execute_func [llvm_term x, llvm_term y, llvm_term {{ `n : [32] }}];
+  llvm_return (llvm_term {{ rhs (drop`{8} x : [8]) (drop`{8} y : [8]) }});
 };
-pmult_fold_0 <- verify_spec "gf28__pmult_fold" [] (pmult_fold_contract 0 {{ \(b : [8]) (c : [8]) -> 0 : [16] }})
-                  rme "rme" "N = 0: \\b c -> 0";
-rec pmult_folds (n : Int) (prev : LLVMSpec) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "gf28__pmult_fold" [prev]
-             (pmult_fold_contract n {{ \(b : [8]) (c : [8]) -> zext (pmult b (take`{n} c)) : [16] }})
-             rme "rme" (str_concat (str_concat "N = " (show n)) ": \\b c -> zext (pmult b (take`{N} c))");
+products_0 <- verify_spec "gf28__products__products" [] (products_contract 0 {{ \(b : [8]) (c : [8]) -> 0 : [16] }})
+                rme "rme" "N = 0: \\x y -> 0";
+rec products_lemmas (n : Int) (prev : LLVMSpec) : TopLevel LLVMSpec = do {
+  lemma <- verify_spec "gf28__products__products" [prev]
+             (products_contract n {{ \(b : [8]) (c : [8]) -> zext (pmult b (take`{n} c)) : [16] }})
+             rme "rme" (str_concat (str_concat "N = " (show n)) ": \\x y -> zext (pmult x (take`{N} y))");
   if eval_bool {{ `n == (8 : Integer) }} then return lemma
-  else pmult_folds (eval_int {{ `n + 1 : [32] }}) lemma;
+  else products_lemmas (eval_int {{ `n + 1 : [32] }}) lemma;
 };
-pmult_fold_8 <- pmult_folds 1 pmult_fold_0;
+products_8 <- products_lemmas 1 products_0;
 
 /*
  * Pmult = Cryptol's pmult at [8] -> [8] -> [15], held in a Poly.
  */
-gf28_pmult <- verify_spec "gf28__pmult" [pmult_fold_8]
+gf28_pmult <- verify_spec "gf28__pmult" [products_8]
                 (byte_byte_contract {{ \b c -> zext (pmult b c) : [16] }})
                 rme "rme" "\\b c -> zext (pmult b c)";
 

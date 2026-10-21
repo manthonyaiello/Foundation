@@ -146,11 +146,12 @@ is
    --  Main.cry's [k] at this k: the key of Encrypt and Decrypt, as bits.
 
    function Split_Key (Key : Key_Bits) return Key_Words
-   is [for J in 0 .. Nk - 1 => [for I in AESWord_Index => Byte_At
-                                  (Key, Bit_Index (32 * J + 8 * I))]];
+   is [for J in 0 .. Nk - 1 => [for I in AESWord_Index => Byte_Bits.Split_At
+                                  (Key, Bit_Index (4 * J + I))]];
    --  Main.cry: split (split key), Cryptol's split twice at [k] ->
    --  [Nk k][32] -> [Nk k][4][8] = [Nk k]AESWord. Byte I of word J is
-   --  bits 32 * J + 8 * I .. 32 * J + 8 * I + 7.
+   --  byte 4 * J + I of the prelude's split at [k] -> [k / 8][8], bits
+   --  32 * J + 8 * I .. 32 * J + 8 * I + 7.
    --  @param Key The key as K bits.
    --  @return The key as Nk words.
 

@@ -93,15 +93,7 @@ is
 
    procedure Lemma_Foldl_Round_Eq (A, B : Block; Xs, Ys : Round_Keys) is
    begin
-      if Xs'Length > 0 then
-         Lemmas.Lemma_Round_Eq (A, B, Xs (Xs'First));
-         Lemma_Round_Key_Eq (B, Xs (Xs'First), Ys (Ys'First));
-         pragma Assert
-           (Xs (Xs'First + 1 .. Xs'Last) = Ys (Ys'First + 1 .. Ys'Last));
-         Lemma_Foldl_Round_Eq
-           (Round (A, Xs (Xs'First)), Round (B, Ys (Ys'First)),
-            Xs (Xs'First + 1 .. Xs'Last), Ys (Ys'First + 1 .. Ys'Last));
-      end if;
+      Lemmas.Lemma_Foldl_Round_Take_Eq (A, B, Xs, Ys, Xs'Length);
    end Lemma_Foldl_Round_Eq;
 
    ---------------------

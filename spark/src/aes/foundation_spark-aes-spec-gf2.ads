@@ -11,8 +11,22 @@
 --  its second factor, and Pdiv states pdiv at [9] -> [9] -> [9] as long
 --  division, a recursive fold over the bits of the dividend, most
 --  significant first, as GF28's Pmod_Fold is for pmod.
+--
+--  From the Cryptol prelude in SPARK (Foundation_Spark.Cryptol, #75): @ on
+--  a [9] (Words). pmult and pdiv stay inline. pmult: as the prelude's
+--  Pmult (Polynomial_Products at {8, 8}), GF2 still proves, but
+--  SBox_Entries, which evaluates pmult on constants at every step of
+--  inner for all 256 bytes, ran past 77 minutes at -j6 with 9 of its 32
+--  subprograms done, against about 26 minutes for the whole unit with
+--  Pmult's closed form below (#75). pdiv: the prelude's Pdiv reduces by its Top (y), the largest power of
+--  2 not above y, where Pdiv_Fold reduces by Lead (y), and Inner_Step's
+--  postcondition rests on Pdiv_Fold's, which pairs it with Pmod_Fold.
+--  With Pdiv as the prelude's (an instance of Polynomial_Quotients at
+--  {9, 9}), Inner_Step's postcondition Inner_Step'Result (3) < Lead (S
+--  (3)) does not prove at level 4.
 
 with Interfaces;
+with Foundation_Spark.Cryptol.Words;
 
 package Foundation_Spark.AES.Spec.GF2 with
   SPARK_Mode,
@@ -90,11 +104,15 @@ is
    --  @param Y The polynomial.
    --  @return x^^(pdeg y).
 
+   package Poly_Bits is new Cryptol.Words
+     (Poly, 9, Interfaces.Shift_Right);
+   --  The prelude's @ on a [9] held in a Poly.
+
    function Bit (X : Poly; I : Natural) return Poly
-   is (Interfaces.Shift_Right (X, 8 - I) and 1)
+   is (if Poly_Bits.Bit (X, I) then 1 else 0)
    with Pre => I <= 8;
-   --  Cryptol's x @ i on a [9], as 0 or 1. Cryptol is big-endian, so bit
-   --  0 is the coefficient of x^^8.
+   --  Cryptol's x @ i on a [9], as 0 or 1: the prelude's Words.Bit.
+   --  Cryptol is big-endian, so bit 0 is the coefficient of x^^8.
    --  @param X The polynomial.
    --  @param I The Cryptol index of the bit.
    --  @return That coefficient.

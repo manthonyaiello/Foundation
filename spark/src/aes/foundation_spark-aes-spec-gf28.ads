@@ -6,8 +6,19 @@
 --  state those two primitives at the types GF28.cry uses them at, each as
 --  a recursive fold over the bits of its argument, most significant first,
 --  as Cryptol orders bits. Ada has no operator named •, so (•) is Dot.
+--
+--  From the Cryptol prelude in SPARK (Foundation_Spark.Cryptol, #75): @
+--  and head on a [8] and @ on a [15] (Words), and pmult at [8] x [8]
+--  (Polynomial_Products). pmod stays inline: Pmod returns the [8] as a
+--  Byte, where the prelude's Pmod returns a Poly whose bound below 2 ** 8
+--  is an induction that no expression function can call, and GF28's Pmod
+--  takes any Poly dividend, where the prelude's requires a [15]. Its long
+--  division is the prelude's, with x ^^ 8 for the prelude's Top (M), as M
+--  has degree 8.
 
 with Interfaces;
+with Foundation_Spark.Cryptol.Polynomial_Products;
+with Foundation_Spark.Cryptol.Words;
 with Foundation_Spark.AES.Spec.Types;
 
 package Foundation_Spark.AES.Spec.GF28 with
@@ -30,8 +41,12 @@ is
    subtype Bit_Index is Natural range 0 .. 7;
    --  The indices of the bits of a Byte.
 
+   package Byte_Bits is new Cryptol.Words
+     (Byte, 8, Interfaces.Shift_Right);
+   --  The prelude's @ and head on a [8].
+
    function Bit (B : Byte; I : Bit_Index) return Boolean
-   is ((Interfaces.Shift_Right (B, 7 - I) and 1) = 1);
+   is (Byte_Bits.Bit (B, I));
    --  Cryptol's b @ i on a [8]. Cryptol is big-endian, so bit 0 is the
    --  most significant.
    --  @param B The byte.
@@ -39,7 +54,7 @@ is
    --  @return Whether that bit is set.
 
    function Head (B : Byte) return Boolean
-   is (Bit (B, 0));
+   is (Byte_Bits.Head (B));
    --  Cryptol's head b on a [8]: its most significant bit.
    --  @param B The byte.
    --  @return Whether its most significant bit is set.
@@ -47,33 +62,37 @@ is
    subtype Product_Index is Natural range 0 .. 14;
    --  The indices of the bits of a [15] product.
 
+   package Product_Bits is new Cryptol.Words
+     (Poly, 15, Interfaces.Shift_Right);
+   --  The prelude's @ on a [15] held in a Poly.
+
    function Product_Bit (X : Poly; I : Product_Index) return Boolean
-   is ((Interfaces.Shift_Right (X, 14 - I) and 1) = 1);
+   is (Product_Bits.Bit (X, I));
    --  Cryptol's x @ i on a [15], held in the low 15 bits of a Poly.
    --  @param X The product.
    --  @param I The Cryptol index of the bit (0 is the coefficient of
    --  x^^14).
    --  @return Whether that bit is set.
 
+   package Products is new Cryptol.Polynomial_Products
+     (Poly, 7, 7, Interfaces.Shift_Right);
+   --  The prelude's pmult at {u, v} = {7, 7}: [8] -> [8] -> [15].
+
    function Pmult_Fold (B, C : Byte; N : Natural) return Poly
-   is (if N = 0 then 0
-       else Interfaces.Shift_Left (Pmult_Fold (B, C, N - 1), 1)
-            xor (if Bit (C, N - 1) then Poly (B) else 0))
-   with
-     Pre                => N <= 8,
-     Subprogram_Variant => (Decreases => N);
+   is (Products.Products (Poly (B), Poly (C), N))
+   with Pre => N <= 8;
    --  The first N steps of pmult b c: the product of B with the leading N
    --  bits of C, accumulated by shift and exclusive-or, most significant
-   --  bit of C first.
+   --  bit of C first: the prelude's Products.
    --  @param B The multiplicand.
    --  @param C The multiplier.
    --  @param N How many bits of C, from the most significant, to use.
    --  @return The partial product.
 
    function Pmult (B, C : Byte) return Poly
-   is (Pmult_Fold (B, C, 8));
+   is (Products.Pmult (Poly (B), Poly (C)));
    --  Cryptol's pmult at type [8] -> [8] -> [15]: the product of B and C
-   --  as polynomials over GF(2).
+   --  as polynomials over GF(2): the prelude's Pmult.
    --  @param B The first factor.
    --  @param C The second factor.
    --  @return Their product, of degree at most 14.

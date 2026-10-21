@@ -16,7 +16,13 @@
 --  Spec.AES128.Encrypt, as in the Cryptol. The split of a key [k] into
 --  [Nk k]AESWord depends on k, so it is there too (AES_K.Split_Key).
 --  Main.cry's property EncryptInverts is in Spec.Properties.
+--
+--  Cryptol's join and split between bytes and bits, and @ on a byte, come
+--  from the Cryptol prelude in SPARK (Foundation_Spark.Cryptol, #75): the
+--  instance Byte_Bits of Join_Split at [8].
 
+with Interfaces;
+with Foundation_Spark.Cryptol.Join_Split;
 with Foundation_Spark.AES.Spec.Types;
 
 package Foundation_Spark.AES.Spec.Main with
@@ -59,47 +65,58 @@ is
    --  @param Key The key bits.
    --  @return Whether Key has K bits from index 0.
 
+   subtype Byte_Index is Natural range 0 .. 31;
+   --  The indices of a sequence of bytes: at most 32 bytes, the 256 bits
+   --  of the longest AES bit sequence, so that its length in bits is a
+   --  Bit_Index.
+
+   type Bytes is array (Byte_Index range <>) of Byte;
+   --  A sequence of bytes, Cryptol's [n][8], the word side of Byte_Bits.
+
+   package Byte_Bits is new Cryptol.Join_Split
+     (Word        => Byte,
+      Width       => 8,
+      Shift_Right => Interfaces.Shift_Right,
+      Word_Index  => Byte_Index,
+      Words       => Bytes,
+      Bit_Index   => Bit_Index,
+      Bits        => Bits);
+   --  The prelude's join, split and @ between bytes [8] and AES's bits.
+
    function Byte_At (Bs : Bits; From : Bit_Index) return Byte
-   is ((if Bs (From) then 16#80# else 0)
-       or (if Bs (From + 1) then 16#40# else 0)
-       or (if Bs (From + 2) then 16#20# else 0)
-       or (if Bs (From + 3) then 16#10# else 0)
-       or (if Bs (From + 4) then 16#08# else 0)
-       or (if Bs (From + 5) then 16#04# else 0)
-       or (if Bs (From + 6) then 16#02# else 0)
-       or (if Bs (From + 7) then 16#01# else 0))
+   is (Byte_Bits.Value (Bs, From, 8))
    with Pre => Bs'Last >= 7 and then From >= Bs'First
                and then From <= Bs'Last - 7;
    --  The [8] at bits From .. From + 7 of Bs as a Byte, big-endian: the
    --  element type of Cryptol's split at [n * 8] -> [n][8], which takes
-   --  byte J of the result from bits 8 * J .. 8 * J + 7.
+   --  byte J of the result from bits 8 * J .. 8 * J + 7. The prelude's
+   --  Join_Split.Value.
    --  @param Bs The bit sequence.
    --  @param From The index of the byte's first (most significant) bit.
    --  @return The eight bits as a Byte.
 
    function Bit_Of (B : Byte; J : Natural) return Boolean
-   is ((B and 2 ** (7 - J)) /= 0)
+   is (Byte_Bits.Word_Bits.Bit (B, J))
    with Pre => J <= 7;
    --  Bit J of a [8], big-endian: bit 0 is the most significant. The
    --  element type of Cryptol's join at [n][8] -> [n * 8], which places
-   --  byte I at bits 8 * I .. 8 * I + 7.
+   --  byte I at bits 8 * I .. 8 * I + 7. The prelude's @ on a word.
    --  @param B The byte.
    --  @param J The bit's position in the Cryptol [8], 0 .. 7.
    --  @return Bit J of B.
 
    function Split_Block (Bs : Block_Bits) return Block
-   is [for I in Block_Index => Byte_At (Bs, Bit_Index (8 * I))];
-   --  Main.cry: split in, Cryptol's split at [128] -> [16][8] = Block.
-   --  Byte I is bits 8 * I .. 8 * I + 7.
+   is [for I in Block_Index => Byte_Bits.Split_At (Bs, Bit_Index (I))];
+   --  Main.cry: split in, Cryptol's split at [128] -> [16][8] = Block:
+   --  byte I is word I of the prelude's Split_At, bits 8 * I .. 8 * I + 7.
    --  @param Bs The block as 128 bits.
    --  @return The block as 16 bytes.
 
    function Join_Block (B : Block) return Block_Bits
-   is [for N in Block_Bits'Range =>
-         Bit_Of (B (Natural (N / 8)), Natural (N mod 8))];
+   is (Byte_Bits.Join (Bytes (B)));
    --  Main.cry: join (Cipher`{k} ...), Cryptol's join at Block = [16][8]
-   --  -> [128], the inverse of Split_Block. Bit N is bit N mod 8 of byte
-   --  N / 8.
+   --  -> [128], the inverse of Split_Block: the prelude's Join. Bit N is
+   --  bit N mod 8 of byte N / 8.
    --  @param B The block as 16 bytes.
    --  @return The block as 128 bits.
 

@@ -85,9 +85,8 @@ is
 
    procedure Lemma_Foldl_Round_Eq (A, B : Block; Xs, Ys : Round_Keys)
    with
-     Pre                => A = B and then Xs = Ys,
-     Post               => Foldl_Round (A, Xs) = Foldl_Round (B, Ys),
-     Subprogram_Variant => (Decreases => Xs'Length);
+     Pre  => A = B and then Xs = Ys,
+     Post => Foldl_Round (A, Xs) = Foldl_Round (B, Ys);
    --  foldl Round maps equal states and equal lists of round keys (equal
    --  as Ada arrays: same length and components, whatever their bounds)
    --  to equal states.

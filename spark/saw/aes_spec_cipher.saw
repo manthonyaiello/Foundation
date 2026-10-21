@@ -56,13 +56,21 @@ c_invround_prime <- verify_spec "cipher__invround_prime" [c_addroundkey, c_invmi
 /*
  * Foldl_Round, Foldl_InvRound and Foldl_InvRound_Prime: Cryptol's foldl
  * Round, foldl InvRound, foldl InvRound' over [M]Block, the folds in
- * Cipher, InvCipher and InvCipher', one lemma per length M in 0 .. 13
- * (aes_spec_common.saw's foldls and foldl_contract). Each is the list of
- * its 14 lemmas.
+ * Cipher, InvCipher and InvCipher'. Since #75 each is the prelude's Folds
+ * instance (Round_Folds and so on), whose Foldl_Take recurses on the
+ * number of steps N, so the lemmas are Foldl_Take's, one per N at each M
+ * in 9, 11, 13 (aes_spec_common.saw's foldls and foldl_take_contract).
+ * Each is the list of the three at N = M. (Unverified until the next SAW
+ * session; PLAN step 7.)
+ *
+ * SubBytes and InvSubBytes now call Table_Indexing.Bulk_Index, and
+ * ShiftRows and InvShiftRows Block_Indexing.Bulk_Index (the prelude's @@,
+ * #75): their contracts above are unchanged, and SAW executes the
+ * instances. Reverse_Keys stays inline (#75).
  */
-c_foldl_round <- foldls "cipher__foldl_round" c_round {{ Round }} "Round" 0 [] [];
-c_foldl_invround <- foldls "cipher__foldl_invround" c_invround {{ InvRound }} "InvRound" 0 [] [];
-c_foldl_invround_prime <- foldls "cipher__foldl_invround_prime" c_invround_prime {{ InvRound' }} "InvRound'" 0 [] [];
+c_foldl_round <- foldls "cipher__round_folds__foldl_take" c_round {{ Round }} "Round";
+c_foldl_invround <- foldls "cipher__invround_folds__foldl_take" c_invround {{ InvRound }} "InvRound";
+c_foldl_invround_prime <- foldls "cipher__invround_prime_folds__foldl_take" c_invround_prime {{ InvRound' }} "InvRound'";
 
 /*
  * Cipher = Cipher.cry's Cipher`{k} [FIPS-PUB-197 Section 5.1], at k = 128,
