@@ -1462,16 +1462,20 @@ it text for text, the spec's `HMAC_init` is proved against the copy, and
 overrides, which ties the copy to `Main.cry` (as `Step` ties
 `SHA256Step.cry`).
 
-**Measured** (`results.txt`, the default run at `d874133` on the x86_64
-IOD): 2742 proofs of the spec layer, 1083 of AES (768 of them the
-exhaustive `Pgcd`, `Inverse` and `Affine`, recorded as three `RESULTS 256`
-lines) and 1659 of SHA-256 and HMAC (1393 of them in the lax-arithmetic
-load), with 11 negative controls of the spec layer failing as they must.
-`aes_spec.saw` takes 567 s, `sha256_spec.saw` 2362 s (most of it the
-`To_Bits` chains, 15 of them, and `Word_Of`), the whole `check-saw.sh`
-3785 s; peak memory 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at
-`c31472e`): 3522 proofs of the spec layer, `sha256_spec.saw` 6363 s, the
-whole 7784 s, peak 7.2 GB (below, "Running it").
+**Measured** (`results.txt`, the default run at `65ee4c2` on the x86_64
+IOD, 2026-10-21): 2798 proofs of the spec layer, 1137 of AES (768 of them
+the exhaustive `Pgcd`, `Inverse` and `Affine`, recorded as three
+`RESULTS 256` lines; 108 the fold lemmas, `Foldl_Take` at N = 0 .. M for
+M = 9, 11, 13 and each of the three rounds) and 1661 of SHA-256 and HMAC
+(1394 of them in the lax-arithmetic load), with 11 negative controls of
+the spec layer failing as they must. `aes_spec.saw` takes 418 s,
+`sha256_spec.saw` 2632 s (most of it the `To_Bits` chains, 15 of them,
+and `Word_Of`), the whole `check-saw.sh` 3707 s. Before #75 and #80 (at
+`d874133`): 2742, of which AES 1083 and SHA-256 and HMAC 1659; peak
+memory then 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at `a4ea138`): 3578
+proofs of the spec layer, `sha256_spec.saw` 6785 s, the whole 7857 s
+(before #75, at `c31472e`: 3522, 7784 s, peak 7.2 GB; below, "Running
+it").
 
 **Not proved by SAW**, and why:
 
