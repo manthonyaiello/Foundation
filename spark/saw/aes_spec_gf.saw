@@ -67,8 +67,7 @@ gf28_product_bit <- verify_spec "gf28__product_bit" []
 /*
  * Since #75, Head, Bit and Product_Bit call the prelude's Words.Head and
  * Words.Bit (instances Byte_Bits and Product_Bits), which SAW executes;
- * their contracts above are unchanged. (Unverified until the next SAW
- * session; PLAN step 7.)
+ * their contracts above are unchanged.
  *
  * Pmult_Fold and Pmult are the prelude's Polynomial_Products (instance
  * Products at {u, v} = {7, 7}), so the recursion is Products.Products (X,
@@ -79,7 +78,6 @@ gf28_product_bit <- verify_spec "gf28__product_bit" []
  *   Products (X, Y, 0) = 0
  *   Products (X, Y, N) = zext (pmult x (take`{N} y))
  * Pmult (B, C) calls Products.Pmult, which calls Products at N = 8.
- * (Unverified until the next SAW session; PLAN step 7.)
  */
 let products_contract (n : Int) (rhs : Term) = do {
   x <- llvm_fresh_var "x" poly_t;

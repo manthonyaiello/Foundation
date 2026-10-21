@@ -23,8 +23,8 @@
  *
  * The {k} functions are the generic AES_K's, proved on its instances
  * AES128, AES192 and AES256 (#80), one per key size as before #80, now
- * with no K argument. Those contracts are UNVERIFIED until the next SAW
- * session (aes_spec_common.saw's header says what they assume).
+ * with no K argument (aes_spec_common.saw's header says how GNAT-LLVM 27
+ * passes their arguments, read from the IR).
  */
 
 include "aes_spec_common.saw";

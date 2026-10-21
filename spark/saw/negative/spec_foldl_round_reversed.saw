@@ -10,14 +10,14 @@
  * aes_spec_cipher.saw first, for the lemmas. The proof must fail with a
  * counterexample, which shows that the fold lemmas' overrides and Round
  * uninterpreted do not make them vacuous: the order of the round keys is
- * checked. (Unverified until the next SAW session; PLAN step 7.)
+ * checked.
  */
 
 include "../aes_spec_common.saw";
 include "../aes_spec_gf.saw";
 include "../aes_spec_cipher.saw";
 
-n8 <- foldl_takes "cipher__round_folds__foldl_take" c_round {{ Round }} "Round" 9 8 0 [];
+n8 <- foldl_takes true "cipher__round_folds__foldl_take" c_round {{ Round }} "Round" 9 8 0 [];
 verify_spec "cipher__round_folds__foldl_take" [n8, c_round]
-  (foldl_take_contract_rhs 9 9 {{ \z (xs : [9][16][8]) -> foldl Round z (take`{9} (reverse xs)) }})
+  (foldl_take_contract_rhs true 9 9 {{ \z (xs : [9][16][8]) -> foldl Round z (take`{9} (reverse xs)) }})
   (w4_unint_z3 ["Round"]) "w4_unint_z3 Round" "M = 9, N = 9: foldl Cipher::Round z (reverse xs)";

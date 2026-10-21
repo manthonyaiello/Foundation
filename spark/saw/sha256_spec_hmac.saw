@@ -41,10 +41,10 @@
  * (HMAC.Byte_Sequences.Repeat, SHA2.Sequences_Of_Bits.Zero; Join keeps
  * its own body), and SHA-2's Word_Of, Foldl_Step and
  * To_Bits recurse in theirs (sha256_spec_hash.saw, sha256_spec_pad.saw).
- * None of them is overridden here, so no symbol changes; but each wrapper
- * returns an unconstrained array, and the stack bases above assume each
- * result is allocated once. Unverified until the next SAW session (PLAN
- * step 7): check the bases first.
+ * None of them is overridden here, so no symbol changes. Each wrapper
+ * returns its callee's unconstrained result as it is, with no second
+ * allocation (GNAT-LLVM 27's IR, 2026-10-21), so the stack bases above
+ * are as before #75.
  */
 
 import "../../algorithms/HMAC/Main.cry" (HMAC);

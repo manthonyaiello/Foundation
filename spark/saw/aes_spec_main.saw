@@ -19,8 +19,8 @@
  * is passed by reference.
  *
  * Until #68 Bit_Index was 128-bit, and these contracts said i128. The i16
- * here is unverified until the next GNAT-LLVM/SAW session: it is what
- * Bit_Index'Object_Size gives (GNAT 16.1, -gnatR2), not read from the IR.
+ * is read from GNAT-LLVM 27's IR (2026-10-21): bits_BOUNDS is { i16, i16 }
+ * and Byte_At's From an i16, as Bit_Index'Object_Size gives.
  */
 
 let bits_bounds_t = llvm_alias "foundation_spark__aes__spec__main__bits_BOUNDS";
@@ -89,7 +89,7 @@ m_byte_at_256 <- verify_byte_at 256;
  * Split_Block = Main.cry's split in : [128] -> Block. Since #75 it calls
  * the prelude's Byte_Bits.Split_At (Join_Split, which calls its Value),
  * not Byte_At, so SAW executes those at each concrete byte index and no
- * override applies. (Unverified until the next SAW session; PLAN step 7.)
+ * override applies.
  */
 m_split_block <- verify_spec "main__split_block" []
                    (do {
@@ -101,28 +101,36 @@ m_split_block <- verify_spec "main__split_block" []
 /*
  * Join_Block = Main.cry's join : Block -> [128] (Encrypt's and Decrypt's
  * join). Block_Bits, constrained, is returned through a pointer to the
- * caller's [128 x i8] (sret). Join_Block's aggregate over
- * Block_Bits'Range indexes its temporary by Bit_Index. While Bit_Index
- * was 128-bit, that GEP index was an i128, which SAW 1.6 rejects ("Invalid
- * index value in GEP"), and check-saw.sh rewrote it (gep64). #68 narrowed
- * Bit_Index and retired the rewrite: the index is now at most 64 bits
- * (unverified until the next SAW session).
+ * caller's [128 x i8] (sret). While Bit_Index was 128-bit, Join_Block's
+ * aggregate indexed its temporary with an i128 GEP index, which SAW 1.6
+ * rejects ("Invalid index value in GEP"), and check-saw.sh rewrote it
+ * (gep64). #68 narrowed Bit_Index and retired the rewrite; Join_Block no
+ * longer indexes anything itself.
  *
  * Since #75 Join_Block is the prelude's Byte_Bits.Join (Join_Split) of the
- * block, which returns an unconstrained Bits, on the secondary stack, that
+ * block, which returns an unconstrained Bits on the secondary stack, that
  * Join_Block copies into the caller's [128]; Join reads bits through
- * Word_Bits.Bit, not Bit_Of, so no override applies. UNVERIFIED: this
- * contract does not yet set up the secondary stack (README "SAW", "The
- * secondary stack"); the next SAW session must add it, and its high
- * water mark to Encrypt's and Decrypt's contracts.
+ * Word_Bits.Bit, not Bit_Of, so no override applies. GNAT-LLVM 27
+ * (2026-10-21): Join_Block marks the secondary stack, calls Join, which
+ * allocates its {i16, i16} bounds and 128 bits (132 bytes, ss_size 4
+ * 128 = 144), memcpys the bits out, and releases the mark. So the stack
+ * is left as found, empty, but its High_Water_Mark is the larger of the
+ * one found, hwm (symbolic; at most the chunk's size, so that the
+ * runtime's signed comparison is the unsigned one), and 144: Encrypt calls Join_Block on a
+ * fresh stack, Decrypt after InvCipher has left its own mark (rv_size).
  */
+let join_block_hwm = ss_size 4 128;
 m_join_block <- verify_spec "main__join_block" []
                   (do {
+                     hwm <- llvm_fresh_var "hwm" (llvm_int 64);
+                     llvm_precond {{ hwm <= `ss_chunk_size }};
+                     stack <- secondary_stack_hwm 0 hwm;
                      b <- llvm_fresh_var "b" block_t;
                      ret <- llvm_alloc (bits_t 128);
                      llvm_execute_func [ret, llvm_term b];
+                     ss_post_hwm_t stack 0 {{ if hwm < `join_block_hwm then `join_block_hwm else hwm }};
                      llvm_points_to ret (llvm_term {{ [ if x then 1 else 0 | x <- join b ] : [128][8] }});
-                   }) z3 "z3" "join : Block -> [128]";
+                   }) z3 "z3" "join : Block -> [128], any High_Water_Mark";
 
 /* --- the instances of AES_K: Main.cry's AES`{k} -------------------------- */
 
@@ -130,32 +138,22 @@ m_join_block <- verify_spec "main__join_block" []
  * AES<k>.Split_Key (Key) = Main.cry's split (split key) : [Nk k]AESWord,
  * at k = 128, 192, 256 (#80: the generic AES_K's, with no K argument).
  * Key, of the instance's constrained Key_Bits (0 .. K - 1), is a pointer
- * to k bits with no bounds; Byte_At, whose Bits is unconstrained, gets
- * them as a fat pointer whose bounds GNAT builds, {0, k - 1}, read-only
- * as verify_byte_at's are (UNVERIFIED: that a static bounds record
- * matches). The result, of the constrained Key_Words, is returned by
- * value at k = 128 and through sret at 192 and 256 (key_words_by_value).
- * Since #75 it reads each byte with the prelude's Byte_Bits.Split_At,
- * not Byte_At, so byte_at is no longer an override; SAW executes
- * Split_At. (Unverified until the next SAW session; PLAN step 7.)
+ * to k bits with no bounds. The result, of the constrained Key_Words, is
+ * returned BY VALUE at every k ([4|6|8 x [4 x i8]], GNAT-LLVM 27,
+ * 2026-10-21; not through sret at 192 and 256, as #80 assumed). Since #75
+ * it reads each byte with the prelude's Byte_Bits.Split_At, not Byte_At,
+ * so no override applies; SAW executes Split_At and its Value.
  */
-let verify_split_key (k : Int) (nk : Int) (byte_at : LLVMSpec) =
+let verify_split_key (k : Int) (nk : Int) =
   verify_spec (instance_symbol k "split_key") []
     (do {
        (key, kp) <- fresh_bits "key" k;
-       let words = {{ split (split (bits_of key)) : [nk][4][8] }};
-       if key_words_by_value nk then do {
-         llvm_execute_func [kp];
-         llvm_return (llvm_term words);
-       } else do {
-         ret <- llvm_alloc (llvm_array nk word_t);
-         llvm_execute_func [ret, kp];
-         llvm_points_to ret (llvm_term words);
-       };
+       llvm_execute_func [kp];
+       llvm_return (llvm_term {{ split (split (bits_of key)) : [nk][4][8] }});
      }) z3 "z3" (str_concat (str_concat "split (split key) : [" (show k)) "] -> [Nk k]AESWord");
-m_split_key_128 <- verify_split_key 128 4 m_byte_at_128;
-m_split_key_192 <- verify_split_key 192 6 m_byte_at_192;
-m_split_key_256 <- verify_split_key 256 8 m_byte_at_256;
+m_split_key_128 <- verify_split_key 128 4;
+m_split_key_192 <- verify_split_key 192 6;
+m_split_key_256 <- verify_split_key 256 8;
 
 /*
  * AES<k>.Encrypt (Key, Input) and AES<k>.Decrypt (Key, Input) = Main.cry's
@@ -168,10 +166,12 @@ m_split_key_256 <- verify_split_key 256 8 m_byte_at_256;
  * AES128 packages, proved separately. Key is a pointer to k bits (the
  * constrained Key_Bits), Input a pointer to 128, the result written
  * through the caller's pointer. Split_Key's and KeyExpansion's results
- * are constrained, so they live in stack temporaries, and Encrypt does
- * not use the secondary stack. Decrypt does only through InvCipher,
- * which leaves it empty with its High_Water_Mark at rv_size nr. The
- * overrides are the lemmas of each call at k; z3 leaves Cipher, InvCipher
+ * are constrained, so they live in stack temporaries. Neither function
+ * marks the secondary stack itself, but both reach it (GNAT-LLVM 27,
+ * 2026-10-21): Encrypt through Join_Block, which leaves it empty with its
+ * High_Water_Mark at join_block_hwm; Decrypt through InvCipher, which
+ * leaves it empty with its High_Water_Mark at rv_size nr (larger), and
+ * then Join_Block, which leaves that unchanged. The overrides are the lemmas of each call at k; z3 leaves Cipher, InvCipher
  * and KeyExpansion uninterpreted.
  */
 let main_unint = ["Cipher", "InvCipher", "KeyExpansion"];
@@ -187,7 +187,7 @@ let main_contract (k : Int) (ss : Bool) (hwm : Int) (f : Term) = do {
 };
 let verify_encrypt (k : Int) (nr : Int) (split_key : LLVMSpec) (ke : LLVMSpec) (cipher : LLVMSpec) =
   verify_spec (instance_symbol k "encrypt") [split_key, ke, m_split_block, cipher, m_join_block]
-    (main_contract k false 0 {{ (AES`{k}).Encrypt }})
+    (main_contract k true join_block_hwm {{ (AES`{k}).Encrypt }})
     (w4_unint_z3 main_unint) main_unint_name
     (str_concat (str_concat (str_concat (str_concat "Main::AES`{" (show k)) "}.Encrypt (Main::AES") (show k)) ".Encrypt)");
 let verify_decrypt (k : Int) (nr : Int) (split_key : LLVMSpec) (ke : LLVMSpec) (invcipher : LLVMSpec) =

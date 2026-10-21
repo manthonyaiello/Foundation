@@ -473,14 +473,21 @@ def saw_cell(rec, layer, entity):
 
     A result matches when its name's parts are the last parts of the
     entity's qualified name (sha256_stream.hash is ...SHA2.SHA256_Stream.Hash).
+    An AES.Spec.Dispatch entity (#80) is never proved by SAW itself: it
+    selects an instance of AES_K by K, and gnatprove proves it is each
+    instance's function. Its results are the instances' (AES128, AES192,
+    AES256) of the same name, one per key size.
     """
     if rec is None or entity in (None, "", "-"):
         return None
     want = entity.lower().split(".")
+    wants = [want]
+    if len(want) >= 2 and want[-2] == "dispatch":
+        wants = [want[:-2] + [k, want[-1]] for k in ("aes128", "aes192", "aes256")]
     c = {"proved": 0, "lax": 0}
     for r in rec["results"]:
         parts = saw_name_parts(r["name"])
-        if r["layer"] == layer and parts and want[-len(parts):] == parts:
+        if r["layer"] == layer and parts and any(w[-len(parts):] == parts for w in wants):
             c["proved"] += r["count"]
             c["lax"] += r["count"] if r["lax"] else 0
     return c

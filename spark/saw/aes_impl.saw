@@ -65,8 +65,7 @@ x_times <- verify_impl "x_times" [] (byte_to_byte_contract {{ xTimes }})
  * so the order of Cryptol's split does not matter. rme: each output bit is
  * a polynomial in the 8 bits of its own lane.
  *
- * UNVERIFIED: written on foundation, where there is no SAW; the IOD
- * session runs it first (#50).
+ * Written on foundation for #50; it proves (IOD, 2026-10-21, #68).
  */
 sbox_lanes <- verify_impl "sbox_lanes" []
                 (lanes_contract {{ \(x : [64]) -> join [ SBox @ b | b <- (split x : [8][8]) ] }})
@@ -188,8 +187,7 @@ inv_round <- verify_impl "inv_round" [inv_shift_rows, inv_sub_bytes, add_round_k
  * Xor_Word and Rcon, expression functions, are inlined into Expand_Key's
  * body even at -O0; Sub_Word is a function of its own since #50), and
  * with Nk's and Nr's. z3, with SubWord and SBox left uninterpreted: both
- * sides apply the same SubWord. UNVERIFIED since #50 changed the
- * override: the IOD session runs it.
+ * sides apply the same SubWord.
  */
 let verify_expand_key (k : Term) (nk : Term) (nr : Term) (f : Term) (size : String) =
   verify_symbol (impl_symbol "expand_key") (str_concat "expand_key at K = " size)

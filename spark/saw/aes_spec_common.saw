@@ -15,16 +15,15 @@
  * one symbol per instance, aes128__cipher and so on (instance_symbol),
  * with no K argument, and their arrays of the instance's constrained
  * subtypes (Key_Words (0 .. Nk - 1), Round_Keys (0 .. Nr), Key_Bits
- * (0 .. K - 1)) passed without bounds. UNVERIFIED: these contracts were
- * rewritten for #80 on a machine without GNAT-LLVM or SAW; until the
- * next SAW session runs them, results.txt records the contracts as they
- * were before #80. What they assume of the ABI, from GNAT-LLVM's rule as
- * the contracts already observe it (a Block, 16 bytes, by value; a
- * Block_Bits, 128 bytes, by reference and returned through sret): a
- * constrained array of at most 16 bytes is passed and returned by value,
- * a larger one by reference and returned through a pointer the caller
- * passes first (sret). So the key words at k = 128 (16 bytes) go by
- * value, at 192 and 256 (24 and 32 bytes) by reference.
+ * (0 .. K - 1)) passed without bounds. #80 wrote these contracts on a
+ * machine without GNAT-LLVM; the IOD session of 2026-10-21 read the ABI
+ * from GNAT-LLVM 27's IR and ran them. A constrained array argument of
+ * at most 16 bytes goes by value, a larger one by reference: the key
+ * words by value at k = 128 (16 bytes), by reference at 192 and 256 (24
+ * and 32 bytes). KeyExpansion's Round_Keys (176 to 240 bytes) and
+ * Encrypt's Block_Bits come back through a pointer the caller passes
+ * first (sret); Split_Key's Key_Words come back by value at every k
+ * (aes_spec_main.saw).
  */
 
 enable_experimental;
@@ -236,32 +235,38 @@ let key_size_contract (f : Term) = do {
  * Xs (the prelude's fold recurses from the last element). So the
  * recursion, and these lemmas, are Foldl_Take's, at the lengths M that
  * Cipher, InvCipher and InvCipher' fold (Nr - 1 = 9, 11, 13), one per N
- * in 0 .. M; SAW executes Foldl_Round and Foldl. (Unverified until the
- * next SAW session; PLAN step 7.)
+ * in 0 .. M; SAW executes Foldl_Round and Foldl.
  *
  * Xs is a slice of the round keys: its fat pointer's data points to its
  * first element and its bounds are {First, First + M - 1}, First
- * symbolic, 1 <= First <= 15 - M (Cipher passes W (1 .. Nr - 1);
- * InvCipher the reversed keys, with bounds {1, M}). The data is allocated
- * writable, and stated unchanged after the call: InvCipher's is on the
- * secondary stack (the reversed keys), writable, which a read-only
- * allocation does not match.
+ * symbolic, 1 <= First <= 15 - M. The data is allocated writable, and
+ * stated unchanged after the call. Where the bounds are depends on the
+ * caller (GNAT-LLVM 27, 2026-10-21), so the lemmas come in two kinds
+ * (ro):
+ *  - Cipher passes W (1 .. Nr - 1) of an instance, whose Nr is a
+ *    constant: the bounds {1, Nr - 1} are a constant global, read-only
+ *    (ro = true);
+ *  - InvCipher and InvCipher' pass the reversed keys, on the secondary
+ *    stack with their bounds {1, M}: writable (ro = false), which a
+ *    read-only allocation does not match, allocated with alignment 1 as
+ *    slice_bounds says, and stated unchanged.
  */
-let foldl_take_contract_rhs (m : Int) (n : Int) (rhs : Term) = do {
+let foldl_take_contract_rhs (ro : Bool) (m : Int) (n : Int) (rhs : Term) = do {
   z <- llvm_fresh_var "z" block_t;
   xs <- llvm_fresh_var "xs" (llvm_array m block_t);
   xsp <- llvm_alloc (llvm_array m block_t);
   llvm_points_to xsp (llvm_term xs);
   first <- llvm_fresh_var "first" (llvm_int 32);
   llvm_precond {{ first >= 1 /\ first <= 15 - `m }};
-  xsb <- slice_bounds first {{ first + `m - 1 }};
+  xsb <- if ro then bounds first {{ first + `m - 1 }} else slice_bounds first {{ first + `m - 1 }};
   llvm_execute_func [llvm_term z, llvm_struct_value [xsp, xsb], llvm_term {{ `n : [32] }}];
   llvm_points_to xsp (llvm_term xs);
-  llvm_points_to xsb (llvm_struct_value [llvm_term first, llvm_term {{ first + `m - 1 }}]);
+  if ro then return ()
+  else llvm_points_to xsb (llvm_struct_value [llvm_term first, llvm_term {{ first + `m - 1 }}]);
   llvm_return (llvm_term {{ rhs z xs }});
 };
-let foldl_take_contract (m : Int) (n : Int) (f : Term) =
-  foldl_take_contract_rhs m n {{ \(z : [16][8]) (xs : [m][16][8]) -> foldl f z (take`{n} xs) }};
+let foldl_take_contract (ro : Bool) (m : Int) (n : Int) (f : Term) =
+  foldl_take_contract_rhs ro m n {{ \(z : [16][8]) (xs : [m][16][8]) -> foldl f z (take`{n} xs) }};
 
 /*
  * The fold lemmas at one length M, one per N in n .. stop, each with the
@@ -269,23 +274,23 @@ let foldl_take_contract (m : Int) (n : Int) (f : Term) =
  * z3 with the round (named cry in the Cryptol) uninterpreted. Returns the
  * lemma at N = stop (stop = M: the one Foldl_Round's callers reach).
  */
-rec foldl_takes (name : String) (round : LLVMSpec) (f : Term) (cry : String) (m : Int) (stop : Int) (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec name (concat prev [round]) (foldl_take_contract m n f)
+rec foldl_takes (ro : Bool) (name : String) (round : LLVMSpec) (f : Term) (cry : String) (m : Int) (stop : Int) (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- verify_spec name (concat prev [round]) (foldl_take_contract ro m n f)
              (w4_unint_z3 [cry]) (str_concat "w4_unint_z3 " cry)
              (str_concat (str_concat (str_concat (str_concat (str_concat "M = " (show m)) ", N = ") (show n))
                                      ": foldl Cipher::") cry);
   if eval_bool {{ `n == `stop }} then return lemma
-  else foldl_takes name round f cry m stop (eval_int {{ `n + 1 : [32] }}) [lemma];
+  else foldl_takes ro name round f cry m stop (eval_int {{ `n + 1 : [32] }}) [lemma];
 };
 
 /*
- * The fold lemmas for one round function: at M = 9, 11 and 13, each the
- * lemma at N = M. Returns the three.
+ * The fold lemmas for one round function, with read-only bounds or not
+ * (ro): at M = 9, 11 and 13, each the lemma at N = M. Returns the three.
  */
-let foldls (name : String) (round : LLVMSpec) (f : Term) (cry : String) = do {
-  l9 <- foldl_takes name round f cry 9 9 0 [];
-  l11 <- foldl_takes name round f cry 11 11 0 [];
-  l13 <- foldl_takes name round f cry 13 13 0 [];
+let foldls (ro : Bool) (name : String) (round : LLVMSpec) (f : Term) (cry : String) = do {
+  l9 <- foldl_takes ro name round f cry 9 9 0 [];
+  l11 <- foldl_takes ro name round f cry 11 11 0 [];
+  l13 <- foldl_takes ro name round f cry 13 13 0 [];
   return [l9, l11, l13];
 };
 
