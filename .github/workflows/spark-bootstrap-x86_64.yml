@@ -7,14 +7,22 @@ name: SPARK bootstrap x86_64
 #
 # bare       a GitHub ubuntu-24.04 (x86_64) runner with NO setup action and
 #            no checkout: the script is fetched as the README's one command
-#            fetches it, and installs and clones everything itself. Then it
-#            runs again (--no-checks), to show the tool phases are idempotent,
-#            and a SAW smoke test runs two of NSA's small AES SAW scripts.
+#            fetches it, and installs and clones everything itself; the job
+#            checks that it reported every tool fetched. Then it runs again
+#            (--no-checks), with every tool now present, and the job checks
+#            that it reported every tool "present and matching the pin" and
+#            downloaded and apt-installed nothing (#100). Then a SAW smoke
+#            test runs two of NSA's small AES SAW scripts.
 # container  the same script in a plain ubuntu:24.04 container (root, nothing
 #            installed): the strictest bare image, and the one that measures
 #            what the script must apt-install, i.e. what needs sudo on the
-#            instance.
-# lint       shellcheck.
+#            instance. It too runs again, and is checked the same way.
+# lint       shellcheck, and scripts/test-bootstrap-detect.sh (the script's
+#            present-or-fetch detection, against stub tools).
+#
+# llvm-link is not exercised here: the gnat-llvm phase needs GNAT_LLVM_DIR,
+# GNAT Pro's LLVM, which is not public. test-bootstrap-detect.sh covers its
+# detection.
 #
 # Neither bootstrap job proves: both run the script with --no-proof, so its
 # build and ffi phases run and its proof phase is reported as skipped. The
@@ -26,6 +34,7 @@ on:
   pull_request:
     paths:
       - 'spark/scripts/bootstrap-x86_64.sh'
+      - 'spark/scripts/test-bootstrap-detect.sh'
       - 'spark/scripts/toolchain-pins.env'
       - '.github/workflows/spark-bootstrap-x86_64.yml'
   workflow_dispatch:
@@ -51,7 +60,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: shellcheck
-        run: shellcheck -x spark/scripts/bootstrap-x86_64.sh
+        run: shellcheck -x spark/scripts/bootstrap-x86_64.sh spark/scripts/test-bootstrap-detect.sh
+      - name: Detection against stub tools
+        run: spark/scripts/test-bootstrap-detect.sh
 
   bare:
     name: Bootstrap (bare ubuntu-24.04 runner)
@@ -65,13 +76,46 @@ jobs:
             "https://raw.githubusercontent.com/${{ github.repository }}/$FOUNDATION_REF/spark/scripts/bootstrap-x86_64.sh"
 
       - name: Bootstrap
-        run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh" --no-proof
+        shell: bash
+        run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh" --no-proof 2>&1 | tee "$HOME/bootstrap-run-1.log"
 
       # The steps below run even when a check of the bootstrap failed: they
       # need only the tools, and they answer questions of their own.
-      - name: Bootstrap again (idempotent, no checks)
+      - name: First run fetched every tool
         if: ${{ !cancelled() }}
-        run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh" --no-checks
+        shell: bash
+        run: |
+          status=0
+          for t in alr gnat_native gprbuild gnatprove gnatdoc cryptol saw; do
+            if grep -q "^>> $t [^ :]*: fetched (" "$HOME/bootstrap-run-1.log"; then
+              echo "$t: fetched"
+            else
+              echo "::error::first run: $t not reported fetched"; status=1
+            fi
+          done
+          exit "$status"
+
+      - name: Bootstrap again (every tool present, no checks)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh" --no-checks 2>&1 | tee "$HOME/bootstrap-run-2.log"
+
+      - name: Second run fetched nothing
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          status=0
+          for t in alr gnat_native gprbuild gnatprove gnatdoc cryptol saw; do
+            if grep -q "^>> $t [^ :]*: present and matching the pin (" "$HOME/bootstrap-run-2.log"; then
+              echo "$t: present and matching the pin"
+            else
+              echo "::error::second run: $t not reported present and matching the pin"; status=1
+            fi
+          done
+          if grep -E '^>> (downloading |apt-get install)|: fetched \(' "$HOME/bootstrap-run-2.log"; then
+            echo "::error::second run downloaded or installed something (above)"; status=1
+          fi
+          exit "$status"
 
       # Two of NSA's small AES SAW scripts, both `rme` proofs: SAW 1.6 runs,
       # and the repository's SAW scripts load and prove under it. Not the
@@ -109,6 +153,7 @@ jobs:
           name: bootstrap-bare
           path: |
             ~/foundation-tools/bootstrap-times.txt
+            ~/bootstrap-run-*.log
             ~/Foundation/spark/obj/prove.log
             ~/Foundation/spark/obj/ffi/ffi-results.txt
             ${{ runner.temp }}/saw-*.log
@@ -129,7 +174,44 @@ jobs:
           ref: ${{ env.FOUNDATION_REF }}
 
       - name: Bootstrap
-        run: bash spark/scripts/bootstrap-x86_64.sh --no-proof
+        shell: bash
+        run: bash spark/scripts/bootstrap-x86_64.sh --no-proof 2>&1 | tee "$HOME/bootstrap-run-1.log"
+
+      - name: First run fetched every tool
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          status=0
+          for t in alr gnat_native gprbuild gnatprove gnatdoc cryptol saw; do
+            if grep -q "^>> $t [^ :]*: fetched (" "$HOME/bootstrap-run-1.log"; then
+              echo "$t: fetched"
+            else
+              echo "::error::first run: $t not reported fetched"; status=1
+            fi
+          done
+          exit "$status"
+
+      - name: Bootstrap again (every tool present, no checks)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: bash spark/scripts/bootstrap-x86_64.sh --no-checks 2>&1 | tee "$HOME/bootstrap-run-2.log"
+
+      - name: Second run fetched nothing
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          status=0
+          for t in alr gnat_native gprbuild gnatprove gnatdoc cryptol saw; do
+            if grep -q "^>> $t [^ :]*: present and matching the pin (" "$HOME/bootstrap-run-2.log"; then
+              echo "$t: present and matching the pin"
+            else
+              echo "::error::second run: $t not reported present and matching the pin"; status=1
+            fi
+          done
+          if grep -E '^>> (downloading |apt-get install)|: fetched \(' "$HOME/bootstrap-run-2.log"; then
+            echo "::error::second run downloaded or installed something (above)"; status=1
+          fi
+          exit "$status"
 
       - name: Upload logs
         if: always()
@@ -138,6 +220,7 @@ jobs:
           name: bootstrap-container
           path: |
             ~/foundation-tools/bootstrap-times.txt
+            ~/bootstrap-run-*.log
             ~/Foundation/spark/obj/prove.log
             ~/Foundation/spark/obj/ffi/ffi-results.txt
           if-no-files-found: ignore
