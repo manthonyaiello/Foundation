@@ -9,6 +9,11 @@
 # of saw/'s scripts, so that one thing can be changed at a time without
 # touching a recorded script (saw/results.txt stays current):
 #
+# saw/experiments/ is outside the record: no recorded run loads it,
+# board.py does not count it among SAW's inputs, and check-saw.sh's
+# assumed-spec guard skips it, so these scripts may use `admit` (here, to
+# time symbolic execution without a solver). A recorded script may not.
+#
 #   run.sh [-v VARIANT] [-p] EXPERIMENT [OUT_DIR]
 #
 #   -v VARIANT  apply variants/<VARIANT>.sed to the scratch copy of the

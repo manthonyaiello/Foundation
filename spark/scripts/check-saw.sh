@@ -23,8 +23,9 @@
 #   2. checks the bitcode, each unit's and the linked module: no symbol of a
 #      ghost entity (the spec layer, the lemmas, ghost functions of the
 #      implementation units) is defined or referenced;
-#   3. refuses any llvm_unsafe_assume_spec in saw/ (every override must be
-#      a proof), then runs saw/<module>_impl.saw, every llvm_verify of
+#   3. refuses any llvm_unsafe_assume_spec or admit in saw/ outside
+#      saw/experiments/ (every override must be a proof, every goal proved
+#      by a solver), then runs saw/<module>_impl.saw, every llvm_verify of
 #      which must succeed;
 # then, for each module of SPEC_MODULES (aes_spec, sha256_spec), the spec
 # layer (M4.4):
@@ -412,9 +413,15 @@ done
 
 # --- 3. the proofs ---------------------------------------------------------------------
 
-# No assumption: every override must be a proof (README "SAW").
-assumed="$(grep -rn --include='*.saw' -E 'llvm_unsafe_assume_spec|_unsafe_assume' "$SAW_DIR" || true)"
-[ -z "$assumed" ] || die "an assumed spec in saw/: every override must be proved:
+# No assumption: every override must be a proof, and every goal proved by a
+# solver (README "SAW"). Refused: an assumed spec (llvm_unsafe_assume_spec),
+# and the tactics that prove nothing, admit and its older names assume_unsat
+# and assume_valid, matched as whole words, comments included. saw/experiments/
+# is left out: no recorded run loads it, its scripts are outside the record,
+# and they may use admit on purpose (#69 timed symbolic execution with it).
+assumed="$(grep -rn --include='*.saw' -E '_unsafe_assume|(^|[^[:alnum:]_])(admit|assume_unsat|assume_valid)([^[:alnum:]_]|$)' "$SAW_DIR" \
+  | grep -v "^$SAW_DIR/experiments/" || true)"
+[ -z "$assumed" ] || die "an assumed spec or admit in saw/ (outside saw/experiments/): every override and goal must be proved:
 $assumed"
 
 export CRYPTOLPATH="$ROOT_DIR"
