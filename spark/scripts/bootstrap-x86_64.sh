@@ -8,32 +8,47 @@
 # clones (or updates) the fork, and runs the build, the proof gate and the FFI
 # check. Run it again at any time: every phase skips what is already in place.
 #
+# Each tool is used where it is when it is present and its version matches
+# its pin in toolchain-pins.env, and fetched (the pinned release, sha256
+# checked) only when it is not. Present means, in this order: in the
+# directory its environment variable names (LLVM_LINK_DIR, for llvm-link),
+# on PATH, or where an earlier run of this script fetched it. The script
+# says which, per tool ("present and matching the pin" or "fetched"), as it
+# goes and in the table at the end. A run with every tool present fetches
+# nothing.
+#
 #   curl -fsSL https://raw.githubusercontent.com/manthonyaiello/Foundation/main/spark/scripts/bootstrap-x86_64.sh | bash
 #
 # Phases, each timed (wall-clock, printed at the end and on failure):
 #   prereqs    the commands and libraries the rest needs (curl, git, python3,
 #              CA certificates, libc6-dev; the shared libraries Cryptol and
 #              SAW link against), and valgrind, for scripts/check-ct.sh's
-#              ct_grind (#50; not run here). The ONLY phase that may need
-#              root: missing packages are apt-installed when running as
-#              root or with passwordless sudo, and otherwise the script
-#              stops and prints the one `sudo apt-get install` line to run.
+#              ct_grind (#50; not run here). The phase that may need root
+#              (as may gnat-llvm, for xz-utils, when it fetches llvm-link,
+#              and a fetched tool's missing shared libraries): missing
+#              packages are apt-installed when running as root or with
+#              passwordless sudo, and otherwise the script stops and prints
+#              the one `sudo apt-get install` line to run.
 #   clone      clone the fork, or fetch it and fast-forward a clean checkout.
 #              The versions below are read from ITS
 #              spark/scripts/toolchain-pins.env, the file CI's
 #              setup-alire-spark action reads too.
-#   alire      alr (release zip, sha256 checked), the gnat_native and
-#              gprbuild toolchain (`alr toolchain --select`), gnatprove and
-#              gnatdoc_bin (`alr install`, into ~/.alire/bin), as CI does.
-#   cryptol    Cryptol's release build with solvers, sha256 checked.
-#   saw        SAW's release build with solvers, sha256 checked (and its .sig,
-#              when SAW_SIGNING_KEY_FILE names the signing key).
+#   alire      alr, the gnat_native and gprbuild toolchain, gnatprove and
+#              gnatdoc_bin. Fetched: alr's release zip (sha256 checked), the
+#              toolchain selected with `alr toolchain --select`, the tools
+#              installed with `alr install` (into ~/.alire/bin), as CI does.
+#   cryptol    Cryptol, with FFI support and a z3 for its type checker.
+#              Fetched: the release build with solvers, sha256 checked.
+#   saw        SAW. Fetched: the release build with solvers, sha256 checked
+#              (and its .sig, when SAW_SIGNING_KEY_FILE names the signing
+#              key).
 #   gnat-llvm  checks GNAT Pro's LLVM back end when GNAT_LLVM_DIR names it
-#              (nothing of it is downloaded), and installs llvm-link from
-#              LLVM's own release of the same version (sha256 checked; only
-#              bin/llvm-link extracted); writes GNAT_LLVM_DIR and
-#              LLVM_LINK_DIR to env.sh, for scripts/check-saw.sh. Skipped,
-#              with a note, when GNAT_LLVM_DIR is unset.
+#              (nothing of it is ever downloaded), and llvm-link of the same
+#              LLVM version. Fetched: llvm-link from LLVM's own release (a
+#              2 GB tarball, sha256 checked; only bin/llvm-link extracted).
+#              Writes GNAT_LLVM_DIR and LLVM_LINK_DIR to env.sh, for
+#              scripts/check-saw.sh. Skipped, with a note, when GNAT_LLVM_DIR
+#              is unset.
 #   build      `alr -n build` in spark/.
 #   proof      scripts/check-proof.sh (the slow units of proof-slow.txt are
 #              skipped, and their recorded proofs checked current, as in CI),
@@ -54,9 +69,10 @@
 #                                     shows proof as skipped, with why.
 #
 # Env:
-#   FOUNDATION_TOOLS   where alr, Cryptol and SAW go (default ~/foundation-tools).
-#                      Alire's own state stays where alr puts it (~/.alire,
-#                      ~/.config/alire, ~/.local/share/alire), as in CI.
+#   FOUNDATION_TOOLS   where fetched tools go, and env.sh (default
+#                      ~/foundation-tools). Alire's own state stays where alr
+#                      puts it (~/.alire, ~/.config/alire,
+#                      ~/.local/share/alire), as in CI.
 #   FOUNDATION_REPO    the checkout (default: the checkout this script is in,
 #                      if any, else ~/Foundation).
 #   FOUNDATION_REMOTE  what to clone (default the fork, over https).
@@ -76,8 +92,12 @@
 #                      with it (and the key must be SAW_SIGNING_KEY's).
 #   GNAT_LLVM_DIR      a GNAT Pro LLVM install (holding bin/llvm-gcc), for
 #                      the gnat-llvm phase; optional. When set, the phase
-#                      also downloads LLVM's release tarball (2 GB) for
-#                      llvm-link.
+#                      also needs llvm-link of the same LLVM version, and
+#                      fetches it (LLVM's 2 GB release tarball) unless it is
+#                      present.
+#   LLVM_LINK_DIR      a directory holding bin/llvm-link; used when that
+#                      llvm-link is the pinned version (else PATH's, else
+#                      fetched). Only read when GNAT_LLVM_DIR is set.
 #
 # Exit status: 0 when every phase passed; 1 when one failed (the proof and FFI
 # phases both run even if the other fails, so one run reports both); 2 on a
@@ -125,6 +145,7 @@ die() { printf '!! %s\n' "$*" >&2; exit 1; }
 # --- phase timing ---------------------------------------------------------------
 
 PHASES=()
+TOOL_STATES=()   # "tool version state", one per tool (tool_present, tool_fetched)
 T_START="$(date +%s)"
 
 # shellcheck disable=SC2317,SC2329  # reached through the EXIT trap
@@ -136,6 +157,9 @@ report() {
     printf '%-10s %8s  %s\n' phase seconds result
     for line in "${PHASES[@]+"${PHASES[@]}"}"; do printf '%s\n' "$line"; done
     printf '%-10s %8s\n' total "$total"
+    echo
+    echo "== tools"
+    for line in "${TOOL_STATES[@]+"${TOOL_STATES[@]}"}"; do printf '%s\n' "$line"; done
   } | tee "$TOOLS/bootstrap-times.txt"
   if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     {
@@ -149,6 +173,14 @@ report() {
         echo "| $1 | $2 | ${*:3} |"
       done
       echo "| total | $total | |"
+      echo
+      echo "| tool | version | state |"
+      echo "|---|---|---|"
+      for line in "${TOOL_STATES[@]+"${TOOL_STATES[@]}"}"; do
+        # shellcheck disable=SC2086  # split the padded columns on purpose
+        set -- $line
+        echo "| $1 | $2 | ${*:3} |"
+      done
     } >> "$GITHUB_STEP_SUMMARY"
   fi
 }
@@ -264,6 +296,127 @@ unpack() {
   mv "$dest.new" "$dest"
 }
 
+# --- tool detection -----------------------------------------------------------------
+# Present and matching the pin, or not. scripts/test-bootstrap-detect.sh
+# sources the lines from here to "end of tool detection", with stub tools on
+# a made-up PATH, so keep them free of side effects beyond the variables
+# they document, and runnable by bash 3.2.
+
+# The first line of a command's output, whatever its exit status
+# (`gnatdoc --version` exits 1).
+first_line() { local out; out="$("$@" 2>&1)" || true; printf '%s\n' "${out%%$'\n'*}"; }
+
+# The version TOOL's executable EXE reports, in the form toolchain-pins.env
+# pins it; empty when it reports none.
+tool_version() {
+  local tool="$1" exe="$2" line w1="" w2=""
+  case "$tool" in
+    llvm-link)
+      # As scripts/check-saw.sh reads it.
+      line="$("$exe" --version 2>&1 | sed -n 's/^ *LLVM version //p')" || true
+      printf '%s\n' "${line%%$'\n'*}"
+      return 0 ;;
+  esac
+  line="$(first_line "$exe" --version)"
+  read -r w1 w2 _ <<< "$line" || true
+  case "$tool" in
+    alr)       [ "$w1" = alr ] && printf '%s\n' "$w2" ;;      # alr 2.1.1
+    gnatprove) [ "$w1" = FSF ] && printf '%s\n' "$w2" ;;      # FSF 16.1.0
+    gnatdoc)   [ "$w1" = GNATdoc ] && printf '%s\n' "$w2" ;;  # GNATdoc 26.0.0 (date)
+    cryptol)   [ "$w1" = Cryptol ] && printf '%s\n' "$w2" ;;  # Cryptol 3.6.0
+    saw)       # 1.6 (commit release-1.6)
+               if [ "$w1" = version ]; then printf '%s\n' "$w2"; else printf '%s\n' "$w1"; fi ;;
+  esac
+  return 0
+}
+
+# Whether EXE is TOOL at version PIN, and usable as such. Cryptol must also
+# have FFI support and a z3 beside it or on PATH (its type checker does not
+# start without one). Says why when EXE runs but does not match.
+tool_matches() {
+  local tool="$1" exe="$2" pin="$3" v out
+  [ -n "$exe" ] && [ -f "$exe" ] && [ -x "$exe" ] || return 1
+  v="$(tool_version "$tool" "$exe")"
+  if [ "$v" != "$pin" ]; then
+    echo ">> $exe: ${v:-no $tool version}, not the pinned $pin"
+    return 1
+  fi
+  if [ "$tool" = cryptol ]; then
+    out="$("$exe" --version 2>&1)" || true
+    case "$out" in
+      *"FFI enabled"*) ;;
+      *) echo ">> $exe: no FFI support"; return 1 ;;
+    esac
+    if [ ! -x "$(dirname "$exe")/z3" ] && ! command -v z3 >/dev/null 2>&1; then
+      echo ">> $exe: no z3 beside it or on PATH"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+# Set FOUND to the first of the CANDIDATES (executable paths; empty ones are
+# skipped) that is TOOL at version PIN. Returns 1, FOUND empty, when none is.
+find_tool() {
+  local tool="$1" pin="$2" c
+  shift 2
+  FOUND=""
+  for c in "$@"; do
+    [ -n "$c" ] || continue
+    if tool_matches "$tool" "$c" "$pin"; then FOUND="$c"; return 0; fi
+  done
+  return 1
+}
+
+# The executable PATH finds for NAME, or nothing.
+on_path() { command -v "$1" 2>/dev/null || true; }
+
+# PATH's llvm-link, when it sits in a bin/ directory, so that its parent can
+# be LLVM_LINK_DIR (scripts/check-saw.sh runs $LLVM_LINK_DIR/bin/llvm-link);
+# else nothing.
+llvm_link_on_path() {
+  local p
+  p="$(on_path llvm-link)"
+  case "$p" in */bin/llvm-link) printf '%s\n' "$p" ;; esac
+  return 0
+}
+
+# Whether `alr toolchain`'s listing (LISTING) has CRATE at VERSION selected:
+# its row says "Default".
+toolchain_selected() {
+  printf '%s\n' "$1" | awk -v c="$2" -v v="$3" \
+    '$1 == c && $2 == v && $3 == "Default" { found = 1 } END { exit !found }'
+}
+
+# PATH is TOOL_PATH (the directories of the tools PATH did not already find,
+# in the order added) ahead of the PATH the script started with.
+BASE_PATH="$PATH"
+TOOL_PATH=""
+# Add DIR to TOOL_PATH, at its end, unless it is there already.
+add_path() {
+  case ":$TOOL_PATH:" in *":$1:"*) return 0 ;; esac
+  TOOL_PATH="${TOOL_PATH:+$TOOL_PATH:}$1"
+  PATH="$TOOL_PATH:$BASE_PATH"
+  export PATH
+}
+# Make PATH find EXE as its command name: add its directory unless PATH
+# already finds EXE itself.
+use_tool() {
+  local exe="$1"
+  [ "$(on_path "$(basename "$exe")")" = "$exe" ] || add_path "$(dirname "$exe")"
+}
+
+# Record and say TOOL's state.
+tool_present() {
+  echo ">> $1 $2: present and matching the pin ($3)"
+  TOOL_STATES+=("$(printf '%-12s %-8s %s' "$1" "$2" "present and matching the pin")")
+}
+tool_fetched() {
+  echo ">> $1 $2: fetched ($3)"
+  TOOL_STATES+=("$(printf '%-12s %-8s %s' "$1" "$2" "fetched")")
+}
+# --- end of tool detection ------------------------------------------------------------
+
 # --- prereqs ------------------------------------------------------------------------
 
 begin prereqs
@@ -282,10 +435,7 @@ for c in curl:curl git:git python3:python3 tar:tar gzip:gzip sha256sum:coreutils
          od:coreutils ldd:libc-bin valgrind:valgrind; do
   command -v "${c%%:*}" >/dev/null 2>&1 || need+=("${c#*:}")
 done
-# The gnat-llvm phase unpacks LLVM's .tar.xz, only when GNAT_LLVM_DIR is set.
-if [ -n "${GNAT_LLVM_DIR:-}" ]; then
-  command -v xz >/dev/null 2>&1 || need+=(xz-utils)
-fi
+# (xz, for LLVM's .tar.xz, is the gnat-llvm phase's, when it fetches.)
 # curl over https needs the CA bundle; GNAT links against the C library's
 # start files and libc.so, which come with libc6-dev.
 [ -f /etc/ssl/certs/ca-certificates.crt ] || need+=(ca-certificates)
@@ -331,20 +481,18 @@ PINS="$REPO/spark/scripts/toolchain-pins.env"
 [ -f "$PINS" ] || die "$PINS missing: is $REPO a checkout of the fork at M0.5 or later?"
 # shellcheck source=/dev/null  # the clone's copy, not this script's sibling
 . "$PINS"
+# Where a tool goes when it is fetched (and where a later run finds it).
 ALR_DIR="$TOOLS/alr-$ALR_VERSION"
+ALIRE_BIN="$HOME/.alire/bin"
 CRYPTOL_DIR="$TOOLS/cryptol-$CRYPTOL_VERSION"
 SAW_DIR="$TOOLS/saw-$SAW_VERSION"
-# Cryptol before SAW: SAW's bin/ carries its own cryptol, and check-ffi.sh
-# must get the pinned one.
-TOOL_PATH="$ALR_DIR/bin:$HOME/.alire/bin:$CRYPTOL_DIR/bin:$SAW_DIR/bin"
-export PATH="$TOOL_PATH:$PATH"
 end
 
 # --- alire ----------------------------------------------------------------------------
 
 begin alire
-if [ -x "$ALR_DIR/bin/alr" ] && [ "$("$ALR_DIR/bin/alr" --version 2>/dev/null)" = "alr $ALR_VERSION" ]; then
-  echo ">> alr $ALR_VERSION already installed"
+if find_tool alr "$ALR_VERSION" "$(on_path alr)" "$ALR_DIR/bin/alr"; then
+  tool_present alr "$ALR_VERSION" "$FOUND"
 else
   zip="$TOOLS/downloads/alr-$ALR_VERSION-bin-x86_64-linux.zip"
   fetch "https://github.com/alire-project/alire/releases/download/v$ALR_VERSION/alr-$ALR_VERSION-bin-x86_64-linux.zip" \
@@ -355,58 +503,138 @@ else
   chmod +x "$ALR_DIR.new/bin/alr"
   rm -rf "$ALR_DIR"
   mv "$ALR_DIR.new" "$ALR_DIR"
+  tool_matches alr "$ALR_DIR/bin/alr" "$ALR_VERSION" || die "the fetched alr is not $ALR_VERSION"
+  FOUND="$ALR_DIR/bin/alr"
+  tool_fetched alr "$ALR_VERSION" "$FOUND"
 fi
-alr --version
+ALR="$FOUND"
+use_tool "$ALR"
+
 # As alire-project/setup-alire does for CI: select the pinned toolchain, then
-# install the tools (not crate dependencies) into ~/.alire/bin. Both are
-# no-ops when already done (`alr install` reinstalls only with --force).
-# From $HOME, so no crate in the current directory is involved.
-(cd "$HOME" && alr -n toolchain --select "gnat_native=$GNAT_NATIVE_VERSION" "gprbuild=$GPRBUILD_VERSION")
-(cd "$HOME" && alr -n install "gnatprove=$GNATPROVE_VERSION" "gnatdoc_bin=$GNATDOC_VERSION")
+# install the tools (not crate dependencies) into ~/.alire/bin; each only
+# when it is not already there. From $HOME, so no crate in the current
+# directory is involved.
+toolchains="$(cd "$HOME" && alr -n toolchain 2>&1)" || true
+if toolchain_selected "$toolchains" gnat_native "$GNAT_NATIVE_VERSION" \
+   && toolchain_selected "$toolchains" gprbuild "$GPRBUILD_VERSION"; then
+  tool_present gnat_native "$GNAT_NATIVE_VERSION" "alr toolchain"
+  tool_present gprbuild "$GPRBUILD_VERSION" "alr toolchain"
+else
+  (cd "$HOME" && alr -n toolchain --select "gnat_native=$GNAT_NATIVE_VERSION" "gprbuild=$GPRBUILD_VERSION")
+  toolchains="$(cd "$HOME" && alr -n toolchain 2>&1)" || true
+  if ! { toolchain_selected "$toolchains" gnat_native "$GNAT_NATIVE_VERSION" \
+         && toolchain_selected "$toolchains" gprbuild "$GPRBUILD_VERSION"; }; then
+    die "alr toolchain did not select gnat_native $GNAT_NATIVE_VERSION and gprbuild $GPRBUILD_VERSION:
+$toolchains"
+  fi
+  tool_fetched gnat_native "$GNAT_NATIVE_VERSION" "alr toolchain --select"
+  tool_fetched gprbuild "$GPRBUILD_VERSION" "alr toolchain --select"
+fi
+
+# gnatprove and gnatdoc (crate gnatdoc_bin).
+GNATPROVE=""
+GNATDOC=""
+to_install=()
+if find_tool gnatprove "$GNATPROVE_VERSION" "$(on_path gnatprove)" "$ALIRE_BIN/gnatprove"; then
+  GNATPROVE="$FOUND"
+  tool_present gnatprove "$GNATPROVE_VERSION" "$GNATPROVE"
+else
+  to_install+=("gnatprove=$GNATPROVE_VERSION")
+fi
+if find_tool gnatdoc "$GNATDOC_VERSION" "$(on_path gnatdoc)" "$ALIRE_BIN/gnatdoc"; then
+  GNATDOC="$FOUND"
+  tool_present gnatdoc "$GNATDOC_VERSION" "$GNATDOC"
+else
+  to_install+=("gnatdoc_bin=$GNATDOC_VERSION")
+fi
+if [ "${#to_install[@]}" -gt 0 ]; then
+  (cd "$HOME" && alr -n install "${to_install[@]}")
+  if [ -z "$GNATPROVE" ]; then
+    tool_matches gnatprove "$ALIRE_BIN/gnatprove" "$GNATPROVE_VERSION" \
+      || die "alr install did not leave gnatprove $GNATPROVE_VERSION in $ALIRE_BIN"
+    GNATPROVE="$ALIRE_BIN/gnatprove"
+    tool_fetched gnatprove "$GNATPROVE_VERSION" "$GNATPROVE"
+  fi
+  if [ -z "$GNATDOC" ]; then
+    tool_matches gnatdoc "$ALIRE_BIN/gnatdoc" "$GNATDOC_VERSION" \
+      || die "alr install did not leave gnatdoc $GNATDOC_VERSION in $ALIRE_BIN"
+    GNATDOC="$ALIRE_BIN/gnatdoc"
+    tool_fetched gnatdoc "$GNATDOC_VERSION" "$GNATDOC"
+  fi
+fi
+use_tool "$GNATPROVE"
+use_tool "$GNATDOC"
 # Captured, not piped into head: gnatprove dies of SIGPIPE under pipefail.
 gp_version="$(gnatprove --version)"
 printf '%s\n' "$gp_version"
-case "$gp_version" in *"$GNATPROVE_VERSION"*) ;; *) die "gnatprove on PATH is not $GNATPROVE_VERSION: $(command -v gnatprove)" ;; esac
 end
 
 # --- cryptol --------------------------------------------------------------------------
 
 begin cryptol
-fetch "https://github.com/GaloisInc/cryptol/releases/download/$CRYPTOL_VERSION/$CRYPTOL_TARBALL" \
-      "$TOOLS/downloads/$CRYPTOL_TARBALL" "$CRYPTOL_SHA256"
-unpack "$TOOLS/downloads/$CRYPTOL_TARBALL" "$CRYPTOL_DIR" "$CRYPTOL_SHA256"
-ensure_libs "$CRYPTOL_DIR"
-[ "$(command -v cryptol)" = "$CRYPTOL_DIR/bin/cryptol" ] \
-  || die "cryptol on PATH is $(command -v cryptol), not $CRYPTOL_DIR/bin/cryptol"
+if find_tool cryptol "$CRYPTOL_VERSION" "$(on_path cryptol)" "$CRYPTOL_DIR/bin/cryptol"; then
+  tool_present cryptol "$CRYPTOL_VERSION" "$FOUND"
+else
+  fetch "https://github.com/GaloisInc/cryptol/releases/download/$CRYPTOL_VERSION/$CRYPTOL_TARBALL" \
+        "$TOOLS/downloads/$CRYPTOL_TARBALL" "$CRYPTOL_SHA256"
+  unpack "$TOOLS/downloads/$CRYPTOL_TARBALL" "$CRYPTOL_DIR" "$CRYPTOL_SHA256"
+  ensure_libs "$CRYPTOL_DIR"
+  tool_matches cryptol "$CRYPTOL_DIR/bin/cryptol" "$CRYPTOL_VERSION" \
+    || die "the fetched cryptol is not a usable $CRYPTOL_VERSION"
+  FOUND="$CRYPTOL_DIR/bin/cryptol"
+  tool_fetched cryptol "$CRYPTOL_VERSION" "$FOUND"
+fi
+CRYPTOL="$FOUND"
+use_tool "$CRYPTOL"
 cr_version="$(cryptol --version)"
 printf '%s\n' "$cr_version"
-case "$cr_version" in *"FFI enabled"*) ;; *) die "cryptol lacks FFI support" ;; esac
 end
 
 # --- saw ------------------------------------------------------------------------------
 
 begin saw
-fetch "https://github.com/GaloisInc/saw-script/releases/download/$SAW_TAG/$SAW_TARBALL" \
-      "$TOOLS/downloads/$SAW_TARBALL" "$SAW_SHA256"
-if [ -n "${SAW_SIGNING_KEY_FILE:-}" ]; then
-  command -v gpg >/dev/null 2>&1 || die "SAW_SIGNING_KEY_FILE is set but gpg is not installed"
-  sig="$TOOLS/downloads/$SAW_TARBALL.sig"
-  curl -fsSL --retry 3 -o "$sig" \
-    "https://github.com/GaloisInc/saw-script/releases/download/$SAW_TAG/$SAW_TARBALL.sig"
-  gnupg="$(mktemp -d)"
-  GNUPGHOME="$gnupg" gpg --batch --quiet --import "$SAW_SIGNING_KEY_FILE"
-  GNUPGHOME="$gnupg" gpg --batch --with-colons --list-keys | grep -q "^fpr:::::::::$SAW_SIGNING_KEY:" \
-    || die "$SAW_SIGNING_KEY_FILE is not key $SAW_SIGNING_KEY"
-  GNUPGHOME="$gnupg" gpg --batch --verify "$sig" "$TOOLS/downloads/$SAW_TARBALL" \
-    || die "SAW signature does not verify"
-  rm -rf "$gnupg"
+if find_tool saw "$SAW_VERSION" "$(on_path saw)" "$SAW_DIR/bin/saw"; then
+  tool_present saw "$SAW_VERSION" "$FOUND"
 else
-  echo ">> SAW .sig not verified (no SAW_SIGNING_KEY_FILE; signer $SAW_SIGNING_KEY); sha256 pinned"
+  fetch "https://github.com/GaloisInc/saw-script/releases/download/$SAW_TAG/$SAW_TARBALL" \
+        "$TOOLS/downloads/$SAW_TARBALL" "$SAW_SHA256"
+  if [ -n "${SAW_SIGNING_KEY_FILE:-}" ]; then
+    command -v gpg >/dev/null 2>&1 || die "SAW_SIGNING_KEY_FILE is set but gpg is not installed"
+    sig="$TOOLS/downloads/$SAW_TARBALL.sig"
+    curl -fsSL --retry 3 -o "$sig" \
+      "https://github.com/GaloisInc/saw-script/releases/download/$SAW_TAG/$SAW_TARBALL.sig"
+    gnupg="$(mktemp -d)"
+    GNUPGHOME="$gnupg" gpg --batch --quiet --import "$SAW_SIGNING_KEY_FILE"
+    GNUPGHOME="$gnupg" gpg --batch --with-colons --list-keys | grep -q "^fpr:::::::::$SAW_SIGNING_KEY:" \
+      || die "$SAW_SIGNING_KEY_FILE is not key $SAW_SIGNING_KEY"
+    GNUPGHOME="$gnupg" gpg --batch --verify "$sig" "$TOOLS/downloads/$SAW_TARBALL" \
+      || die "SAW signature does not verify"
+    rm -rf "$gnupg"
+  else
+    echo ">> SAW .sig not verified (no SAW_SIGNING_KEY_FILE; signer $SAW_SIGNING_KEY); sha256 pinned"
+  fi
+  unpack "$TOOLS/downloads/$SAW_TARBALL" "$SAW_DIR" "$SAW_SHA256"
+  ensure_libs "$SAW_DIR"
+  tool_matches saw "$SAW_DIR/bin/saw" "$SAW_VERSION" || die "the fetched saw is not $SAW_VERSION"
+  FOUND="$SAW_DIR/bin/saw"
+  tool_fetched saw "$SAW_VERSION" "$FOUND"
 fi
-unpack "$TOOLS/downloads/$SAW_TARBALL" "$SAW_DIR" "$SAW_SHA256"
-ensure_libs "$SAW_DIR"
-"$SAW_DIR/bin/saw" --version
+SAW="$FOUND"
+# SAW's bin/ carries a cryptol of its own: Cryptol's directory goes first,
+# so check-ffi.sh still gets the one chosen above.
+if [ "$(on_path saw)" != "$SAW" ]; then
+  add_path "$(dirname "$CRYPTOL")"
+  add_path "$(dirname "$SAW")"
+fi
+"$SAW" --version
 end
+
+# Every chosen tool must be the one PATH finds: a directory added for one
+# tool can hold another version of another (each was checked where it is).
+for t in "$ALR" "$GNATPROVE" "$GNATDOC" "$CRYPTOL" "$SAW"; do
+  [ "$(on_path "$(basename "$t")")" = "$t" ] \
+    || die "PATH finds $(basename "$t") at $(on_path "$(basename "$t")"), not the chosen $t (PATH: $PATH)"
+done
 
 # --- gnat-llvm ------------------------------------------------------------------------
 
@@ -418,14 +646,17 @@ begin gnat-llvm
 # on PATH: the crate's toolchain stays FSF GNAT (README "SAW").
 #
 # check-saw.sh also needs llvm-link (M4.2, #23), which GNAT Pro does not
-# ship: it comes from LLVM's own release of the same LLVM version, pinned in
-# toolchain-pins.env. The tarball is 2 GB; only bin/llvm-link, linked
-# against libc and libz only, is extracted, to $TOOLS/llvm-<version>,
-# written to env.sh as LLVM_LINK_DIR. (Until #68, bin/opt and
+# ship, of the same LLVM version, pinned in toolchain-pins.env. Present:
+# LLVM_LINK_DIR's bin/llvm-link, else PATH's (in a bin/ directory, whose
+# parent becomes LLVM_LINK_DIR), else an earlier run's. Fetched: from LLVM's
+# own release; the tarball is 2 GB, and only bin/llvm-link, linked against
+# libc and libz only, is extracted, to $TOOLS/llvm-<version>. Either way its
+# directory is written to env.sh as LLVM_LINK_DIR. (Until #68, bin/opt and
 # bin/llvm-extract were extracted too, for a GEP rewrite #68 retired.)
 # Only when GNAT_LLVM_DIR is set: nothing else uses it.
 GNAT_LLVM_ENV=""
-LLVM_LINK_DIR="$TOOLS/llvm-$LLVM_LINK_VERSION"
+LLVM_LINK_GIVEN="${LLVM_LINK_DIR:-}"
+LLVM_LINK_FETCH_DIR="$TOOLS/llvm-$LLVM_LINK_VERSION"
 if [ -n "${GNAT_LLVM_DIR:-}" ]; then
   [ -x "$GNAT_LLVM_DIR/bin/llvm-gcc" ] || die "GNAT_LLVM_DIR=$GNAT_LLVM_DIR has no bin/llvm-gcc"
   [ -x "$GNAT_LLVM_DIR/bin/llvm-nm" ] || die "GNAT_LLVM_DIR=$GNAT_LLVM_DIR has no bin/llvm-nm"
@@ -436,26 +667,30 @@ if [ -n "${GNAT_LLVM_DIR:-}" ]; then
   [ "$gnat_llvm_version" = "$LLVM_LINK_VERSION" ] \
     || die "GNAT_LLVM_DIR's LLVM is ${gnat_llvm_version:-?}, but toolchain-pins.env pins llvm-link $LLVM_LINK_VERSION: they must match"
 
-  if [ -x "$LLVM_LINK_DIR/bin/llvm-link" ] && [ -f "$LLVM_LINK_DIR/.bootstrap-sha256" ] \
-     && [ "$(cat "$LLVM_LINK_DIR/.bootstrap-sha256")" = "$LLVM_LINK_SHA256" ]; then
-    echo ">> $LLVM_LINK_DIR: already installed"
+  if find_tool llvm-link "$LLVM_LINK_VERSION" \
+       "${LLVM_LINK_GIVEN:+$LLVM_LINK_GIVEN/bin/llvm-link}" "$(llvm_link_on_path)" \
+       "$LLVM_LINK_FETCH_DIR/bin/llvm-link"; then
+    tool_present llvm-link "$LLVM_LINK_VERSION" "$FOUND"
   else
+    command -v xz >/dev/null 2>&1 || apt_install xz-utils
     fetch "https://github.com/llvm/llvm-project/releases/download/$LLVM_LINK_TAG/$LLVM_LINK_TARBALL" \
           "$TOOLS/downloads/$LLVM_LINK_TARBALL" "$LLVM_LINK_SHA256"
-    rm -rf "$LLVM_LINK_DIR.new"
-    mkdir -p "$LLVM_LINK_DIR.new"
+    rm -rf "$LLVM_LINK_FETCH_DIR.new"
+    mkdir -p "$LLVM_LINK_FETCH_DIR.new"
     echo ">> extracting bin/llvm-link from $LLVM_LINK_TARBALL"
-    tar -xJf "$TOOLS/downloads/$LLVM_LINK_TARBALL" -C "$LLVM_LINK_DIR.new" --strip-components=1 \
+    tar -xJf "$TOOLS/downloads/$LLVM_LINK_TARBALL" -C "$LLVM_LINK_FETCH_DIR.new" --strip-components=1 \
         "${LLVM_LINK_TARBALL%.tar.xz}/bin/llvm-link"
-    echo "$LLVM_LINK_SHA256" > "$LLVM_LINK_DIR.new/.bootstrap-sha256"
-    rm -rf "$LLVM_LINK_DIR"
-    mv "$LLVM_LINK_DIR.new" "$LLVM_LINK_DIR"
+    echo "$LLVM_LINK_SHA256" > "$LLVM_LINK_FETCH_DIR.new/.bootstrap-sha256"
+    rm -rf "$LLVM_LINK_FETCH_DIR"
+    mv "$LLVM_LINK_FETCH_DIR.new" "$LLVM_LINK_FETCH_DIR"
+    ensure_libs "$LLVM_LINK_FETCH_DIR"
+    tool_matches llvm-link "$LLVM_LINK_FETCH_DIR/bin/llvm-link" "$LLVM_LINK_VERSION" \
+      || die "the fetched llvm-link is not LLVM $LLVM_LINK_VERSION"
+    FOUND="$LLVM_LINK_FETCH_DIR/bin/llvm-link"
+    tool_fetched llvm-link "$LLVM_LINK_VERSION" "$FOUND"
   fi
-  ensure_libs "$LLVM_LINK_DIR"
-  link_version_found="$("$LLVM_LINK_DIR/bin/llvm-link" --version 2>&1 | sed -n 's/^ *LLVM version //p')"
-  [ "$link_version_found" = "$LLVM_LINK_VERSION" ] \
-    || die "$LLVM_LINK_DIR/bin/llvm-link is LLVM ${link_version_found:-?}, not $LLVM_LINK_VERSION"
-  echo ">> LLVM_LINK_DIR=$LLVM_LINK_DIR: llvm-link $link_version_found"
+  LLVM_LINK_DIR="${FOUND%/bin/llvm-link}"
+  echo ">> LLVM_LINK_DIR=$LLVM_LINK_DIR"
 
   GNAT_LLVM_ENV="export GNAT_LLVM_DIR=\"$GNAT_LLVM_DIR\"
 export LLVM_LINK_DIR=\"$LLVM_LINK_DIR\""
@@ -470,7 +705,7 @@ fi
 # check still leaves the tools usable.
 cat > "$TOOLS/env.sh" <<EOF
 # Written by spark/scripts/bootstrap-x86_64.sh. Source it: . $TOOLS/env.sh
-export PATH="$TOOL_PATH:\$PATH"
+export PATH="${TOOL_PATH:+$TOOL_PATH:}\$PATH"
 $GNAT_LLVM_ENV
 EOF
 
@@ -512,9 +747,13 @@ if [ "$CHECKS" -eq 1 ]; then
 fi
 
 log "done"
-echo "Tools in $TOOLS, checkout in $REPO. For a new shell:"
+echo "Checkout in $REPO; tools as listed at the end. For a new shell:"
 echo
-echo "  export PATH=\"$TOOL_PATH:\$PATH\""
+if [ -n "$TOOL_PATH" ]; then
+  echo "  export PATH=\"$TOOL_PATH:\$PATH\""
+else
+  echo "  (nothing to add: PATH already finds every tool)"
+fi
 echo
 echo "(or: . $TOOLS/env.sh)"
 [ "$FAILED" -eq 0 ] || { warn "a check failed (above)"; exit 1; }

@@ -1091,33 +1091,48 @@ prints the `export PATH=...` line). The rules while it lives:
   there is no scheduler there and no other user.
 
 `scripts/bootstrap-x86_64.sh` (M0.5, #6) is idempotent: each phase skips
-what is in place, so rerun it after anything goes wrong. Its phases, each
-timed at the end of the run:
+what is in place, so rerun it after anything goes wrong.
+
+**Present or fetched** (#100). Each tool is used where it is when it is
+present and its version matches its pin, and fetched (the pinned
+release, sha256 checked) only when it is not. Present means, in this
+order: in the directory its environment variable names (`LLVM_LINK_DIR`,
+for `llvm-link`), on `PATH`, or where an earlier run fetched it. Cryptol
+must also have FFI support and a `z3` beside it or on `PATH`. The script
+says which, per tool, as it goes ("present and matching the pin" or
+"fetched") and in a table at the end, and a run with every tool present
+fetches nothing. Only the directories of tools `PATH` did not already
+find are added to it, and to `env.sh`.
+
+Its phases, each timed at the end of the run (the versions are the pins;
+"fetched" says what is fetched when the tool is not present):
 
 | phase | what |
 |---|---|
 | `prereqs` | curl, git, python3, CA certificates, `libc6-dev`; missing ones are apt-installed |
 | `clone` | clones the fork to `~/Foundation`, or fetches it and fast-forwards a clean checkout |
-| `alire` | alr 2.1.1, `alr toolchain --select` gnat_native 16.1.0 and gprbuild 26.0.1, `alr install` gnatprove 16.1.0 and gnatdoc_bin 26.0.0 |
-| `cryptol` | Cryptol 3.6.0, `ubuntu-24.04-X64-with-solvers` release |
-| `saw` | SAW 1.6, `ubuntu-24.04-X64-with-solvers` release |
-| `gnat-llvm` | checks the GNAT Pro LLVM install that `GNAT_LLVM_DIR` names (nothing of it is downloaded), installs `llvm-link` from LLVM's own 21.1.8 release (2 GB tarball, sha256 checked, `bin/llvm-link` alone extracted), and writes `GNAT_LLVM_DIR` and `LLVM_LINK_DIR` to `env.sh`; skipped, with a note, when `GNAT_LLVM_DIR` is unset ("SAW") |
+| `alire` | alr 2.1.1, gnat_native 16.1.0 and gprbuild 26.0.1, gnatprove 16.1.0, gnatdoc_bin 26.0.0. Fetched: alr's release zip; the toolchain with `alr toolchain --select`; gnatprove and gnatdoc_bin with `alr install` |
+| `cryptol` | Cryptol 3.6.0. Fetched: the `ubuntu-24.04-X64-with-solvers` release |
+| `saw` | SAW 1.6. Fetched: the `ubuntu-24.04-X64-with-solvers` release |
+| `gnat-llvm` | checks the GNAT Pro LLVM install that `GNAT_LLVM_DIR` names (nothing of it is ever downloaded), and `llvm-link` 21.1.8. Fetched: LLVM's own 21.1.8 release (2 GB tarball, sha256 checked, `bin/llvm-link` alone extracted). Writes `GNAT_LLVM_DIR` and `LLVM_LINK_DIR` to `env.sh`; skipped, with a note, when `GNAT_LLVM_DIR` is unset ("SAW") |
 | `build` | `alr -n build` |
 | `proof` | `scripts/check-proof.sh`, slow units skipped as in CI ("Slow proofs"), under CI's allowance (`FOUNDATION_SPARK_PROOF_ALLOWANCE=ci` unless set); retried once on failure, and then reported as "ok on retry"; skipped with `--no-proof` |
 | `ffi` | `scripts/check-ffi.sh` |
 
 Every version and release sha256 comes from `scripts/toolchain-pins.env`,
 which CI's `setup-alire-spark` action reads too, so the instance and CI
-cannot drift apart. Tools go to `~/foundation-tools` (`FOUNDATION_TOOLS`),
-Alire's state to `~/.alire` and `~/.local/share/alire` as in CI. The
+cannot drift apart. Fetched tools go to `~/foundation-tools`
+(`FOUNDATION_TOOLS`), Alire's state to `~/.alire` and
+`~/.local/share/alire` as in CI. The
 header of the script lists its other variables (`FOUNDATION_REPO`,
 `FOUNDATION_REF`, `FOUNDATION_SPARK_PROOF_ALLOWANCE`, ...).
 
-**Root** is needed only by `prereqs`, and only for packages the image
-lacks. As root or with passwordless sudo the script installs them;
-otherwise it stops and prints the one `sudo apt-get install` line to run.
-Cryptol's and SAW's shared libraries are checked with `ldd` after
-unpacking, the same way.
+**Root** is needed only for packages the image lacks: in `prereqs`, and
+for a fetched tool (`xz-utils` to unpack LLVM's tarball, and the shared
+libraries of a fetched Cryptol, SAW or `llvm-link`, checked with `ldd`
+after unpacking). As root or with passwordless sudo the script installs
+them; otherwise it stops and prints the one `sudo apt-get install` line
+to run.
 
 **SAW's signature.** The release's `.sig` is signed by key
 `07FC90D0C93F5F3B56354E1DCBF4BB4143DB4A3A`, which neither
@@ -1130,7 +1145,13 @@ The script is tested by `.github/workflows/spark-bootstrap-x86_64.yml`
 with no setup action, and in a plain `ubuntu:24.04` container as root,
 which is what measures the packages it must install. Both jobs run it with
 `--no-proof`: every phase but `proof` runs, and the phase table reports
-`proof` as skipped.
+`proof` as skipped. Both check that the first run reported every tool
+fetched, then run it again (`--no-checks`) and check that the second
+reported every tool present and matching the pin, and downloaded and
+apt-installed nothing. `llvm-link` is not exercised there (it needs
+`GNAT_LLVM_DIR`); `scripts/test-bootstrap-detect.sh`, run by the
+workflow's lint job and runnable anywhere, tests the detection of every
+tool, `llvm-link` included, against stub tools.
 
 **The proof gate is arm64 only** (`spark-prove.yml`, on
 `ubuntu-24.04-arm`). x86_64's provers are slower on some goals, and on
@@ -1832,10 +1853,12 @@ sha256 is the digest GitHub lists for `LLVM-21.1.8-Linux-X64.tar.xz`).
 `LLVM_LINK_DIR` must name a directory with that `bin/llvm-link`; the
 script fails, saying which, when it is unset, missing, of another
 version, or when GNAT-LLVM's LLVM (`llvm-nm --version`) is not the same
-version. The bootstrap's `gnat-llvm` phase installs it when
-`GNAT_LLVM_DIR` is set: it fetches the 2 GB tarball, checks its sha256,
-extracts `bin/llvm-link` alone (it is statically linked against LLVM) to
-`~/foundation-tools/llvm-21.1.8`, and writes `LLVM_LINK_DIR` to `env.sh`.
+version. The bootstrap's `gnat-llvm` phase, when `GNAT_LLVM_DIR` is
+set, uses an `llvm-link` 21.1.8 that is present (in `LLVM_LINK_DIR`, or
+on `PATH` in a `bin/` directory), and otherwise fetches the 2 GB tarball,
+checks its sha256, and extracts `bin/llvm-link` alone (it is statically
+linked against LLVM) to `~/foundation-tools/llvm-21.1.8`. Either way it
+writes `LLVM_LINK_DIR` to `env.sh`.
 
 **The record.** Since no one else can rerun it, every run that passes
 writes `saw/results.txt`: the commit (the tree must be clean), the date,
