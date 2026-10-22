@@ -6,6 +6,7 @@
 
 with Interfaces;
 with Foundation_Spark.Cryptol.Bit_Sequences;
+with Foundation_Spark.Cryptol.Numeric;
 
 package Foundation_Spark.SHA2 with
   SPARK_Mode,
@@ -33,31 +34,13 @@ is
    package Sequences_Of_Bits is new Cryptol.Bit_Sequences (Bit_Index, Bits);
    --  The prelude's `zero` and numeric literals at the bit sequences [l].
 
-   function Ceil_Div (A, B : Bit_Index) return Bit_Index is
-     ((A + (B - 1)) / B)
-   with
-     Ghost,
-     Pre => B > 0 and then A <= Bit_Index'Last - B;
-   --  Cryptol's ceiling division `a /^ b` on naturals, as Main.cry:59
-   --  uses it for `type N`: the least n with n * b >= a. The same
-   --  statement as the prelude's Numeric.Ceil_Div, kept inline (#75): as
-   --  a call of a Numeric instance, SHA256_Bytes' Lemma_Pad_Bytes_Bits
-   --  lost its proof at level 2.
-   --  @param A The dividend.
-   --  @param B The divisor, positive.
-   --  @return A divided by B, rounded up.
-
-   function Ceil_Mod (A, B : Bit_Index) return Bit_Index is
-     (Ceil_Div (A, B) * B - A)
-   with
-     Ghost,
-     Pre => B > 0 and then A <= Bit_Index'Last - B;
-   --  Cryptol's ceiling modulus `a %^ b` on naturals, as Main.cry:58 uses
-   --  it for `type k`: `b * (a /^ b) - a`, the distance from A up to the
-   --  next multiple of B. Kept inline, as Ceil_Div is.
-   --  @param A The dividend.
-   --  @param B The divisor, positive.
-   --  @return What A lacks of a multiple of B.
+   package Lengths is new Cryptol.Numeric (Bit_Index);
+   --  The prelude's `/^` and `%^` on lengths, as Main.cry:58 and :59 use
+   --  them for `hash`'s `type k` and `type N`. Main calls Lengths.Ceil_Div
+   --  and Lengths.Ceil_Mod directly. A wrapper here (SHA2.Ceil_Div whose
+   --  body calls Lengths.Ceil_Div) is one more definition between `k` and
+   --  its arithmetic, and that layer alone took SHA256_Bytes'
+   --  Lemma_Pad_Bytes_Bits from 3831 CVC5 steps to 52939 (#75).
 
    function To_Bits (Value, Width : Bit_Index) return Bits is
      (Sequences_Of_Bits.Literal (Value, Width))

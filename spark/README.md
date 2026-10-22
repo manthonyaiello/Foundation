@@ -591,16 +591,34 @@ know:
   the same way, bit of weight `2 ** i` the coefficient of `x ^^ i`.
 
 **Who uses it.** SHA-2 (`foldl` twice, `@`, `join`, `split`, `zero`, the
-literal of `pad`) and HMAC (`repeat`, `zero`) since #75. Three
-statements stay inline, the same as the prelude's, because routing them
-through an instance cost an implementation lemma its proof (each fails at
-the committed level with the instance and proves without it; the
-mechanism was not isolated): SHA-2's `Ceil_Div` and `Ceil_Mod` (`/^`,
-`%^`; `SHA256_Bytes.Lemma_Pad_Bytes_Bits`, level 2) and HMAC's
-`Byte_Bit` and `Join` (`@` and `join` on bytes;
-`HMAC.SHA256_Impl.Lemma_Update`, levels 2 and 3). The FFI shim
-instantiates the prelude at exactly those types, so the statements are
-checked against Cryptol all the same.
+literal of `pad`, `/^` and `%^`) and HMAC (`repeat`, `zero`, `@` and
+`join` on bytes), with nothing of either left inline. The last four
+statements moved in #75's remainder, once the cause of the lost proofs
+was measured from the provers' own goals (`--debug-save-vcs`):
+- `/^` and `%^` (`SHA2.Lengths`, `Numeric`). They had been tried as
+  wrappers, `SHA2.Ceil_Div` with the body `Lengths.Ceil_Div (A, B)`. The
+  goal of `SHA256_Bytes.Lemma_Pad_Bytes_Bits`' assertion on the message's
+  bytes then differs from the inline one in exactly one thing: one more
+  definition between `k` and its arithmetic. That layer alone took CVC5
+  from 3831 steps (2.5 s) to 52939 (98 s). With `Main` calling the
+  instance directly, the goal is the inline one again (3831 steps), so
+  there is no wrapper.
+- `@` and `join` on bytes (`HMAC.Byte_Words`, `Join_Split` at `[8]`).
+  `HMAC.SHA256_Impl.Lemma_Update`'s call of `SHA256_Stream.Lemma_Update`
+  needs `Inner_Prefix (Key, M2)` to begin with `Inner_Prefix (Key, M)`.
+  Its context holds `Init_Key`'s postcondition, and so `HMAC_init`'s
+  `join`. Through the instance, that context has the generic `Join`'s
+  postcondition (`'Last = K'Length * 8 - 1`, guarded by its
+  precondition) where the inline `Join` had an unguarded `'Length = 8 *
+  K'Length`. The level-2 provers did not prove that conjunct in 60 s.
+  With `HMAC.Join` a renaming of the instance's, so with no wrapper, it
+  still failed at the gate's 10 s, and also with the generic's
+  precondition removed, or with its postcondition stated as a `'Length`.
+  With both changes it proved (Z3, 4023 steps; inline, 4191). The prelude is left as it is:
+  `SHA256_Impl.Lemma_Prefix_Extends` states the prefix reasoning apart
+  from `Init_Key`, where it proves at once.
+
+The FFI shim calls these instances (`SHA2.Lengths`, `HMAC.Byte_Words`).
 
 AES since #75's second half: `foldl` (`Spec.Cipher`'s three round folds,
 `Folds`; GF28MultiplicationCorrect's fold over a byte's bits,
@@ -608,12 +626,16 @@ AES since #75's second half: `foldl` (`Spec.Cipher`'s three round folds,
 `Bulk_Indexing`), `join` and `split` between bytes and bits (`Spec.Main`'s
 `Join_Block`, `Split_Block`, `Byte_At`, `Bit_Of`, and `AES_K.Split_Key`,
 `Join_Split` at `[8]`), `@` and `head` on words (GF28's `Bit`, `Head`,
-`Product_Bit`, GF2's `Bit`, `Words`), and `pmult` (GF28 at `[8] x [8]`,
-`Polynomial_Products`). Five stay written out, each for a measured
-reason:
-- `reverse` (`Cipher.Reverse_Keys`): through `Sequences.Reverse_Of`,
-  `AES.Impl.Decrypt_Block_Prime`'s assertion `RK (J) = W (Nr (K) - J)`
-  times out at level 2;
+`Product_Bit`, GF2's `Bit`, `Words`), `pmult` (GF28 at `[8] x [8]`,
+`Polynomial_Products`), and `reverse` (`Cipher.Reverse_Keys`,
+`Sequences` over round keys). `reverse` had stayed written out because
+#85 measured `AES.Impl.Decrypt_Block_Prime`'s assertion `RK (J) = W (Nr
+(K) - J)` timing out at level 2 through the instance. That does not
+reproduce: through the instance the assertion proves with Z3 in 396
+steps (0.15 s), on this tree and on #85's own before its rebase (its
+spec with `AES.Impl` as it was before #84), and the gate proves. Four
+stay written out, each for a measured reason (not re-measured in #75's
+remainder):
 - `pmod` (GF28's `Pmod_Fold`, `Pmod`): GF28 returns the remainder as a
   `Byte`, and its bound below `2 ** 8` is an induction no expression
   function can call; GF28's `Pmod` also takes any `Poly` dividend;

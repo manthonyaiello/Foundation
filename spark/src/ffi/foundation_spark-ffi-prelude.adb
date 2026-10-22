@@ -12,10 +12,10 @@ is
      (Byte_Enumeration_Folds.Foldl (E, Z, Integer (From), Integer (To)));
 
    function Bit_8 (X, J : Byte) return Byte is
-     (Bit_Byte (Byte_Words.Word_Bits.Bit (X, Natural (J))));
+     (Bit_Byte (HMAC.Byte_Words.Word_Bits.Bit (X, Natural (J))));
 
    function Head_8 (X : Byte) return Byte is
-     (Bit_Byte (Byte_Words.Word_Bits.Head (X)));
+     (Bit_Byte (HMAC.Byte_Words.Word_Bits.Head (X)));
 
    function Bit_32 (X : Word_32; J : Byte) return Byte is
      (Bit_Byte (SHA2.SHA256.Word_Sequences.Word_Bits.Bit (X, Natural (J))));
@@ -24,7 +24,7 @@ is
      (Bit_Byte (Bits_15.Bit (X, Natural (J))));
 
    function Join_Bytes (Xs : Four_Bytes) return Word_32 is
-     (SHA2.SHA256.Word_Sequences.Value (Byte_Words.Join (Xs), 0, 32));
+     (SHA2.SHA256.Word_Sequences.Value (HMAC.Byte_Words.Join (Xs), 0, 32));
 
    procedure Split_Word (X : Word_64; Output : out Two_Words)
    is
@@ -40,7 +40,7 @@ is
    begin
       Output :=
         [for K in Eight_Bytes'Range =>
-           Byte_Words.Split_At (P, SHA2.Bit_Index (K))];
+           HMAC.Byte_Words.Split_At (P, SHA2.Bit_Index (K))];
    end Join_Words;
 
    function Zero_64 return Word_64 is
@@ -74,11 +74,11 @@ is
 
    function Ceil_Div (M, N : C_Size) return Word_64 is
      (Word_64
-        (Lengths.Ceil_Div (SHA2.Bit_Index (M), SHA2.Bit_Index (N))));
+        (SHA2.Lengths.Ceil_Div (SHA2.Bit_Index (M), SHA2.Bit_Index (N))));
 
    function Ceil_Mod (M, N : C_Size) return Word_64 is
      (Word_64
-        (Lengths.Ceil_Mod (SHA2.Bit_Index (M), SHA2.Bit_Index (N))));
+        (SHA2.Lengths.Ceil_Mod (SHA2.Bit_Index (M), SHA2.Bit_Index (N))));
 
    function Pmult_8 (X, Y : Byte) return Word_16 is
      (Pmult_7_7.Pmult (Word_16 (X), Word_16 (Y)));

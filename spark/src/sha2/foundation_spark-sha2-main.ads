@@ -224,7 +224,7 @@ is
    --  sequence decision), which is the same bound at w = 32.
 
    function Small_K (L : Bit_Index) return Bit_Index is
-     (Ceil_Mod (L + 1 + 2 * Bit_Index (Word_Size), Block_Size))
+     (Lengths.Ceil_Mod (L + 1 + 2 * Bit_Index (Word_Size), Block_Size))
    with
      Ghost,
      Pre => L < Max_Length;
@@ -237,7 +237,7 @@ is
    --  @return `k`.
 
    function N (L : Bit_Index) return Bit_Index is
-     (Ceil_Div (L + 1 + 2 * Bit_Index (Word_Size), Block_Size))
+     (Lengths.Ceil_Div (L + 1 + 2 * Bit_Index (Word_Size), Block_Size))
    with
      Ghost,
      Pre => L < Max_Length;

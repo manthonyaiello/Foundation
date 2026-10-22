@@ -661,6 +661,54 @@ is
       return SHA2.SHA256_Stream.Final (D);
    end Final;
 
+   --------------------------
+   -- Lemma_Prefix_Extends --
+   --------------------------
+
+   procedure Lemma_Prefix_Extends
+     (P : Key_Block; M : Byte_Array; Data : Byte_Array; M2 : Byte_Array)
+   with
+     Ghost,
+     Pre  =>
+       M2'Length < Max_Text
+       and then M2'Length = M'Length + Data'Length
+       and then
+         (for all I in 0 .. Stream_Index (M'Length) - 1 =>
+            M2 (M2'First + I) = M (M'First + I))
+       and then
+         (for all I in 0 .. Stream_Index (Data'Length) - 1 =>
+            M2 (M2'First + Stream_Index (M'Length) + I)
+            = Data (Data'First + I)),
+     Post =>
+       (for all I in 0 .. Stream_Index (Byte_Array'(P & M)'Length) - 1 =>
+          Byte_Array'(P & M2) (Byte_Array'(P & M2)'First + I)
+          = Byte_Array'(P & M) (Byte_Array'(P & M)'First + I))
+       and then
+         (for all I in 0 .. Stream_Index (Data'Length) - 1 =>
+            Byte_Array'(P & M2)
+              (Byte_Array'(P & M2)'First
+               + Stream_Index (Byte_Array'(P & M)'Length) + I)
+            = Data (Data'First + I));
+   --  A prefix P before M and before M2, M then Data, keeps M2 being M
+   --  then Data: what SHA256_Stream.Lemma_Update requires of the inner
+   --  hash's messages Inner_Prefix (Key, M) and Inner_Prefix (Key, M2),
+   --  with P = K0 xor ipad. Stated apart from Lemma_Update, whose context
+   --  holds Init_Key's postcondition and so HMAC_init's join. With
+   --  HMAC.Join stated through the prelude's Join_Split, that context
+   --  holds the generic Join's postcondition ('Last = K'Length * 8 - 1,
+   --  guarded by its precondition) where an inline Join had an unguarded
+   --  'Length = 8 * K'Length, and the first conjunct did not prove there
+   --  in 60 s. Changing either difference alone did not help; changing
+   --  both did (#75). Here, without Init_Key, it proves at once.
+   --  @param P The prefix, K0 xor ipad.
+   --  @param M The text before.
+   --  @param Data The bytes absorbed.
+   --  @param M2 M then Data.
+
+   procedure Lemma_Prefix_Extends
+     (P : Key_Block; M : Byte_Array; Data : Byte_Array; M2 : Byte_Array)
+   is null;
+
    ------------------
    -- Lemma_Update --
    ------------------
@@ -674,6 +722,7 @@ is
       M2   : Byte_Array)
    is
    begin
+      Lemma_Prefix_Extends (Xor_Pad (Init_Key (Key), 16#36#), M, Data, M2);
       SHA2.SHA256_Stream.Lemma_Update
         (C0.Inner, Data, C1.Inner, Inner_Prefix (Key, M),
          Inner_Prefix (Key, M2));
