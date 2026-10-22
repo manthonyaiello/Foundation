@@ -1719,7 +1719,7 @@ may use `admit` on purpose (to time symbolic execution alone). `board.py`
 does not count a change there as a change to SAW's inputs either.
 
 ```console
-$ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install LLVM_LINK_DIR=.../llvm-21.1.8 scripts/check-saw.sh
+$ GNAT_LLVM_DIR=<dir> LLVM_LINK_DIR=<dir> scripts/check-saw.sh   # GNAT Pro's LLVM back end (bin/llvm-gcc); llvm-link 21.1.8
 $ scripts/check-saw.sh --print      # run, print the record, write nothing
 $ SAW_LONG=1 scripts/check-saw.sh   # also the long proofs; writes saw/results-long.txt
 $ SAW_LAYERS=impl scripts/check-saw.sh --print   # one layer only (impl or spec)
