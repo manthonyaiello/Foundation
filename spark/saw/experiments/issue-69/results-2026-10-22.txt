@@ -1,0 +1,234 @@
+# #69 experiments: run-all.sh on the x86_64 IOD (ip-10-10-103-187), main = 09fa337, 2026-10-22 00:35-01:15 UTC, nothing else running.
+# One block per experiment: labels.sh's output (label, Time lines after it, first and last Time), then wall-clock, peak RSS, exit status.
+# Per-lemma lines of the chains are left out (in each saw.log).
+
+## tobits_w0b
+full contract                                                                  1  first 0.380352478s   last 0.380352478s
+full contract, again                                                           1  first 0.347985839s   last 0.347985839s
+no postcondition                                                               1  first 0.189547987s   last 0.189547987s
+no postcondition, again                                                        1  first 0.188334063s   last 0.188334063s
+v concrete, no postcondition                                                   1  first 0.201652112s   last 0.201652112s
+v concrete, no postcondition, again                                            1  first 0.196708418s   last 0.196708418s
+v concrete, ss_post only                                                       1  first 0.321813544s   last 0.321813544s
+v concrete, ss_post only, again                                                1  first 0.373318388s   last 0.373318388s
+v concrete, bounds points-to only                                              1  first 0.228541208s   last 0.228541208s
+v concrete, bounds points-to only, again                                       1  first 0.22062471s    last 0.22062471s
+non-lax module, full contract                                                  1  first 0.364457554s   last 0.364457554s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.61
+	Maximum resident set size (kbytes): 198048
+	Exit status: 0
+
+## tobits_chain
+chain z3 (all)                                                                 0  first                last 
+z3 W = 0                                                                       1  first 0.543770269s   last 0.543770269s
+z3 W = 1                                                                       1  first 0.610728345s   last 0.610728345s
+z3 W = 64                                                                      2  first 0.669392056s   last 43.812502784s
+chain admit (all)                                                              0  first                last 
+admit W = 0                                                                    1  first 0.54513153s    last 0.54513153s
+admit W = 1                                                                    1  first 0.589108s      last 0.589108s
+admit W = 64                                                                   2  first 0.61240422s    last 40.624835919s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:25.04
+	Maximum resident set size (kbytes): 389624
+	Exit status: 0
+
+## tobits_chain-chunk8k
+chain z3 (all)                                                                 0  first                last 
+z3 W = 0                                                                       1  first 0.522729034s   last 0.522729034s
+z3 W = 1                                                                       1  first 0.632388741s   last 0.632388741s
+z3 W = 64                                                                      2  first 0.648571406s   last 44.433467874s
+chain admit (all)                                                              0  first                last 
+admit W = 0                                                                    1  first 0.527431779s   last 0.527431779s
+admit W = 1                                                                    1  first 0.591880054s   last 0.591880054s
+admit W = 64                                                                   2  first 0.600288394s   last 40.937302272s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:25.99
+	Maximum resident set size (kbytes): 390332
+	Exit status: 0
+
+## tobits_chain-chunk1m
+chain z3 (all)                                                                 0  first                last 
+z3 W = 0                                                                       1  first 0.516902039s   last 0.516902039s
+z3 W = 1                                                                       1  first 0.587880373s   last 0.587880373s
+z3 W = 64                                                                      2  first 0.659599177s   last 43.343858254s
+chain admit (all)                                                              0  first                last 
+admit W = 0                                                                    1  first 0.515245017s   last 0.515245017s
+admit W = 1                                                                    1  first 0.576762264s   last 0.576762264s
+admit W = 64                                                                   2  first 0.599778303s   last 40.299474595s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:24.25
+	Maximum resident set size (kbytes): 390472
+	Exit status: 0
+
+## recursion_aes
+W lemmas, k = 128, I = 0 .. 43 (as recorded)                                  45  first 0.231233744s   last 16.324372981s
+W unfolded, k = 128, I = 4                                                     1  first 0.2269712s     last 0.2269712s
+W unfolded, k = 128, I = 6                                                     1  first 0.228843489s   last 0.228843489s
+W unfolded, k = 128, I = 8                                                     1  first 0.23374629s    last 0.23374629s
+W unfolded, k = 128, I = 10                                                    1  first 0.243680978s   last 0.243680978s
+W unfolded, k = 128, I = 12                                                    1  first 0.254220067s   last 0.254220067s
+W unfolded, k = 128, I = 14                                                    1  first 0.290373152s   last 0.290373152s
+W unfolded, k = 128, I = 16                                                    1  first 0.334054362s   last 0.334054362s
+W unfolded, k = 128, I = 18                                                    1  first 0.46619812s    last 0.46619812s
+W unfolded, k = 128, I = 20                                                    1  first 0.583826471s   last 0.583826471s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:20.28
+	Maximum resident set size (kbytes): 220012
+	Exit status: 0
+
+## recursion_wide
+AES W unfolded, k = 128, I = 24                                                1  first 1.53281049s    last 1.53281049s
+AES W unfolded, k = 128, I = 28                                                1  first 4.941816845s   last 4.941816845s
+AES W unfolded, k = 128, I = 32                                                3  first 17.420186743s  last 0.018058248s
+SHA-256 W unfolded, T = 30                                                     1  first 0.117747947s   last 0.117747947s
+SHA-256 W unfolded, T = 40                                                     1  first 0.168410501s   last 0.168410501s
+SHA-256 W unfolded, T = 50                                                     1  first 0.559862467s   last 0.559862467s
+SHA-256 W unfolded, T = 63                                                     1  first 6.710244304s   last 6.710244304s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:32.79
+	Maximum resident set size (kbytes): 908300
+	Exit status: 0
+
+## recursion_sha
+W unfolded                                                                     0  first                last 
+W unfolded, T = 16                                                             1  first 0.112923588s   last 0.112923588s
+W unfolded, T = 17                                                             1  first 0.102679603s   last 0.102679603s
+W unfolded, T = 18                                                             1  first 0.109682957s   last 0.109682957s
+W unfolded, T = 19                                                             1  first 0.101934959s   last 0.101934959s
+W unfolded, T = 20                                                             1  first 0.103038909s   last 0.103038909s
+W unfolded, T = 21                                                             1  first 0.103762606s   last 0.103762606s
+W unfolded, T = 22                                                             1  first 0.108731601s   last 0.108731601s
+Rounds.Foldl unfolded, N = 8                                                   1  first 0.288522857s   last 0.288522857s
+Rounds.Foldl unfolded, N = 16                                                  1  first 0.476736752s   last 0.476736752s
+Rounds.Foldl unfolded, N = 32                                                  1  first 0.984769255s   last 0.984769255s
+Rounds.Foldl unfolded, N = 64                                                  1  first 2.39918493s    last 2.39918493s
+To_Bits unfolded, stack at 48, W = 8                                           1  first 0.698709292s   last 0.698709292s
+To_Bits unfolded, stack at 48, W = 16                                          1  first 0.745266921s   last 0.745266921s
+To_Bits unfolded, stack at 48, W = 32                                          1  first 0.982135619s   last 0.982135619s
+To_Bits unfolded, stack at 48, W = 64                                          1  first 1.392751728s   last 1.392751728s
+Word_Of unfolded, P of 512 bits, Count = 4                                     1  first 7.23319381s    last 7.23319381s
+Word_Of unfolded, P of 512 bits, Count = 8                                     1  first 229.78472332s  last 229.78472332s
+Word_Of lemmas, P of 512 bits (as recorded)                                   34  first 0.239056024s   last 180.682773038s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 8:03.23
+	Maximum resident set size (kbytes): 1037476
+	Exit status: 0
+
+## hash
+load, strict                                                                   1  first 0.066363239s   last 0.066363239s
+load, lax arithmetic                                                           1  first 0.02046056s    last 0.02046056s
+the compression function's lemmas, lax load                                  267  first 0.025202928s   last 0.77365898s
+Zero, Small_K, To_Bits chain for l = 440 (all)                                67  first 0.494473493s   last 0.031017103s
+Pad, l = 440, z3                                                               1  first 1.759783905s   last 1.759783905s
+Pad, l = 440, admit                                                            1  first 0.67580425s    last 0.67580425s
+Word_Of chain, 512 bits, Count = 0 .. 31                                       0  first                last 
+Word_Of, 512 bits, Count = 32, yices                                           1  first 5.823417441s   last 5.823417441s
+Word_Of, 512 bits, Count = 32, z3                                              1  first 7.543548965s   last 7.543548965s
+Word_Of, 512 bits, Count = 32, admit                                           1  first 0.240863368s   last 0.240863368s
+Parse, 1 block, z3                                                             1  first 3.803816258s   last 3.803816258s
+Parse, 1 block, admit                                                          3  first 1.094050251s   last 0.13699756s
+Hash, l = 440, w4_unint_z3 step                                                1  first 4.557925567s   last 4.557925567s
+Hash, l = 440, admit                                                           1  first 2.197266683s   last 2.197266683s
+Hash, l = 440, admit, profiled                                                 1  first 2.22395791s    last 2.22395791s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:06.15
+	Maximum resident set size (kbytes): 1092092
+	Exit status: 0
+
+## probes
+N: Literal (128) W = 0, strict load                                            1  first 0.451198265s   last 0.451198265s
+N: Literal (128) W = 1, strict load: must fail (poison)                        0  first                last 
+Anticipated failure message ==                                                 0  first                last 
+N: Literal_No_Null (128) chain W = 0 .. 64, strict load (all)                 66  first 0.413259255s   last 42.404725091s
+N: Literal (128) chain W = 0 .. 64, lax load (all)                            66  first 0.433413333s   last 40.867889787s
+R: Literal_Agg (128) W = 64, one proof, strict load                            1  first 0.739057202s   last 0.739057202s
+R: Literal (128) unfolded W = 64, lax load                                     1  first 1.317334028s   last 1.317334028s
+S: Literal_Agg (64) W = 64, secondary stack                                    1  first 0.566863204s   last 0.566863204s
+S: Literal_64 (64), constrained result (sret)                                  1  first 0.167759061s   last 0.167759061s
+S: Literal (64) chain W = 0 .. 64, lax load (all)                             66  first 0.397131791s   last 38.795646613s
+B: value (128) chain, P of 512 bits (all)                                     34  first 0.275840229s   last 192.749225257s
+B: value_packed (128) chain, P of 512 bits (all)                              34  first 0.228770842s   last 11.827045808s
+B: value (128) chain, P of 1024 bits (all)                                    34  first 0.471522496s   last 448.071010844s
+B: value_packed (128) chain, P of 1024 bits (all)                             34  first 0.257991029s   last 15.689345587s
+B: value_packed (128) chain, P of 2048 bits (all)                             34  first 0.274075477s   last 23.612536256s
+B: value (64) chain, P of 512 bits (all)                                      34  first 0.403238638s   last 226.249931427s
+B: value (128) P of 512 bits, Count = 32, First concrete = 0                   1  first 0.835985344s   last 0.835985344s
+B: value (128) P of 512 bits, Count = 32, First concrete = 224                 1  first 0.861212525s   last 0.861212525s
+B: value (128) P of 512 bits, Count = 32, First concrete = 480                 1  first 0.849722094s   last 0.849722094s
+B: value (128) P of 512 bits, Count = 32, First symbolic                       1  first 6.856653374s   last 6.856653374s
+B: value (128) P of 512 bits, Count = 32, First symbolic, admit (no solver)    1  first 0.373326005s   last 0.373326005s
+B: value (128) P of 512 bits, Count = 32, First symbolic, z3                   1  first 9.609261893s   last 9.609261893s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 21:27.65
+	Maximum resident set size (kbytes): 2202072
+	Exit status: 0
+
+## hash: crucible profile of Hash at l = 440 (admit)
+callgraph: 1240 events, span 1401.3 ms
+  _start                                                           1     1401.3 ms
+  foundation_spark__sha2__sha256__hash                             1     1400.9 ms
+  overrideBranches                                                18     1238.3 ms
+  foundation_spark__sha2__sha256__parse                            1     1157.5 ms
+  foundation_spark__sha2__sha256__parse_block                      1     1154.8 ms
+  foundation_spark__sha2__sha256__word_sequences__split_at        16     1152.7 ms
+  foundation_spark__sha2__sha256__word_sequences__value           16     1152.3 ms
+  foundation_spark__sha2__sha256__pad                              1      138.2 ms
+  foundation_spark__sha2__sha256__join                             1       89.4 ms
+  foundation_spark__sha2__sha256__word_sequences__join             1       89.3 ms
+  foundation_spark__sha2__sha256__word_sequences__word_bits__bit   256       12.8 ms
+  foundation_spark__sha2__sha256__foldl_step                       1       11.7 ms
+  foundation_spark__sha2__sha256__blocks__foldl_take               1       11.6 ms
+  system__secondary_stack__ss_allocate                             3        6.4 ms
+  foundation_spark__sha2__sha256__shift_right                    256        5.8 ms
+  system__secondary_stack__allocate_dynamic                        3        3.6 ms
+  system__secondary_stack__allocate_on_chunk                       3        2.0 ms
+  system__secondary_stack__has_enough_free_memory                  3        0.7 ms
+  system__secondary_stack__used_memory_size                        3        0.4 ms
+  system__secondary_stack__ss_allocate__round_up                   3        0.2 ms
+  foundation_spark__sha2__sha256__n                                2        0.2 ms
+  saw_soft_links__get_sec_stack                                    3        0.1 ms
+  system__soft_links__get_sec_stack_nt                             3        0.1 ms
+  foundation_spark__sha2__ceil_div                                 2        0.1 ms
+  llvm.memcpy.p0.p0.i64                                            3        0.1 ms
+
+## dev runs (2026-10-21 23:40-00:15 UTC, alongside the full check-saw.sh --print and other experiments)
+### tobits_w0
+W = 0, stack at 48, 39 kept (recorded)                                         1  first 0.537852981s   last 0.537852981s
+W = 0, stack at 48, 39 kept (recorded), again                                  1  first 0.5244619s     last 0.5244619s
+W = 0, empty stack, none kept                                                  1  first 0.508534072s   last 0.508534072s
+Zero, k = 7, empty stack                                                       1  first 0.378123102s   last 0.378123102s
+Small_K, l = 8 (no stack)                                                      1  first 0.032186789s   last 0.032186789s
+W = 0, stack at 48, 39 kept, profiled                                          1  first 0.58783412s    last 0.58783412s
+done                                                                           0  first                last 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.18
+	Maximum resident set size (kbytes): 198476
+	Exit status: 0
+### tobits_w0: crucible profile of the To_Bits lemma at W = 0
+callgraph: 36 events, span 2.3 ms
+  _start                                                           1        2.3 ms
+  foundation_spark__sha2__sequences_of_bits__literal               1        1.7 ms
+  system__secondary_stack__ss_allocate                             1        1.6 ms
+  system__secondary_stack__allocate_dynamic                        1        0.9 ms
+  system__secondary_stack__allocate_on_chunk                       1        0.4 ms
+  system__secondary_stack__has_enough_free_memory                  1        0.2 ms
+  system__secondary_stack__ss_allocate__round_up                   1        0.1 ms
+  system__secondary_stack__used_memory_size                        1        0.1 ms
+  saw_soft_links__get_sec_stack                                    1        0.1 ms
+  system__soft_links__get_sec_stack_nt                             1        0.0 ms
+### recursion_sha: Word_Of unfolded, P of 512 bits, Count = 16 (yices): stopped by hand after 22 min without a result
+
+## full-base: scripts/check-saw.sh --print (SAW_LAYERS=all, SAW_MEMORY_MAX=6G) on 09fa337, 2026-10-21 23:37-00:36 UTC, each saw timed by a /usr/bin/time -v shim (sha256_spec.saw shared the machine with the dev runs above)
+>> SAW: 2890 proved (2800 of the spec layer, in 2125 lines), 20 negative controls failed as they must (3555 s)
+== saw aes_impl.saw 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:04.40
+	Maximum resident set size (kbytes): 206880
+== saw sha256_impl.saw 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:31.24
+	Maximum resident set size (kbytes): 297992
+== saw aes_spec.saw 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 6:38.07
+	Maximum resident set size (kbytes): 1361732
+== saw sha256_spec.saw 
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 39:11.61
+	Maximum resident set size (kbytes): 3887800

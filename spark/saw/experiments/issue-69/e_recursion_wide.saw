@@ -1,0 +1,42 @@
+/*
+ * #69, experiment "recursion_wide": the two recursions with more than one
+ * recursive call, unfolded further than e_recursion_aes.saw and
+ * e_recursion_sha.saw take them, to fit their growth: KeyExpansion's W
+ * at k = 128 at I = 24, 28, 32 (calls: 2503, 9201, 33673), and SHA-2's W
+ * at T = 30, 40, 50, 63 (calls: 77, 637, 4709, 64977). Same contracts,
+ * leaves and tactics as the recorded per-index lemmas.
+ */
+include "aes_spec_common.saw";
+ke_rotword <- verify_spec "keyexpansion__rotword" [] (word_contract {{ RotWord }}) rme "rme" "KeyExpansion::RotWord";
+ke_subword <- verify_spec "keyexpansion__subword" [] (word_contract {{ SubWord }}) rme "rme" "KeyExpansion::SubWord";
+ke_xor <- verify_spec "keyexpansion__Oxor" [] (word_word_contract {{ \a b -> a ^ b }}) rme "rme" "\\a b -> a ^ b : AESWord";
+let leaves = [ke_rotword, ke_subword, ke_xor];
+for [24, 28, 32] (\i -> do {
+  print (str_concat "== AES W unfolded, k = 128, I = " (show i));
+  time (llvm_verify aes_spec (spec_symbol (instance_symbol 128 "w")) leaves false
+          (w_contract 128 4 i {{ \(key : [4][4][8]) -> key }}) (w4_unint_z3 ["SubWord"]));
+  return ();
+});
+
+include "sha256_spec_common.saw";
+let word_contract (f : Term) = do {
+  x <- llvm_fresh_var "x" word_t;
+  llvm_execute_func [llvm_term x];
+  llvm_return (llvm_term {{ f x }});
+};
+f_sigma_0 <- verify_spec "functions__small_sigma_256_0" [] (word_contract {{ sigma_256_0 }}) rme "rme" "Functions::sigma_256_0";
+f_sigma_1 <- verify_spec "functions__small_sigma_256_1" [] (word_contract {{ sigma_256_1 }}) rme "rme" "Functions::sigma_256_1";
+let w_contract (t : Int) = do {
+  m <- llvm_fresh_var "m" block_t;
+  mp <- llvm_alloc block_t;
+  llvm_points_to mp (llvm_term m);
+  llvm_execute_func [mp, llvm_term {{ `t : [32] }}];
+  llvm_points_to mp (llvm_term m);
+  llvm_return (llvm_term {{ Ws m @ (`t : [32]) }});
+};
+for [30, 40, 50, 63] (\t -> do {
+  print (str_concat "== SHA-256 W unfolded, T = " (show t));
+  time (llvm_verify sha256_spec (spec_symbol "sha256__w") [f_sigma_0, f_sigma_1] false (w_contract t) unint_sigmas);
+  return ();
+});
+print "== done";

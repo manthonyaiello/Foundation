@@ -1,0 +1,50 @@
+/*
+ * #69, experiment "recursion_sha": what the per-index lemmas buy, for
+ * the SHA-256 spec layer's recursions, against letting SAW unfold the
+ * recursion at the fixed size (no lemma of the function's own as an
+ * override; the leaves' lemmas still are). Same module, same contracts,
+ * same tactics as the recorded proofs.
+ *
+ *  1. W (the message schedule, four recursive calls): the recorded
+ *     lemmas (sha256_spec_step.saw, 64, timed in its RESULT lines), then
+ *     W unfolded at T = 16 .. 22, the sigmas' lemmas as overrides.
+ *  2. Rounds.Foldl (Foldl_Step3's recursion, one call): unfolded at
+ *     N = 8, 16, 32, 64, with Step3's lemmas as overrides, against the
+ *     recorded 65 lemmas.
+ *  3. In the load with lax arithmetic: To_Bits (Literal, one call)
+ *     unfolded at W = 8, 16, 32, 64, stack at 48, against the recorded
+ *     chain; and Word_Of (Value, one call) unfolded at Count = 4 and 8 (at 16 it ran over 22 minutes and was stopped, 2026-10-22),
+ *     P of 512 bits, against the recorded 33 lemmas.
+ */
+include "sha256_spec_common.saw";
+include "sha256_spec_step.saw";
+
+print "== W unfolded";
+for [16, 17, 18, 19, 20, 21, 22] (\t -> do {
+  print (str_concat "== W unfolded, T = " (show t));
+  time (llvm_verify sha256_spec (spec_symbol "sha256__w") [f_sigma_0, f_sigma_1] false (w_contract t) unint_sigmas);
+  return ();
+});
+
+for [8, 16, 32, 64] (\n -> do {
+  print (str_concat "== Rounds.Foldl unfolded, N = " (show n));
+  time (llvm_verify sha256_spec (spec_symbol "sha256__rounds__foldl") i_step3 false (rounds_foldl_contract n) unint_sigmas);
+  return ();
+});
+
+let verify_spec = verify_spec_lax;
+include "sha256_spec_pad.saw";
+include "sha256_spec_hash.saw";
+for [8, 16, 32, 64] (\w -> do {
+  print (str_concat "== To_Bits unfolded, stack at 48, W = " (show w));
+  time (llvm_verify sha256_spec_lax (spec_symbol "sequences_of_bits__literal") [] false (to_bits_contract_at 48 0 39 0 0 w) z3);
+  return ();
+});
+for [4, 8] (\c -> do {
+  print (str_concat "== Word_Of unfolded, P of 512 bits, Count = " (show c));
+  time (llvm_verify sha256_spec_lax (spec_symbol "sha256__word_sequences__value") [] false (word_of_contract 512 c) yices);
+  return ();
+});
+print "== Word_Of lemmas, P of 512 bits (as recorded)";
+time (word_of_lemmas 512 0 []);
+print "== done";

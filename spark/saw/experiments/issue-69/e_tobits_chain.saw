@@ -1,0 +1,29 @@
+/*
+ * #69, experiment "tobits_chain": one To_Bits chain (the prelude's
+ * Sequences_Of_Bits.Literal, W = 0 .. 64), exactly as sha256_spec.saw
+ * proves it for the pad group k = 7 (l = 8, 520 bits): the secondary
+ * stack at 48 bytes (Zero's result), the first 39 kept. Each lemma is
+ * proved twice, with z3 (the recorded tactic) and with `admit` (no
+ * solver: symbolic execution, override matching and goal construction
+ * only), so that the solver's share is the difference.
+ *
+ * Run with variants (run.sh -v) that change secondary_stack.saw's chunk
+ * size (65536 recorded; chunk8k: 8192; chunk1m: 1048576) to measure what
+ * the stack's static chunk costs each lemma.
+ */
+include "sha256_spec_common.saw";
+let verify_spec = verify_spec_lax;
+include "sha256_spec_pad.saw";
+
+let sym = spec_symbol "sequences_of_bits__literal";
+rec chain (w : Int) (prev : [LLVMSpec]) (tactic : ProofScript ()) (name : String) : TopLevel LLVMSpec = do {
+  print (str_concat (str_concat (str_concat "== " name) " W = ") (show w));
+  lemma <- time (llvm_verify sha256_spec_lax sym prev false (to_bits_contract_at 48 0 39 0 0 w) tactic);
+  if eval_bool {{ `w == (64 : Integer) }} then return lemma
+  else chain (eval_int {{ `w + 1 : [32] }}) [lemma] tactic name;
+};
+print "== chain z3 (all)";
+time (chain 0 [] z3 "z3");
+print "== chain admit (all)";
+time (chain 0 [] (admit "symbolic execution only") "admit");
+print "== done";

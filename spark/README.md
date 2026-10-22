@@ -1481,6 +1481,20 @@ and 53 s), `sha256_spec.saw` 6523 s, the whole 7708 s (at `a4ea138`,
 before #67's `Parse`: 3578, 7857 s; before #75, at `c31472e`: 3522, 7784 s, peak 7.2 GB; below, "Running
 it").
 
+**Why the spec layer costs about 76 times the implementation** (#69;
+`.claude/campaign/measurements/2026-10-22-saw-cost.md`, experiments in
+`saw/experiments/issue-69/`): 31 times as many results, each 2.6 times
+as long. Of the spec layer's time, 44% is lemmas proved again at another
+secondary-stack base (an override matches only the stack state its
+contract names, and SAW cannot name a symbolic one), 33% lemmas per
+index of a recursion (`Word_Of` alone 23%, most of it the solver relating
+one Boolean byte per bit to Cryptol's shift), 7% the exhaustive per-byte
+proofs, and 2% the lemmas re-proved in the lax-arithmetic load. Measured
+there too: unfolding the linear recursions (`Rounds.Foldl`, `To_Bits`)
+is 10 to 30 times cheaper than their lemmas, and a constrained result, an
+aggregate for a literal, and packed bits each remove a factor; and what
+this says about checking a C-to-SPARK translation.
+
 **Not proved by SAW**, and why:
 
 - `SHA2.SHA256.Hash` at 120, 128 and 200 bytes (3 and 4 padded blocks)

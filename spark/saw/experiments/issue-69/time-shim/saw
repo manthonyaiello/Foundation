@@ -1,0 +1,9 @@
+#!/bin/bash
+# A saw that records its own wall-clock and peak RSS (/usr/bin/time -v)
+# in $SAW_TIME_LOG, appending, then behaves as saw. For measuring
+# check-saw.sh's runs per script without changing the script.
+if [ "${1:-}" = "--version" ] || [ -z "${SAW_TIME_LOG:-}" ]; then
+  exec /it/foundation-tools/saw-1.6/bin/saw "$@"
+fi
+echo "== saw $* (cwd $PWD)" >> "$SAW_TIME_LOG"
+exec /usr/bin/time -v -a -o "$SAW_TIME_LOG" /it/foundation-tools/saw-1.6/bin/saw "$@"
