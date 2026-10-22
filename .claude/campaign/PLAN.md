@@ -1,26 +1,20 @@
 # The campaign plan: SPARK AES, SHA-256 and HMAC against the Cryptol
 
-**Provenance.** Rewritten 2026-10-22 on the x86_64 IOD,
-at `main` = `95a57c4` (the merge of PR #96), after the IOD session of
-2026-10-21/22. That session merged PRs #89, #92, #93, #94 and #96 (closing
-#68, #69 and #95). **SAW is current again**: `board.py` on `95a57c4` (with
-the tools' `env.sh` sourced) says "SAW: recorded", both records
-current. The gnatprove gate was confirmed by CI on each PR's head (no PR of
-the session changed a proof result; one changed `spark/src`: #89's
-`with Pure` on the three AES instances, re-proved).
-**Open PRs:** #90 (`Closes #50`; green except the bootstrap jobs, which
-fail on six x86_64 proof timeouts already on `main`; unblocked by the
-bootstrap `--no-proof` PR, decision below), #97 (this plan), #98 (effort
-data), and the bootstrap `--no-proof` / scrub PR.
-**Open issues:** #50 (PR #90), #51, #99, #100, #67 (item 11's header in the generated
-`sbox_entries.ads` only), #75 (five statements left inline; the prelude's
-own SAW proofs, item 3, not written), and E5's epic #48.
-**E0–E4 are closed**; E5 is under way (#49 closed, #50 waiting on #90).
+**Provenance.** Rewritten 2026-10-22 (evening) on **hex**, at `main` =
+`f7a2366` (the merge of PR #111). **The campaign now runs on hex**, Tony's
+arm64 Mac; the `foundation` container is retired ("Machines"). This session
+merged PRs #108 (#100), #109 (#107) and #111 (part of #75), and refiled the
+remaining work around **a technical blog post** (#102).
+**Board, counted on hex at `f7a2366`:** 4264/4264 proved; SAW **STALE**
+(PR #111 changed five of its inputs; the next IOD session re-records).
+**Open PRs:** none besides this plan's.
+**Open issues:** #102 blog post and its prerequisites #103 #104 #105 #51;
+the IOD batch #99 #110 and #75 (item 3, the re-record, four AES
+statements); #106 effort analysis; #67 (item 11 only); E5's epic #48.
+**E0–E4 are closed**; E5: #49 and #50 closed, #51 open.
 **Measurements:** `.claude/campaign/measurements/2026-10-19-iod.md` (the E4
-day) and `2026-10-22-saw-cost.md` (#69). The AES spec crosswalks (`.claude/campaign/walkthroughs/`) are the
-"before" of 2026-10-20 and the "after #75" of 2026-10-21 (both published),
-plus an old-vs-new SPARK page (published, PR #88); the links are in the
-walkthroughs README. The "after #80" copy is superseded and unpublished.
+day) and `2026-10-22-saw-cost.md` (#69). The AES spec crosswalks are in
+`.claude/campaign/walkthroughs/` (links in its README).
 
 **A fresh session starts at "Next".**
 
@@ -48,57 +42,44 @@ check proved, against a SPARK spec layer, with no assumptions.
 
 ## The board
 
-Counted on `main` = `95a57c4` (gnatprove from CI on the session's PR heads,
-unchanged since `1140824`; SAW recorded at `5bf56ac` and `babab6f`):
+Counted on hex at `main` = `f7a2366` (`check-proof.sh` through the
+scheduler, `FOUNDATION_SPARK_PROOF_ALLOWANCE=ci`, 225 s warm; CI's arm64
+gate green on PR #111's head):
 
-* **40 of 40 functions complete**, 3 of them by design (`board.py`'s row
-  kinds, #67/PR #81): `AES::SBox::affine` and `GF2::inverse (AES)` are
+* **40 of 40 functions complete** in CI, 3 of them by design (`board.py`'s
+  row kinds, #67/PR #81): `AES::SBox::affine` and `GF2::inverse (AES)` are
   `spec-only`, covered by `SBoxCorrect` and `SBox_Entries.Lemma_SBox_Entry`;
   `SHA2::Preprocessing::pad` is `subsumed-by` `hash`. `Ch`, `Maj`, Σ, σ are
-  `impl = spec` rows.
-* **72 units, 4231 checks in the default gate: 4231 proved**, 0 justified,
-  0 unproved. Plus one slow unit proved on demand:
-  `foundation_spark-aes-spec-sbox-sbox_entries` (moved out from under
-  `Properties` by PR #79; closure `Types`, `SBox`, `GF2`, `GF28` and the
-  prelude), **2565/2565** at level 4, proved at `283afe5`, fingerprint
-  current. PR #86 (#70) split each row lemma, so pgcd's steps no longer
-  carry the 256-entry `SBox` table. That took the proof from 1148 s to 493 s
-  on `foundation` (`-j6`, idle pool), and the cold CI run from 1h40m47s to
-  28m24s. The cost was never gnat2why, which takes 3 s: it was gnatwhy3's
-  per-goal transformations, 3404 s of CPU before and 1015 s after. `alire.toml` is now in every slow fingerprint, and
-  `slow_proofs.py refresh FILE` records an input-only change without
-  re-proving, when the new input is unchanged since the proof.
+  `impl = spec` rows. (On hex `board.py` says 0 of 40: it has no FFI log,
+  since hex has no Cryptol.)
+* **72 units, 4264 checks in the default gate: 4264 proved**, 0 justified,
+  0 unproved (4231 before PR #111: `Lemma_Prefix_Extends` and the prelude
+  instances). Plus one slow unit proved on demand:
+  `foundation_spark-aes-spec-sbox-sbox_entries`, **2565/2565** at level 4,
+  proved at `283afe5`, fingerprint current (#111 changed none of its
+  inputs). About 28 min cold in CI; 493 s on `foundation` at `-j6`.
 * **Holes:** 0 assumes, 0 justifications, 0 `SPARK_Mode Off`, 0 warning
   suppressions, 0 check suppressions. **23 foreign bindings** (the FFI
-  export units, each justified in `spark/scripts/trust-surface.txt`; #83
-  added the prelude's shim and exports).
-* **FFI:** 147 properties, all passing (`spark/cryptol/properties.txt`):
-  the 119 of 2026-10-19, 22 for the Cryptol prelude against Cryptol's
-  built-ins (#83), and 6 for the constant-time S-box leaves, three at
-  `:exhaust` 256 (#84). CI FFI job about 11–15 min.
-* **Constant time (#50, PR #84):** AES's S-box is a bitsliced Boyar–Peralta
-  circuit, proved equal to the tables. `scripts/check-ct.sh`:
-  * the object-code check finds 0 violations on aarch64 (re-run by the
-    orchestrator);
-  * dudect max |t| is at most 2.1 on aarch64 (17.6 before);
-  * cost on aarch64 at `-O3`: AES-128 encrypt 1.64×, decrypt 1.42×,
-    `Expand_Key` 2.9×.
-
-  **x86_64 (PR #90, not merged):** object-code check 0 violations; Valgrind
-  `ct_grind` 0 errors, its control failing; dudect max |t| ≤ 2.3 (1M–2M
-  samples). The table S-box (`b967ebb`) is flagged by all three: 86
-  object-code violations, 1855 Memcheck errors (incl. `sub_byte`), |t| > 4.5
-  in 10 of 15 runs. Cost at `-O3`: encrypt 1.64×, decrypt 1.54×,
-  `Expand_Key` 1.9–2.1×. Valgrind on aarch64 is not done (`foundation` has
-  none), as #84 allowed.
-* **SAW: current.** `results.txt` (recorded at `5bf56ac`): **2890 proved**,
-  implementation 90 (24 lax) and spec layer 2800 (AES 1137, 768 of them
-  exhaustive; SHA-256 + HMAC 1663, 1396 lax); 20 negative controls fail with
-  a counterexample; 3543 s. `results-long.txt` (`SAW_LONG=1`, at `babab6f`):
-  3672 proved (spec 3582, 2178 lax), 7819 s. Rows with a SAW result of their
-  own: spec 36 of 40, impl 28 of 37 (`board.py` counts the AES `Dispatch`
-  rows through their instances since #92). `AES.Impl.Main.Encrypt`/`Decrypt`
-  have none (#67 documents why). GNAT Pro 27 LLVM 21.1.8, SAW 1.6.
+  export units, each justified in `spark/scripts/trust-surface.txt`).
+* **FFI:** 147 properties, all passing in CI on PR #111's head
+  (`spark/cryptol/properties.txt`). CI FFI job about 11–16 min.
+* **Coverage (#49, PR #55):** under the FFI properties, 300/303 statements,
+  13/14 decisions, 14/17 MC/DC, every gap explained
+  (`spark/coverage/explained.txt`). Measured before the constant-time
+  S-box; the CI Coverage job is green on every PR since, so the gaps are
+  still all explained, but the numbers need re-running (#104).
+* **Constant time (#50, closed):** AES's S-box is a bitsliced
+  Boyar–Peralta circuit, proved equal to the tables. On aarch64 and x86_64
+  the object-code check finds 0 violations; dudect max |t| ≤ 2.3; x86_64
+  Valgrind `ct_grind` 0 errors. Cost at `-O3`: encrypt 1.64×, decrypt
+  1.42–1.54×, `Expand_Key` 1.9–2.9×. **Left out of the blog post** (Tony).
+* **SAW: STALE.** Last records: `results.txt` at `5bf56ac`, **2890 proved**
+  (implementation 90, 24 lax; spec layer 2800: AES 1137, SHA-256 + HMAC
+  1663), 20 negative controls fail, 3543 s; `results-long.txt` at
+  `babab6f`, 3672 proved, 7819 s. PR #111 changed `sha2.ads`,
+  `sha2-main.ads`, `hmac.ads`, `hmac-sha256_impl.adb` and
+  `aes-spec-cipher.ads`; the re-record's changes are listed on #99.
+  GNAT Pro 27 LLVM 21.1.8, SAW 1.6.
 
 ## The issues
 
@@ -109,131 +90,100 @@ unchanged since `1140824`; SAW recorded at `5bf56ac` and `babab6f`):
 | **#13** E2 SHA-256 | #14 #15 #16 #17 | all closed |
 | **#18** E3 HMAC-SHA-256 | #19 #20 | all closed |
 | **#21** E4 SAW | #22 #23 #24 #59 | all closed |
-| **#48** E5 assurance beyond the proofs | #49 M5.1 coverage · #50 M5.2 constant time · #51 M5.3 binaries and performance | #49 closed; #50 waits on PR #90; #51 open |
-| review of 2026-10-20 | #67 board kinds, SAW scope, docs · #68 AES `Bit_Index` · #69 SAW spec-layer cost · #70 cheaper SBoxCorrect · #72 SPARKlib · #73 AES spec feedback · #74 generic spike · #75 Cryptol prelude · #80 generic AES | #68 #69 #70 #72 #73 #74 #80 closed; #67 item 11 header left; #75 inline statements + prelude SAW left |
-| IOD session 2026-10-21/22 | #95 SAW record inputs (`saw/experiments/`, `admit`) | closed (PR #96) |
+| **#48** E5 assurance beyond the proofs | #49 coverage · #50 constant time · #51 binaries and performance (AES only) | #49 #50 closed; #51 open |
+| review of 2026-10-20 | #67 … #80 | all closed but #67 (item 11) and #75 (item 3, four AES statements) |
+| IOD session 2026-10-21/22 | #95 #99 #100 | #95 #100 closed; #99 open (IOD) |
+| **#102** blog post (2026-10-22) | #103 docs · #104 mutation testing · #105 fork history · #51 · #75 · #99 | all open |
+| hex move (2026-10-22) | #107 scripts on macOS · #110 `check-saw.sh` on macOS | #107 closed; #110 open (IOD) |
+| other | #106 effort analysis | open |
 
 ## Next
 
-Done on 2026-10-21/22 on the x86_64 IOD, all SAW, in
-one line of PRs:
-* **#68** (PR #89, closed): the impl layer re-proved, 90 (87 + the
-  constant-time S-box's `sbox_lanes`, `inv_sbox_lanes`, `sub_word`); 8 impl
-  negative controls fail. GNAT Pro 27 rejected the Pure `Dispatch` withing
-  the instances: `with Pure` on `AES128/192/256` (FSF 16.1 accepts both;
-  re-proved 195/195). Read from the IR: `bits_BOUNDS` is `{i16, i16}`; no
-  `i128` GEP in the AES spec module. `check-saw.sh` gained
-  `SAW_LAYERS=all|impl|spec` (one layer only with `--print`).
-* **#75's SAW half** (PR #92): the spec layer re-proved (#80, #83, #85's
-  edits). Departures from the plan's assumptions: `Split_Key` returns by
-  value at every k; fold slice bounds are a read-only constant global in
-  `Cipher` but writable in the inverse folds (`foldl_take_contract`'s `ro`
-  flag); `Join_Block` needs the secondary-stack setup, with a high-water
-  mark bounded by the chunk (signed compare); the AES spec count rose 54
-  (108 `Foldl_Take` lemmas where the per-M ones were 42). #83 needed no
-  edits.
-* **#67 item 3** (PR #93): SAW proves `Parse` on its own,
-  = ``parse`{32, N}`` at N = 1, 2 (and 3, 4 long), with a negative control.
-  `Hash` still executes `Parse` (its input sits at a `Pad`-dependent stack
-  base).
-* **#69** (PR #94, closed): why SAW costs 76× more on the spec layer. Write-up
-  `.claude/campaign/measurements/2026-10-22-saw-cost.md`; experiments in
-  `spark/saw/experiments/issue-69/`. Shares of spec proof time: secondary
-  stack 44% (a lemma per stack base: SAW 1.6 places values only at constant
-  offsets); recursion lemmas 33% (needed for the exponential recursions;
-  **linear ones are 10–30× cheaper unfolded**); one byte per bit 23%
-  (packed bits remove 94–97% of it); exhaustive per-byte proofs 7%; null
-  ranges / lax module 2%. Lesson for C-to-SPARK equivalence: cost follows
-  structural distance, not size.
-* **#95** (PR #96, closed): `saw/experiments/` is not a SAW input for
-  `board.py`; `check-saw.sh` refuses `admit`/`assume_unsat`/`assume_valid`
-  outside `saw/experiments/`. Both records re-run, identical results.
-* **#50's IOD half** (PR #90, **open**): see the board. `check-ct-asm.py`
-  skips x86 prefix words (`data16`, `notrack`, `bnd`, ...) and counts
-  `loop*` as branches; Valgrind joins the bootstrap prereqs.
+**The goal is the blog post (#102).** Tony writes it by hand; Claude
+supplies bullets, data, code snippets and the figure's content, on request,
+and never drafts it. A `/campaign` run never takes #102 as a writing task.
 
-**Order from here:**
+**The order** (A → B: A first):
 
-1. **Merge the bootstrap `--no-proof` / scrub PR** once its bootstrap jobs
-   are green, then rebase and merge **#90** (closes #50).
-2. **#51** (M5.3 binaries and performance): aarch64 on `foundation`, x86_64
-   on the next IOD (needs a Rust toolchain and an idle machine; not started).
-3. **#100** (bootstrap uses present tools): any machine; its CI is the
-   bootstrap workflow.
-4. **#99** (unfold SAW's linear recursions): the next IOD; a re-record
-   follows.
-5. **#67 item 11**: the "re-proved properties are optional" header in the
-   generated `sbox_entries.ads` means changing `gen-sbox-entries.py` and
-   re-proving the slow unit (about 30 min cold): a `foundation` job.
-6. **#75's remainder**: the five inline statements (each measured; cause not
-   isolated) and the prelude's own SAW proofs (item 3), the latter on an IOD.
-7. **Obtain vs. check analysis** (Tony, another session): data in
-   `.claude/campaign/effort/` (PR #98); extend it with the `foundation`
-   sessions' transcripts.
+```
+#105 decision (Tony) ───────────────────────────────────────────────────┐
+#104a mutants: FFI + gnatprove (hex, needs Cryptol) ─┐                   │
+#51a  AES perf, aarch64 (hex, needs Rust, idle) ─────┤                   │
+                          IOD session ◄──────────────┘                   │
+                            #99 unfold linear recursions                 │
+                            #110 check-saw.sh portable                   │
+                            #75 item 3, prelude SAW proofs               │
+                            check-saw: relative runtime path (#105)      │
+                            SAW re-record, default + long, once          │
+                            #104 SAW column · #51b AES perf, x86_64      │
+                          ──► #103 docs ──► #102 data ──► tag, clean FSF repro ──► publish
+#106 effort analysis: independent; add the IOD session's transcript to it
+```
 
-Small items: none open. Settled on 2026-10-20 (Tony):
-* **Dropped:** Pro-27 proof repair (the crate stays on FSF 16.1; Pro 27's 4
-  failures and 3 timeouts, listed in the measurements file, are known and
-  accepted); x86_64 proof margins (the gate proves on arm64); the
-  scheduler inside `prove.sh` (the scheduler is an internal tool, not part of
-  this repository); the FFI job's 14 min on #52 (runner noise: identical
-  code runs in about 8–10 or 14–15 min, the property step alone doubling,
-  e.g. PR #65 at 7m35s, 14m34s, 9m27s; do not chase it again).
-* **Already done:** the bootstrap workflow's path filter (it triggers only on
-  the bootstrap script, the pins and the workflow).
-* **Into issues:** `board.py`'s SAW column, board row kinds and SAW's
-  unproved pieces → #67; one bit-sequence type → dropped by #68 (AES and
-  SHA-2 keep different index types on purpose); why SAW of the spec layer is harder
-  → #69; a cheaper SBoxCorrect → #70; gnatcov in the bootstrap → #51.
+**Doable on hex now, waiting on Tony:**
+1. **#105**: accept the history, or rewrite plus a GitHub Support purge
+   (options on the issue; the 60 PR refs cannot be force-pushed).
+2. **#104 and #51** need Cryptol (with FFI) and Rust installed on hex;
+   Tony has not yet said yes. #51's benchmarks want an idle machine, so run
+   them last.
+3. **#106** needs the `foundation` container's session transcripts.
+4. **#67 item 11**: fold into #103 and close #67 (proposed, not yet
+   answered).
+
+**The IOD session** (Tony builds one; it dies 24 h after start, so **upload
+the session to memcp before then**): everything under "IOD session" above,
+in one line of PRs, one re-record.
+
+**Then #103** (the README rewrite and in-repo walkthroughs), which needs the
+final numbers, then data for #102 as Tony asks.
+
+Not in the post (Tony, 2026-10-22): constant time; offering the work to NSA
+(undecided; possibly after GNAT-LLVM is in the community release).
 
 Not yet, and not filed:
-* A T-table AES (only if speed matters; M5.3 will say).
-* `FinalBits` for SHA-256 (trailing partial byte): cheap, since the padding
-  lemma already covers every bit length.
-* SHA-224/384/512 instances of the E2 generic.
-* HMAC with truncated output (λ < 256).
+* A T-table AES (only if speed matters; #51 will say).
+* `FinalBits` for SHA-256; SHA-224/384/512 instances; truncated HMAC.
+* The four AES statements still inline (`pmod`, GF2 `pmult` [9], `pdiv`,
+  `Types.Split`/`Join`): each sits in `SBox_Entries`' closure (PR #111
+  says what each would need).
 
 ## Machines
 
-* **`foundation`**: an aarch64 Linux container on niss, 11 CPUs, long-lived.
-  Main checkout `/work/Foundation`. alr 2.1.1, gnatprove FSF 16.1.0,
-  gprbuild 26.0.1, on an interactive shell's PATH only. **A tick's or the
-  orchestrator's shell has none of them**: pass
-  `env PATH=/home/tony/Software/alr/bin:~/.local/share/alire/toolchains/gnat_native_16.1.0_*/bin:~/.local/share/alire/toolchains/gprbuild_*/bin:~/.local/share/alire/releases/gnatprove_16.1.0_*/bin:$PATH`.
-  GNAT's own `objdump` is in the gnat_native bin; there is no system
-  `objdump`, `gdb` or Valgrind. Cryptol 3.6.0 built from source with FFI
-  (`~/.local/bin/cryptol`; headers in `~/.local/sysroot`). **No system C
-  toolchain**: GNAT's gcc is the only one. No SAW, no GNAT-LLVM (neither
-  exists for aarch64 Linux). `/tmp` is a ramfs. `spark-scheduler` pool of 10.
+* **hex** (since 2026-10-22): Tony's arm64 Mac, macOS, 10 CPUs, BSD
+  userland, bash 3.2. Main checkout under `~/Local/repos/`.
+  alr 2.1.1 at `~/Local/Software/alr/bin/alr`, gnatprove FSF 16.1.0 in
+  `~/.alire/bin`, gnat_native 16.1.0 and gprbuild 26.0.1 as alr's default
+  toolchain; **none on PATH**: give a tick
+  `PATH=$HOME/Local/Software/alr/bin:$HOME/.alire/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin`
+  (written out in full: the scheduler's child does not expand `~`).
+  `spark-scheduler` pool of 8, key prefix `hex|`. **Prove with
+  `FOUNDATION_SPARK_PROOF_ALLOWANCE=ci`**: at the local default (5 s at
+  level 2) three `aes-lemmas` checks time out under load. **No Cryptol, Rust,
+  gnatcov, Valgrind or SAW** (yet): CI runs the FFI and coverage. Whole-crate
+  gate: about 550 s cold at `-j8`. hex is also Tony's desktop: never
+  idle, so benchmarks go last or elsewhere.
+* **`foundation`** (retired 2026-10-22): the aarch64 Linux container on
+  niss where E0–E3 and the reviews ran. Its session transcripts are needed
+  for #106.
 * **The x86_64 IOD**: dies 24 hours after it starts. **8 CPUs, 15.7 GB RAM,
-  no swap; the request has no memory option** (Tony checked). Bootstrap with
-  `spark/scripts/bootstrap-x86_64.sh` (PR #46) on a bare image; it fetches
-  the pinned llvm-link and, when `GNAT_LLVM_DIR` names a GNAT Pro LLVM
-  install, records it. No scheduler: gnatprove with `PROVE_JOBS=$(nproc)`.
-  **Push after every commit.** Needs root or passwordless sudo only if the
-  image lacks the apt prerequisites the script names.
-  The IOD comes with a GNAT Pro 27 install (GNAT Pro, SPARK Pro and GNAT
-  Pro's LLVM back end). On 2026-10-21 it was set up by
-  `FOUNDATION_TOOLS=<tools dir> bootstrap-x86_64.sh --no-checks` (65 s;
-  passwordless sudo), **without** `GNAT_LLVM_DIR`, then two lines added to
-  the tools directory's `env.sh` by hand: `GNAT_LLVM_DIR` (GNAT Pro's LLVM
-  back end, holding `bin/llvm-gcc`) and `LLVM_LINK_DIR`. The GNAT Pro 27
-  install provides a matching `llvm-link` (21.1.8), so the LLVM tarball is
-  not needed. **The concrete paths are not in this repository** (it is
-  public): they are in memcp (session of 2026-10-21/22). Valgrind 3.22 by
-  apt (in the bootstrap since PR #90). A default SAW record takes about
-  60 min, the long one about 130 min, on one core.
-* **niss** (the host of `foundation`, M5 Pro, 64 GB): the fallback if a SAW
-  proof ever needs more than the IOD's memory. SAW ships for macOS arm64 (not
-  aarch64 Linux), so that would mean compiling and linking on the IOD and
-  verifying on niss's macOS host. Not needed so far: every SAW proof runs in
-  under 1 GB once composed.
+  no swap.** Bootstrap with `spark/scripts/bootstrap-x86_64.sh`: since #100
+  it uses each tool already present at its pin and fetches the rest. The IOD
+  comes with GNAT Pro 27 (GNAT Pro, SPARK Pro and the LLVM back end); point
+  `GNAT_LLVM_DIR` and `LLVM_LINK_DIR` at it in the tools' `env.sh`. **The
+  concrete paths are not in this repository** (it is public): they are in
+  memcp (session of 2026-10-21/22). A default SAW record takes about 60 min,
+  the long one about 130 min, on one core. **Push after every commit, and
+  upload the session to memcp before the instance dies** (one was reaped
+  with its session on it).
+* **niss** (M5 Pro, 64 GB): the fallback if a SAW proof ever needs more
+  memory than the IOD has. SAW ships for macOS arm64, so that would mean
+  bitcode on the IOD and SAW on a Mac. Not needed so far.
 
 ## How the ticks run
 
 * The `campaign` skill's procedure holds, with `agent-brief.md`.
 * **Parallel ticks** are fine; each proves through the scheduler on
-  `foundation`. Parallel ticks are siblings; restack into one line before
+  hex. Parallel ticks are siblings; restack into one line before
   merging.
 * **The orchestrator merges** verified PRs, bottom up, merge commits,
   retargeting each to `main` first.
@@ -297,10 +247,11 @@ Not yet, and not filed:
     only where needed.
   * **A spec body uses the prelude, unless an instance form costs a
     proof.** Then the statement stays inline, word for word the prelude's,
-    with the reason in its comment. Five such statements remain (listed in
-    "Next").
+    with the reason in its comment. Four remain, all AES, all in
+    `SBox_Entries`' closure (PR #111 isolated and fixed the other four:
+    an extra definition layer, a guarded postcondition; see the README).
 * **SAW waits for one IOD session** (Tony, 2026-10-20): spec and
-  implementation changes land on `foundation` first, each PR editing its
+  implementation changes land on hex (formerly `foundation`) first, each PR editing its
   SAW contracts and saying they are unverified. One IOD session then
   confirms them all. (Done for #68–#85 on 2026-10-21/22.)
 * **SHA-2 generality.** A generic mirroring `SHA2::Main`, instantiated for
@@ -397,18 +348,25 @@ Not yet, and not filed:
   per-index overrides (#59 discussion, 2026-10-19). #69 measured that the
   linear recursions are 10–30× cheaper for SAW unfolded: #99 changes that
   (decision above).
+* **The blog post** (Tony, 2026-10-22, #102): Tony writes it; Claude
+  provides bullets, data, snippets and the figure's content only. It has a
+  "what we used, and what the results rest on" section. Performance is AES
+  only (no reference SHA-256/HMAC). Constant time and upstreaming stay out.
+  A tag and a clean-machine FSF reproduction come after the post is written.
+* **Coverage is not the argument against FFI-only testing**: it is near
+  100%. Mutation testing (#104) is.
 * **Plan location.** This file. There is one `PLAN.md`; its history is git's.
 
 ## Open for Tony
 
-* **Rewrite the fork's history** (Tony, 2026-10-22, from another session).
-  The fork is public, and its history (and two SAW-input files that cannot
-  change without a SAW re-record: `spark/scripts/check-saw.sh`'s comment
-  example and the results files' `runtime` line) still holds internal host
-  names, install paths and toolchain package names. Forward commits (PR #97,
-  PR #98, the bootstrap/scrub PR) and edited PR bodies removed the rest. The
-  list of patterns is in memcp (session of 2026-10-21/22). Tony does the
-  `git filter-repo` and force-push.
+* **The fork's history (#105)**: reviewed 2026-10-22 (comment on #105):
+  30 distinct lines in 31 files; commit messages clean; two places at the
+  tip are SAW inputs (fixed in the IOD re-record). The 60 GitHub PR refs
+  cannot be force-pushed: a rewrite needs a GitHub Support purge to matter.
+  Accept, or rewrite + Support. Patterns in memcp (summary 1267).
+* **Installing Cryptol (FFI) and Rust on hex**, for #104 and #51.
+* **The `foundation` transcripts**, for #106.
+* **#67 item 11**: fold into #103 and close #67?
 * **crucible-llvm and wide GEP indices**: optional (draft in PR #65).
 * **The constant-time S-box's cost** (#50): aarch64 encrypt 1.64×, decrypt
   1.42×, `Expand_Key` 2.9×; x86_64 1.64×, 1.54×, 1.9–2.1× (PR #90). Accept
@@ -422,8 +380,6 @@ Not yet, and not filed:
 * **`SBox_Entries` and the default gate.** 28m24s cold in CI against a
   30 min job timeout. Levers measured, not applied: one inverse lemma per
   byte (about 20%); Z3 alone (a `--prover` level-policy change).
-* **A tick changed global Alire state** on `foundation` (2026-10-20). Check
-  `~/.config/alire`.
 * **The IOD's global `~/.claude/CLAUDE.md`** is a mempalace leftover; Tony
   said to ignore it (use memcp). Delete it on the next image if wanted.
 * **memcp's SessionStart hook** injected no surface on the IOD, and `hex`'s
@@ -434,22 +390,23 @@ Not yet, and not filed:
 
 * **The auto-mode permission classifier** blocks wrapper commands it has no
   allow rule for (`spark-scheduler run ... -- env ...`), and then grows
-  suspicious of nearby commands. `.claude/settings.local.json` on `foundation`
-  (untracked, Tony's) allows `spark-scheduler run/status`,
+  suspicious of nearby commands. `.claude/settings.local.json`
+  (untracked, Tony's) allowed, on `foundation`; hex has none, and so far
+  has not needed one. The rules were: `spark-scheduler run/status`,
   `[spark/]scripts/prove.sh`, `[spark/]scripts/check-*.sh`,
   `python3 [spark/]scripts/board.py`. Start commands with those prefixes.
   The classifier refuses to let the orchestrator edit settings itself.
 * **A fresh worktree has no Alire workspace**: `alr -n build` in its
   `spark/` before any proof, or gnatprove fails at once with "imported
   project file config/foundation_spark_config.gpr not found" (`alr -n
-  exec` does not generate it; re-checked after #72). On `foundation`, `alr`
-  is `~/Software/alr/bin/alr` and the toolchain comes from
-  `~/Software/null_crate`'s `alr printenv`; neither is on a tick's `PATH`
-  by default.
+  exec` does not generate it; re-checked after #72). On hex, see
+  "Machines" for the PATH a tick needs.
 * **Moving a spec body behind a prelude instance can time out an
-  implementation lemma**, even with the same formula (#83, #85). Five cases
-  are known and none is explained. Bisect primitive by primitive against
-  the implementation lemmas: it takes about 1–2 min per unit. Restating GF2
+  implementation lemma**, even with the same formula (#83, #85). PR #111
+  explained four: one more definition between a term and its arithmetic
+  (CVC5 3831 → 52939 steps), and a precondition-guarded `'Last`
+  postcondition in context. Diagnose by diffing the saved VCs
+  (`--debug-save-vcs`) with and without the instance. Restating GF2
   can also blow up `SBox_Entries`: GF2's `pmult` via the prelude ran past
   77 min for 9 of its 32 subprograms.
 * **gnatprove warns on a `Subprogram_Variant` of a function that no longer
@@ -458,16 +415,19 @@ Not yet, and not filed:
   instance's expression function crashes the compiler; read a constant
   instead. A Pure library-level instance needs a static actual, so its
   subtype needs a `Static_Predicate`.
-* **A hand re-run replays cached proofs** (about 2 s); `prove.sh` refuses
-  `-f`. CI's run is the cold one.
+* **A hand re-run replays cached proofs** (seconds); `prove.sh` refuses
+  `-f` (its freshness guard forces per unit). CI's run is the cold one.
+* **hex is macOS**: scripts must run under BSD awk/sed and bash 3.2 (#107
+  fixed the proof and FFI scripts; `check-saw.sh` is #110). XProtect and
+  Tony's own work load the machine: load averages near 20 are normal
+  during a `-j8` proof.
 * **gnatdoc 26 crashes** on: `declare` expressions; a line break right after
   `for X in A .. B =>` in an aggregate; an iterated aggregate nested in
   another expression; package renamings; `is` alone on its line before an
   iterated aggregate; a private-part expression function whose quantified
   expression breaks after `=>`. It rejects `@formal` on generic-subprogram
-  formals. gnatdoc is not on PATH on `foundation` (a copy lives in a
-  session scratchpad; the CI action installs it).
-* **gnat1 16.1 (aarch64) crashes** (`Storage_Error`) on an iterated aggregate
+  formals.
+* **gnat1 16.1 (aarch64 Linux) crashes** (`Storage_Error`) on an iterated aggregate
   over a 64- or 128-bit index range written `[for N in T range A .. B => …]`;
   use `[for N in Subtype'Range => …]`.
 * **The provers do not treat Ada array `=` as equality.** Extensionality and
@@ -496,7 +456,8 @@ Not yet, and not filed:
   controls outside the proof's uninterpreted vocabulary can run for minutes.
 * **`gh pr checks` skips the bootstrap workflow** unless the bootstrap script
   or pins change; when they do, it adds 35–50 min per job, and (since
-  #84/#85) it fails on six x86_64 timeouts ("Open for Tony").
+  #84/#85) it runs with `--no-proof` (decision above); since #100 each job runs the
+  script twice, to check that a second run fetches nothing.
 * **On the IOD, source the tools' `env.sh` in every shell.**
   Without it GNAT Pro 27's `gnatprove`, `gcc` and `gprbuild` are first on
   PATH: builds use Pro 27, and `board.py` reports `SBox_Entries` falsely
@@ -534,5 +495,3 @@ Not yet, and not filed:
   of names need splitting.
 * **`gh pr create` on a fork** defaults to the upstream. Always
   `--repo manthonyaiello/Foundation`.
-* **Subagent reports call `foundation` "hex"** out of habit: the numbers are
-  from `foundation`.
