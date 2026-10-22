@@ -233,6 +233,10 @@ fi
 #
 # A listed slow unit is not in TRACKED_UNITS here: this run does not prove it,
 # so neither rule applies to it (prove-slow.sh checks its own run).
+#
+# The two unit lists reach awk through ENVIRON, not -v: BSD awk (macOS)
+# rejects a -v value with a newline in it ("newline in string"), and POSIX
+# leaves the escape processing of -v values to each awk (#107).
 TRACKED_UNITS="$(git ls-files -- src | grep -E '^src/.+\.(ads|adb)$' \
   | sed -E 's#^.*/##; s/\.(ads|adb)$//' | sort -u \
   | { if [ -n "$SLOW_UNITS" ]; then grep -vxF "$SLOW_UNITS"; else cat; fi; } || true)"
@@ -243,9 +247,9 @@ OFF_UNITS="$(
   | sort -u
 )"
 SKIPPED="$(
-  awk -v tracked="$TRACKED_UNITS" -v off="$OFF_UNITS" '
-    BEGIN { n = split(tracked, t, "\n"); for (i = 1; i <= n; i++) T[t[i]] = 1
-            n = split(off, o, "\n");     for (i = 1; i <= n; i++) O[o[i]] = 1 }
+  CHECK_PROOF_TRACKED="$TRACKED_UNITS" CHECK_PROOF_OFF="$OFF_UNITS" awk '
+    BEGIN { n = split(ENVIRON["CHECK_PROOF_TRACKED"], t, "\n"); for (i = 1; i <= n; i++) T[t[i]] = 1
+            n = split(ENVIRON["CHECK_PROOF_OFF"], o, "\n");     for (i = 1; i <= n; i++) O[o[i]] = 1 }
     /^in unit / {
       unit = $3; sub(/,$/, "", unit)
       # "0 out of 0" is a generic unit: it is analyzed through its instances.

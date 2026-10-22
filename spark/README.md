@@ -52,7 +52,8 @@ CI's proof gate alike. It runs, from `spark/`:
 alr -n exec -- gnatprove -P foundation_spark.gpr -j$PROVE_JOBS [-u FILE ...] [ARGS after --] $GNATPROVE_EXTRA
 ```
 
-`PROVE_JOBS` defaults to `nproc`; set it on a shared machine. `alr -n exec`
+`PROVE_JOBS` defaults to `nproc` (`getconf _NPROCESSORS_ONLN` where there is
+no `nproc`, as on macOS); set it on a shared machine. `alr -n exec`
 runs gnatprove in the crate's Alire environment (the toolchain Alire
 selected, on `PATH`). The project `with`s
 `config/foundation_spark_config.gpr`, which Alire generates from
@@ -109,6 +110,13 @@ CI's allowance is now `FOUNDATION_SPARK_PROOF_ALLOWANCE=ci` (set in
 explicit timeout of max (the level's own, 10 s): 10 s at level 2, 20 s at
 level 3, 60 s at level 4. A raised level is never shortened. Locally (the
 default, `none`) a level is just the level.
+
+**The local default is marginal on a loaded machine.** Level 2's 5 s leaves
+little room: on 2026-10-22, on macOS arm64 under load, the three
+`AddRoundKey` assertions in `foundation_spark-aes-lemmas.adb` (lines 74, 93
+and 115) timed out at 5 s, and proved under
+`FOUNDATION_SPARK_PROOF_ALLOWANCE=ci`, the gate's 10 s. To reproduce the gate
+locally, set it.
 
 ## The board
 
