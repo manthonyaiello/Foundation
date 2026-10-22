@@ -441,9 +441,7 @@ KILLED_BY_CAP=137  # 128 + SIGKILL: what a scope killed by its MemoryMax returns
 
 run_saw() {  # run_saw FILE LOG: saw FILE from saw/, capped, its output in LOG; returns saw's status
   local status=0
-  # CAP is empty where systemd-run is not (macOS); the + form keeps bash 3.2
-  # from calling the empty array unbound under set -u.
-  (cd "$SAW_DIR" && "${CAP[@]+"${CAP[@]}"}" saw "$1") > "$2" 2>&1 || status=$?
+  (cd "$SAW_DIR" && "${CAP[@]}" saw "$1") > "$2" 2>&1 || status=$?
   if [ "$status" -eq "$KILLED_BY_CAP" ] && [ "${#CAP[@]}" -gt 0 ]; then
     echo "!! KILLED (SIGKILL): saw $1 reached the memory cap ($SAW_MEMORY_MAX)" >> "$2"
   fi
@@ -532,8 +530,7 @@ T_TOTAL=$(( $(date +%s) - T0 ))
 
 # --- 5. the record --------------------------------------------------------------------------
 
-# sha256sum is GNU coreutils; macOS has shasum (and sha256sum only from 14 on).
-sha() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
+sha() { sha256sum "$1" | cut -d' ' -f1; }
 
 record() {
   echo "# saw/${RESULTS##*/} -- written by scripts/check-saw.sh; do not edit."
@@ -546,7 +543,7 @@ record() {
   echo
   echo "commit      $COMMIT$DIRTY"
   echo "date        $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "host        $(uname -m), $(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN) CPUs"
+  echo "host        $(uname -m), $(nproc) CPUs"
   echo "llvm-gcc    $V_LLVM_GCC"
   echo "llvm        $V_LLVM"
   echo "llvm-link   $V_LLVM_LINK ($LLVM_LINK_TARBALL, sha256 $LLVM_LINK_SHA256)"
