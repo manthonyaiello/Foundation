@@ -2,8 +2,23 @@
 # A saw that records its own wall-clock and peak RSS (/usr/bin/time -v)
 # in $SAW_TIME_LOG, appending, then behaves as saw. For measuring
 # check-saw.sh's runs per script without changing the script.
+#
+# The real saw is the first one on PATH that is not this shim (put this
+# directory first on PATH to use it).
+self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
+real=""
+IFS=: read -r -a dirs <<< "$PATH"
+for d in "${dirs[@]}"; do
+  [ -n "$d" ] || continue
+  c="$d/saw"
+  [ -f "$c" ] && [ -x "$c" ] || continue
+  [ "$(cd "$d" && pwd -P)/saw" = "$self" ] && continue
+  real="$c"
+  break
+done
+[ -n "$real" ] || { echo "time-shim/saw: no other saw on PATH" >&2; exit 127; }
 if [ "${1:-}" = "--version" ] || [ -z "${SAW_TIME_LOG:-}" ]; then
-  exec /it/foundation-tools/saw-1.6/bin/saw "$@"
+  exec "$real" "$@"
 fi
 echo "== saw $* (cwd $PWD)" >> "$SAW_TIME_LOG"
-exec /usr/bin/time -v -a -o "$SAW_TIME_LOG" /it/foundation-tools/saw-1.6/bin/saw "$@"
+exec /usr/bin/time -v -a -o "$SAW_TIME_LOG" "$real" "$@"

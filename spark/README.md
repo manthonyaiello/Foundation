@@ -1039,7 +1039,7 @@ timed at the end of the run:
 | `saw` | SAW 1.6, `ubuntu-24.04-X64-with-solvers` release |
 | `gnat-llvm` | checks the GNAT Pro LLVM install that `GNAT_LLVM_DIR` names (nothing of it is downloaded), installs `llvm-link` from LLVM's own 21.1.8 release (2 GB tarball, sha256 checked, `bin/llvm-link` alone extracted), and writes `GNAT_LLVM_DIR` and `LLVM_LINK_DIR` to `env.sh`; skipped, with a note, when `GNAT_LLVM_DIR` is unset ("SAW") |
 | `build` | `alr -n build` |
-| `proof` | `scripts/check-proof.sh`, slow units skipped as in CI ("Slow proofs"), under CI's allowance (`FOUNDATION_SPARK_PROOF_ALLOWANCE=ci` unless set); retried once on failure, and then reported as "ok on retry" |
+| `proof` | `scripts/check-proof.sh`, slow units skipped as in CI ("Slow proofs"), under CI's allowance (`FOUNDATION_SPARK_PROOF_ALLOWANCE=ci` unless set); retried once on failure, and then reported as "ok on retry"; skipped with `--no-proof` |
 | `ffi` | `scripts/check-ffi.sh` |
 
 Every version and release sha256 comes from `scripts/toolchain-pins.env`,
@@ -1064,7 +1064,17 @@ verifies the `.sig` too.
 The script is tested by `.github/workflows/spark-bootstrap-x86_64.yml`
 (on a PR that touches it, or dispatched): on a bare `ubuntu-24.04` runner
 with no setup action, and in a plain `ubuntu:24.04` container as root,
-which is what measures the packages it must install.
+which is what measures the packages it must install. Both jobs run it with
+`--no-proof`: every phase but `proof` runs, and the phase table reports
+`proof` as skipped.
+
+**The proof gate is arm64 only** (`spark-prove.yml`, on
+`ubuntu-24.04-arm`). x86_64's provers are slower on some goals, and on
+x86_64 six checks run out of time under the committed levels and CI's
+allowance: four in `Foundation_Spark.AES.Lemmas` and the postconditions of
+`Sub_Bytes` and `Inv_Sub_Bytes` in `Foundation_Spark.AES.Impl`. The
+bootstrap's `proof` phase still proves on x86_64 when run without
+`--no-proof`, and reports those six as unproved.
 
 ## Slow proofs
 
@@ -1709,7 +1719,7 @@ may use `admit` on purpose (to time symbolic execution alone). `board.py`
 does not count a change there as a change to SAW's inputs either.
 
 ```console
-$ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install LLVM_LINK_DIR=.../llvm-21.1.8 scripts/check-saw.sh
+$ GNAT_LLVM_DIR=<dir> LLVM_LINK_DIR=<dir> scripts/check-saw.sh   # GNAT Pro's LLVM back end (bin/llvm-gcc); llvm-link 21.1.8
 $ scripts/check-saw.sh --print      # run, print the record, write nothing
 $ SAW_LONG=1 scripts/check-saw.sh   # also the long proofs; writes saw/results-long.txt
 $ SAW_LAYERS=impl scripts/check-saw.sh --print   # one layer only (impl or spec)
