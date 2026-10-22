@@ -37,11 +37,20 @@
 #   proof      scripts/check-proof.sh (the slow units of proof-slow.txt are
 #              skipped, and their recorded proofs checked current, as in CI),
 #              retried once if it fails; the phase says "ok on retry" then.
+#              Skipped with --no-proof.
 #   ffi        scripts/check-ffi.sh.
 #
 # Usage:
 #   bootstrap-x86_64.sh               everything
 #   bootstrap-x86_64.sh --no-checks   tools and clone only (no build/proof/ffi)
+#   bootstrap-x86_64.sh --no-proof    everything but the proof phase (build and
+#                                     ffi still run). CI's bootstrap jobs use
+#                                     it: the proof gate runs on arm64 only,
+#                                     because x86_64's provers are slower on
+#                                     some goals and miss their time limits
+#                                     there (README "Bootstrapping the
+#                                     x86_64 instance"). The phase table
+#                                     shows proof as skipped, with why.
 #
 # Env:
 #   FOUNDATION_TOOLS   where alr, Cryptol and SAW go (default ~/foundation-tools).
@@ -78,12 +87,15 @@ set -euo pipefail
 REMOTE_DEFAULT="https://github.com/manthonyaiello/Foundation.git"
 
 CHECKS=1
-case "${1:-}" in
-  "") ;;
-  --no-checks) CHECKS=0 ;;
-  -h|--help) sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]:-/dev/null}" | sed '$d'; exit 0 ;;
-  *) echo "bootstrap-x86_64.sh: unknown argument: $1" >&2; exit 2 ;;
-esac
+PROOF=1
+for arg in "$@"; do
+  case "$arg" in
+    --no-checks) CHECKS=0 ;;
+    --no-proof) PROOF=0 ;;
+    -h|--help) sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]:-/dev/null}" | sed '$d'; exit 0 ;;
+    *) echo "bootstrap-x86_64.sh: unknown argument: $arg" >&2; exit 2 ;;
+  esac
+done
 
 TOOLS="${FOUNDATION_TOOLS:-$HOME/foundation-tools}"
 REMOTE="${FOUNDATION_REMOTE:-$REMOTE_DEFAULT}"
@@ -114,7 +126,7 @@ die() { printf '!! %s\n' "$*" >&2; exit 1; }
 PHASES=()
 T_START="$(date +%s)"
 
-# shellcheck disable=SC2317  # reached through the EXIT trap
+# shellcheck disable=SC2317,SC2329  # reached through the EXIT trap
 report() {
   local total=$(( $(date +%s) - T_START )) line
   {
@@ -143,7 +155,7 @@ report() {
 # A tool phase that fails stops the run; the report is still printed.
 CURRENT=""
 CURRENT_T0=0
-# shellcheck disable=SC2317  # reached through the EXIT trap
+# shellcheck disable=SC2317,SC2329  # reached through the EXIT trap
 on_exit() {
   local status=$?
   if [ -n "$CURRENT" ]; then
@@ -470,20 +482,28 @@ if [ "$CHECKS" -eq 1 ]; then
   end
 
   begin proof
-  # CI's allowance by default: the instance's speed is unknown, and the
-  # allowance never shortens a committed level (README "Levels").
-  export FOUNDATION_SPARK_PROOF_ALLOWANCE="${FOUNDATION_SPARK_PROOF_ALLOWANCE:-ci}"
-  echo ">> PROVE_JOBS=${PROVE_JOBS:-$(nproc)} FOUNDATION_SPARK_PROOF_ALLOWANCE=$FOUNDATION_SPARK_PROOF_ALLOWANCE"
-  # A cold run proves every goal at once on every core, and a goal near its
-  # time limit can miss it under that load. One retry: gnatprove replays
-  # what proved from its session files, so only the unproved goals run
-  # again, at the same level and limits. The phase says when it took the
-  # retry, so a pass on retry is never reported as a first-time pass.
-  if "$REPO/spark/scripts/check-proof.sh"; then
-    end
+  if [ "$PROOF" -eq 0 ]; then
+    # The proof gate is arm64 only: on x86_64 the provers are slower on some
+    # goals, and six AES checks run out of time (README "Bootstrapping the
+    # x86_64 instance"). Build and ffi still run.
+    echo ">> skipped: --no-proof (the proof gate runs on arm64 only)"
+    end "skipped (--no-proof: proof gate is arm64 only)"
   else
-    log "proof: retrying once (proved goals replay from the session; the rest run again, same limits)"
-    if "$REPO/spark/scripts/check-proof.sh"; then end "ok on retry"; else FAILED=1; end FAILED; fi
+    # CI's allowance by default: the instance's speed is unknown, and the
+    # allowance never shortens a committed level (README "Levels").
+    export FOUNDATION_SPARK_PROOF_ALLOWANCE="${FOUNDATION_SPARK_PROOF_ALLOWANCE:-ci}"
+    echo ">> PROVE_JOBS=${PROVE_JOBS:-$(nproc)} FOUNDATION_SPARK_PROOF_ALLOWANCE=$FOUNDATION_SPARK_PROOF_ALLOWANCE"
+    # A cold run proves every goal at once on every core, and a goal near its
+    # time limit can miss it under that load. One retry: gnatprove replays
+    # what proved from its session files, so only the unproved goals run
+    # again, at the same level and limits. The phase says when it took the
+    # retry, so a pass on retry is never reported as a first-time pass.
+    if "$REPO/spark/scripts/check-proof.sh"; then
+      end
+    else
+      log "proof: retrying once (proved goals replay from the session; the rest run again, same limits)"
+      if "$REPO/spark/scripts/check-proof.sh"; then end "ok on retry"; else FAILED=1; end FAILED; fi
+    fi
   fi
 
   begin ffi

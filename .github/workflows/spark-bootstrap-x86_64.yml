@@ -16,8 +16,12 @@ name: SPARK bootstrap x86_64
 #            instance.
 # lint       shellcheck.
 #
-# Both bootstrap jobs prove with FOUNDATION_SPARK_PROOF_ALLOWANCE=ci (the
-# script's default, and spark-prove.yml's), and cold: no proof cache.
+# Neither bootstrap job proves: both run the script with --no-proof, so its
+# build and ffi phases run and its proof phase is reported as skipped. The
+# gnatprove gate is arm64 only (spark-prove.yml): x86_64's provers are slower
+# on some goals, and six checks of Foundation_Spark.AES.Lemmas and
+# Foundation_Spark.AES.Impl run out of time here (README "Bootstrapping the
+# x86_64 instance").
 on:
   pull_request:
     paths:
@@ -61,37 +65,13 @@ jobs:
             "https://raw.githubusercontent.com/${{ github.repository }}/$FOUNDATION_REF/spark/scripts/bootstrap-x86_64.sh"
 
       - name: Bootstrap
-        run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh"
+        run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh" --no-proof
 
       # The steps below run even when a check of the bootstrap failed: they
       # need only the tools, and they answer questions of their own.
       - name: Bootstrap again (idempotent, no checks)
         if: ${{ !cancelled() }}
         run: bash "$RUNNER_TEMP/bootstrap-x86_64.sh" --no-checks
-
-      # Diagnostic only, and only when the proof gate failed: the three
-      # level-2 checks that run out of time on x86_64 (#46), proved with
-      # more time, to tell what raising their units would buy. It calls
-      # gnatprove directly, because prove.sh rightly refuses --level and
-      # --timeout; its result gates nothing.
-      - name: Diagnose x86_64 proof timeouts (not a gate)
-        if: ${{ failure() }}
-        continue-on-error: true
-        working-directory: /home/runner/Foundation/spark
-        run: |
-          . "$HOME/foundation-tools/env.sh"
-          for sw in "--level=2 --timeout=60" "--level=3 --timeout=60" "--level=4 --timeout=120"; do
-            echo "== $sw"
-            t0=$(date +%s)
-            # shellcheck disable=SC2086
-            alr -n exec -- gnatprove -P foundation_spark.gpr -j4 -f $sw \
-              -u foundation_spark-aes-spec-properties.ads \
-              -u foundation_spark-hmac-sha256_impl.adb \
-              --report=fail > diag.log 2>&1 || true
-            grep -E '(medium|high|low):|^Summary' diag.log || true
-            grep -E '^Total' obj/*/gnatprove/gnatprove.out || true
-            echo "== $sw: $(( $(date +%s) - t0 ))s"
-          done
 
       # Two of NSA's small AES SAW scripts, both `rme` proofs: SAW 1.6 runs,
       # and the repository's SAW scripts load and prove under it. Not the
@@ -149,7 +129,7 @@ jobs:
           ref: ${{ env.FOUNDATION_REF }}
 
       - name: Bootstrap
-        run: bash spark/scripts/bootstrap-x86_64.sh
+        run: bash spark/scripts/bootstrap-x86_64.sh --no-proof
 
       - name: Upload logs
         if: always()
