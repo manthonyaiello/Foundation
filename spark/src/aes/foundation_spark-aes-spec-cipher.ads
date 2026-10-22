@@ -18,11 +18,11 @@
 --    Its lists of round keys are Round_Keys of any length, as foldl takes
 --    any [n]. The prelude's fold recurses from the last element, as the
 --    implementation's loops run (see Folds);
---  * reverse, in InvCipher and InvCipher', stays inline (Reverse_Keys
---    says why).
+--  * reverse, in InvCipher and InvCipher', is Sequences' Reverse_Of.
 
 with Foundation_Spark.Cryptol.Bulk_Indexing;
 with Foundation_Spark.Cryptol.Folds;
+with Foundation_Spark.Cryptol.Sequences;
 with Foundation_Spark.AES.Spec.GF28;
 with Foundation_Spark.AES.Spec.SBox;
 with Foundation_Spark.AES.Spec.Types;
@@ -233,15 +233,16 @@ is
    --  @param Xs The round keys to apply, in order.
    --  @return The state after one InvRound' per element of Xs.
 
+   package Key_Sequences is new Cryptol.Sequences
+     (Index => Round_Key_Index, Element => Block, Seq => Round_Keys);
+   --  The prelude's reverse over round keys.
+
    function Reverse_Keys (Xs : Round_Keys) return Round_Keys
-   is [for I in Xs'Range => Xs (Xs'First + Xs'Last - I)];
+   is (Key_Sequences.Reverse_Of (Xs));
    --  Cryptol's reverse at type [n]Block -> [n]Block, as InvCipher and
-   --  InvCipher' apply it to ws. Reverse is an Ada reserved word. The
-   --  result has the bounds of Xs. Stated inline, as the prelude's
-   --  Sequences.Reverse_Of states it (element I is element Xs'Last - (I -
-   --  Xs'First)), not through an instance: through one, Impl's
-   --  Decrypt_Block_Prime loses an assertion (RK (J) = W (Nr (K) - J)) to
-   --  a timeout at level 2 (#75).
+   --  InvCipher' apply it to ws, as the prelude's Sequences.Reverse_Of
+   --  states it: element I is element Xs'Last - (I - Xs'First). Reverse is
+   --  an Ada reserved word. The result has the bounds of Xs.
    --  @param Xs The round keys.
    --  @return Xs in reverse order.
 
