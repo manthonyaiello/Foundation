@@ -152,7 +152,7 @@ for u in "${UNITS[@]+"${UNITS[@]}"}"; do CMD+=(-u "$u"); done
 CMD+=("${ARGS[@]+"${ARGS[@]}"}" "${EXTRA[@]+"${EXTRA[@]}"}")
 
 {
-  echo ">> prove.sh $(date -u +%Y-%m-%dT%H:%M:%SZ) on $(hostname) ($(nproc 2>/dev/null || echo '?') CPUs)"
+  echo ">> prove.sh $(date -u +%Y-%m-%dT%H:%M:%SZ) on $(hostname) ($(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo '?') CPUs)"
   echo ">> commit $(git rev-parse --short HEAD 2>/dev/null || echo '?')$(git diff --quiet HEAD -- . 2>/dev/null || echo ' (dirty)')"
   echo ">> FOUNDATION_SPARK_PROOF_ALLOWANCE=${FOUNDATION_SPARK_PROOF_ALLOWANCE:-none}"
   echo ">> ${CMD[*]}"

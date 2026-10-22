@@ -100,13 +100,18 @@ fi
 
 # Our modules: every .cry under cryptol/, by its module name. Each gets the
 # library beside it, and only these may load one.
-declare -A OURS=()
+#
+# OURS is a newline-separated list, not an associative array, and the link's
+# relative path comes from python3, not `realpath --relative-to`: macOS ships
+# bash 3.2 and a BSD realpath, and the script runs there too (#107).
+OURS=""
 while IFS= read -r cry; do
   mod="$(sed -nE 's/^[[:space:]]*module[[:space:]]+([A-Za-z0-9_:]+)[[:space:]]+where.*/\1/p' "$cry" | head -n 1)"
   [ -n "$mod" ] || die "$cry declares no module"
-  OURS["$mod"]="$(basename "$cry" .cry)"
+  OURS="${OURS}${mod}"$'\n'
   dir="$(dirname "$cry")"
-  ln -sfn "$(realpath --relative-to="$dir" "$LIB")" "$dir/$(basename "$cry" .cry).$EXT"
+  rel="$(python3 -c 'import os, sys; print(os.path.relpath(os.path.realpath(sys.argv[1]), os.path.realpath(sys.argv[2])))' "$LIB" "$dir")"
+  ln -sfn "$rel" "$dir/$(basename "$cry" .cry).$EXT"
 done < <(find cryptol -name '*.cry' | sort)
 
 # --- 3. the properties -------------------------------------------------------------
@@ -153,7 +158,7 @@ judge() {
       if (!loaded) { print "module " mod " did not load its library " lib; bad = 1 }
       exit bad
     }
-  ' <(printf '%s\n' "${!OURS[@]}") "$out" || bad=1
+  ' <(printf '%s' "$OURS") "$out" || bad=1
   if grep -qE 'ERROR|Counterexample|\[error\]' "$out"; then
     grep -E 'ERROR|Counterexample|\[error\]' "$out" | head -n 5
     bad=1

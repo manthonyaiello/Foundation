@@ -48,7 +48,7 @@ case "$ARCH" in
   x86_64|amd64)  ARCH=x86_64 ;;
   *) echo "check-ct.sh: no Valgrind client requests for $ARCH" >&2; exit 2 ;;
 esac
-"$GPRBUILD" -P ct/ct.gpr -q -XCT_ARCH="$ARCH" -j"$(nproc 2>/dev/null || echo 2)"
+"$GPRBUILD" -P ct/ct.gpr -q -XCT_ARCH="$ARCH" -j"$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)"
 
 mkdir -p "$ASM"
 units=(foundation_spark-aes-impl foundation_spark-sha2-sha256_stream
