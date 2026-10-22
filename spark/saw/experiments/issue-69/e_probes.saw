@@ -157,32 +157,34 @@ rec value_chain (iw : Int) (packed : Bool) (len : Int) (c : Int) (prev : [LLVMSp
   if eval_bool {{ `c == (32 : Integer) }} then return lemma
   else value_chain iw packed len (eval_int {{ `c + 1 : [32] }}) [lemma];
 };
-for [512, 1024, 2048] (\len -> do {
+for [512, 1024] (\len -> do {
   label (str_concat (str_concat "B: value (128) chain, P of " (show len)) " bits (all)");
   v31 <- time (value_chain 128 false len 0 []);
   label (str_concat (str_concat "B: value_packed (128) chain, P of " (show len)) " bits (all)");
   time (value_chain 128 true len 0 []);
   return ();
 });
-label "B: value (64) chain, P of 1024 bits (all)";
-time (value_chain 64 false 1024 0 []);
+label "B: value_packed (128) chain, P of 2048 bits (all)";
+time (value_chain 128 true 2048 0 []);
+label "B: value (64) chain, P of 512 bits (all)";
+time (value_chain 64 false 512 0 []);
 /* Count = 32 with First concrete (as Parse calls it, at 32 j), on the chain to 31 with First symbolic. */
 rec value_chain_to (len : Int) (c : Int) (last : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
   lemma <- llvm_verify probes (sym 128 "value") prev false (value_contract 128 false len true 0 c) yices;
   if eval_bool {{ `c == `last }} then return lemma
   else value_chain_to len (eval_int {{ `c + 1 : [32] }}) last [lemma];
 };
-v31_1024 <- value_chain_to 1024 0 31 [];
-for [0, 480, 992] (\fc -> do {
-  label (str_concat "B: value (128) P of 1024 bits, Count = 32, First concrete = " (show fc));
-  time (llvm_verify probes (sym 128 "value") [v31_1024] false (value_contract 128 false 1024 false fc 32) yices);
+v31_512 <- value_chain_to 512 0 31 [];
+for [0, 224, 480] (\fc -> do {
+  label (str_concat "B: value (128) P of 512 bits, Count = 32, First concrete = " (show fc));
+  time (llvm_verify probes (sym 128 "value") [v31_512] false (value_contract 128 false 512 false fc 32) yices);
   return ();
 });
-label "B: value (128) P of 1024 bits, Count = 32, First symbolic";
-time (llvm_verify probes (sym 128 "value") [v31_1024] false (value_contract 128 false 1024 true 0 32) yices);
-label "B: value (128) P of 1024 bits, Count = 32, First symbolic, admit (no solver)";
-time (llvm_verify probes (sym 128 "value") [v31_1024] false (value_contract 128 false 1024 true 0 32) (admit "symbolic execution only"));
-label "B: value (128) P of 1024 bits, Count = 32, First symbolic, z3";
-time (llvm_verify probes (sym 128 "value") [v31_1024] false (value_contract 128 false 1024 true 0 32) z3);
+label "B: value (128) P of 512 bits, Count = 32, First symbolic";
+time (llvm_verify probes (sym 128 "value") [v31_512] false (value_contract 128 false 512 true 0 32) yices);
+label "B: value (128) P of 512 bits, Count = 32, First symbolic, admit (no solver)";
+time (llvm_verify probes (sym 128 "value") [v31_512] false (value_contract 128 false 512 true 0 32) (admit "symbolic execution only"));
+label "B: value (128) P of 512 bits, Count = 32, First symbolic, z3";
+time (llvm_verify probes (sym 128 "value") [v31_512] false (value_contract 128 false 512 true 0 32) z3);
 label "done";
 

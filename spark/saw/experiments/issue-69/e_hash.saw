@@ -1,0 +1,68 @@
+/*
+ * #69, experiment "hash": where the time of the spec layer's top-level
+ * SHA-256 proofs goes, symbolic execution or the solver. The module
+ * loads are timed (the strict one and the one with lax arithmetic); then
+ * at l = 440 bits (55 bytes, one padded block), as sha256_spec.saw proves
+ * them: Pad, Parse at 1 block, Word_Of's lemma at Count = 32, and Hash,
+ * each with its recorded tactic and again with `admit` (no solver), and
+ * Hash once more with crucible's profiler on (profile/, read with
+ * profile_summary.py: which executed functions take the simulation's
+ * time).
+ */
+enable_experimental;
+import "SHA256Main.cry" (step, hash);
+import "SHA256Step.cry" (Ws, T1, T2, step3);
+import "../../algorithms/SHA2/Notation.cry";
+import "../../algorithms/SHA2/Functions.cry";
+import "../../algorithms/SHA2/Preprocessing.cry" (pad, parse, H0_256);
+print "== load, strict";
+time (llvm_load_module "obj/spec/sha256_spec.bc");
+
+include "sha256_spec_common.saw";
+print "== load, lax arithmetic";
+time (llvm_load_module "obj/spec/sha256_spec.bc");
+let verify_spec = verify_spec_lax;
+print "== the compression function's lemmas, lax load";
+include "sha256_spec_step.saw";
+include "sha256_spec_pad.saw";
+include "sha256_spec_hash.saw";
+let adm = admit "symbolic execution only";
+
+let l = 440;
+let k = small_k l;
+print "== Zero, Small_K, To_Bits chain for l = 440 (all)";
+z <- verify_zero k;
+tb <- to_bits_lemmas (ss_size 32 k) (eval_int {{ 32 + `k : [64] }}) 0 [];
+sk <- verify_small_k l;
+print "== Pad, l = 440, z3";
+pad_l <- time (llvm_verify sha256_spec_lax (spec_symbol "sha256__pad") [sk, z, tb] false (pad_contract l) z3);
+print "== Pad, l = 440, admit";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__pad") [sk, z, tb] false (pad_contract l) adm);
+
+print "== Word_Of chain, 512 bits, Count = 0 .. 31";
+rec chain_to (c : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- llvm_verify sha256_spec_lax (spec_symbol "sha256__word_sequences__value") prev false (word_of_contract 512 c) yices;
+  if eval_bool {{ `c == (31 : Integer) }} then return lemma else chain_to (eval_int {{ `c + 1 : [32] }}) [lemma];
+};
+w31 <- chain_to 0 [];
+print "== Word_Of, 512 bits, Count = 32, yices";
+w32 <- time (llvm_verify sha256_spec_lax (spec_symbol "sha256__word_sequences__value") [w31] false (word_of_contract 512 32) yices);
+print "== Word_Of, 512 bits, Count = 32, z3";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__word_sequences__value") [w31] false (word_of_contract 512 32) z3);
+print "== Word_Of, 512 bits, Count = 32, admit";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__word_sequences__value") [w31] false (word_of_contract 512 32) adm);
+
+print "== Parse, 1 block, z3";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__parse") [w32] false (parse_contract 1) z3);
+print "== Parse, 1 block, admit";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__parse") [w32] false (parse_contract 1) adm);
+
+fs1 <- foldl_step_lemmas 1 0 [];
+print "== Hash, l = 440, w4_unint_z3 step";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__hash") [pad_l, w32, fs1] false (hash_contract l) (w4_unint_z3 ["step"]));
+print "== Hash, l = 440, admit";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__hash") [pad_l, w32, fs1] false (hash_contract l) adm);
+enable_crucible_profiling "profile";
+print "== Hash, l = 440, admit, profiled";
+time (llvm_verify sha256_spec_lax (spec_symbol "sha256__hash") [pad_l, w32, fs1] false (hash_contract l) adm);
+print "== done";

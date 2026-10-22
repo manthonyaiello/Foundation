@@ -13,7 +13,7 @@
  *     recorded 65 lemmas.
  *  3. In the load with lax arithmetic: To_Bits (Literal, one call)
  *     unfolded at W = 8, 16, 32, 64, stack at 48, against the recorded
- *     chain; and Word_Of (Value, one call) unfolded at Count = 8, 16, 32,
+ *     chain; and Word_Of (Value, one call) unfolded at Count = 4 and 8 (at 16 it ran over 22 minutes and was stopped, 2026-10-22),
  *     P of 512 bits, against the recorded 33 lemmas.
  */
 include "sha256_spec_common.saw";
@@ -40,7 +40,7 @@ for [8, 16, 32, 64] (\w -> do {
   time (llvm_verify sha256_spec_lax (spec_symbol "sequences_of_bits__literal") [] false (to_bits_contract_at 48 0 39 0 0 w) z3);
   return ();
 });
-for [8, 16, 32] (\c -> do {
+for [4, 8] (\c -> do {
   print (str_concat "== Word_Of unfolded, P of 512 bits, Count = " (show c));
   time (llvm_verify sha256_spec_lax (spec_symbol "sha256__word_sequences__value") [] false (word_of_contract 512 c) yices);
   return ();
