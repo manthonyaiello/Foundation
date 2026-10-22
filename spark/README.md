@@ -174,7 +174,8 @@ result of its caller, or leaves it out, for the reasons in "SAW" below.
 
 A SAW record is **stale** when what SAW read has changed since: a `source`,
 `cryptol` or `spec.adc` file whose sha256 is no longer the one recorded, or
-a SAW script (`saw/`, `scripts/check-saw.sh`, `scripts/toolchain-pins.env`)
+a SAW script (`saw/` but for the records and `saw/experiments/`, which no
+recorded run loads; `scripts/check-saw.sh`; `scripts/toolchain-pins.env`)
 that differs from the recorded commit's (when this checkout has that
 commit). The board then says **STALE**, names the changed inputs, and marks
 every row's SAW cell "(stale)": the results are not this tree's until
@@ -1699,7 +1700,13 @@ what SPARK adds:
 
 There is **no `llvm_unsafe_assume_spec`**: every override is a proof in
 the same module, and `check-saw.sh` refuses to run if a script under
-`saw/` contains one.
+`saw/` contains one. Nor is there an **`admit`** (or its older names
+`assume_unsat` and `assume_valid`), the tactic that closes a goal without
+a solver: `check-saw.sh` refuses the word anywhere in those scripts,
+comments included. The one exception is `saw/experiments/`: scratch
+measurements (#69) that no recorded run loads, outside the record, which
+may use `admit` on purpose (to time symbolic execution alone). `board.py`
+does not count a change there as a change to SAW's inputs either.
 
 ```console
 $ GNAT_LLVM_DIR=.../gnatpro-llvm-ada/install LLVM_LINK_DIR=.../llvm-21.1.8 scripts/check-saw.sh

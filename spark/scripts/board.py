@@ -83,8 +83,17 @@ SAW_RESULTS_LONG = "saw/results-long.txt"
 
 #: What SAW reads besides the hashed sources and Cryptol: the scripts and
 #: check-saw.sh. A change to one since the recorded commit makes the record
-#: stale too. Relative to the crate; the results files themselves excluded.
+#: stale too. Relative to the crate; the results files themselves excluded
+#: (SAW_NOT_INPUTS).
 SAW_SCRIPTS = ["saw", "scripts/check-saw.sh", "scripts/toolchain-pins.env"]
+
+#: What is under saw/ but not an input of the record, as git exclude
+#: pathspecs: the records themselves, and saw/experiments/, scratch
+#: measurements (#69) that no recorded run loads (nothing check-saw.sh runs
+#: includes them, and its assumed-spec guard skips saw/experiments/, whose
+#: scripts may use admit). The trailing
+#: slash keeps the exclusion to that one directory.
+SAW_NOT_INPUTS = [":!saw/results.txt", ":!saw/results-long.txt", ":!saw/experiments/"]
 
 
 def git(root, *args):
@@ -446,7 +455,7 @@ def read_saw(root, rel):
     if rec["commit"] and git(root, "cat-file", "-t", rec["commit"]) == "commit":
         rec["scripts_checked"] = True
         out = git(root, "diff", "--name-only", rec["commit"], "--", *SAW_SCRIPTS,
-                  ":!saw/results.txt", ":!saw/results-long.txt")
+                  *SAW_NOT_INPUTS)
         prefix = git(root, "rev-parse", "--show-prefix")
         for p in out.splitlines():
             p = p[len(prefix):] if prefix and p.startswith(prefix) else p
