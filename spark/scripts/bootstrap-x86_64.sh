@@ -13,10 +13,11 @@
 # Phases, each timed (wall-clock, printed at the end and on failure):
 #   prereqs    the commands and libraries the rest needs (curl, git, python3,
 #              CA certificates, libc6-dev; the shared libraries Cryptol and
-#              SAW link against). The ONLY phase that may need root: missing
-#              packages are apt-installed when running as root or with
-#              passwordless sudo, and otherwise the script stops and prints
-#              the one `sudo apt-get install` line to run.
+#              SAW link against), and valgrind, for scripts/check-ct.sh's
+#              ct_grind (#50; not run here). The ONLY phase that may need
+#              root: missing packages are apt-installed when running as
+#              root or with passwordless sudo, and otherwise the script
+#              stops and prints the one `sudo apt-get install` line to run.
 #   clone      clone the fork, or fetch it and fast-forward a clean checkout.
 #              The versions below are read from ITS
 #              spark/scripts/toolchain-pins.env, the file CI's
@@ -278,7 +279,7 @@ if [ -r /etc/os-release ]; then
 fi
 need=()
 for c in curl:curl git:git python3:python3 tar:tar gzip:gzip sha256sum:coreutils \
-         od:coreutils ldd:libc-bin; do
+         od:coreutils ldd:libc-bin valgrind:valgrind; do
   command -v "${c%%:*}" >/dev/null 2>&1 || need+=("${c#*:}")
 done
 # The gnat-llvm phase unpacks LLVM's .tar.xz, only when GNAT_LLVM_DIR is set.
@@ -294,7 +295,7 @@ if [ "${#need[@]}" -gt 0 ]; then
   need=($(printf '%s\n' "${need[@]}" | sort -u))
   apt_install "${need[@]}"
 else
-  echo ">> curl, git, python3, CA certificates and libc6-dev present"
+  echo ">> curl, git, python3, valgrind, CA certificates and libc6-dev present"
 fi
 mkdir -p "$TOOLS/downloads"
 end
