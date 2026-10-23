@@ -224,8 +224,8 @@ UNITS_aes_spec=(
 )
 
 # sha256_spec: the SHA-256 instance of the generic SHA2.Main (its ghost
-# functions are the spec layer), with the SHA2 root (To_Bits, Ceil_Div,
-# Ceil_Mod), SHA2.Functions and SHA2.Preprocessing (H0_256), which it
+# functions are the spec layer), with the SHA2 root (To_Bits, and the
+# prelude's instances Lengths and Sequences_Of_Bits), SHA2.Functions and SHA2.Preprocessing (H0_256), which it
 # calls or reads; and the HMAC-SHA-256 spec layer, the instance
 # HMAC.SHA256 of the generic HMAC.Main, with the HMAC root (Join, Repeat,
 # Zero), whose hashes are SHA2.SHA256.Hash.
@@ -268,11 +268,18 @@ HARNESS_UNITS=(saw_soft_links.ads)
 #  - SHA-256 and HMAC: the ghost units SHA2.SHA256_Blocks, HMAC.Main and
 #    its instance HMAC.SHA256; the ghost functions of the units that also
 #    hold executable code (the SHA2 root, the SHA-256 instance of Main,
-#    SHA256_Bytes, SHA256_Stream, the HMAC root, HMAC.SHA256_Impl); and
-#    every lemma (`__lemma_`), wherever it is declared.
+#    SHA256_Bytes, SHA256_Stream, the HMAC root, HMAC.SHA256_Impl); the
+#    instances of the Cryptol prelude (a ghost generic, #75) in the SHA2
+#    and HMAC roots and in the SHA-256 instance of Main (since #111,
+#    SHA2.Lengths holds Ceil_Div and Ceil_Mod, and HMAC.Join calls
+#    HMAC.Byte_Words.Join); and every lemma (`__lemma_`), wherever it is
+#    declared.
 GHOST_RE_AES='foundation_spark__aes__(spec__(aes128|aes192|aes256|aes_k|cipher|dispatch|gf2|gf28|keyexpansion|main|properties|sbox)|lemmas|main_lemmas)(__|_E$|$)'
 GHOST_RE_SHA='foundation_spark__(sha2__sha256_blocks|hmac__main|hmac__sha256)(__|_E$|$)'
-GHOST_RE_SHA+='|foundation_spark__sha2__(ceil_div|ceil_mod|to_bits)$'
+GHOST_RE_SHA+='|foundation_spark__sha2__to_bits$'
+GHOST_RE_SHA+='|foundation_spark__sha2__(lengths|sequences_of_bits)__'
+GHOST_RE_SHA+='|foundation_spark__sha2__sha256__(rounds|word_sequences|blocks)__'
+GHOST_RE_SHA+='|foundation_spark__hmac__(byte_words|byte_sequences)__'
 GHOST_RE_SHA+='|foundation_spark__sha2__sha256__(w|t1|t2|step3|foldl_step3|step|small_k|n|zero|pad|word_of|parse_block|parse|foldl_step|bit|join|hash)$'
 GHOST_RE_SHA+='|foundation_spark__sha2__sha256_bytes__(byte_bit|bits_of|blocks|length_byte|padded_byte|pad_bytes|word_at|block_at|parse_bytes|word_byte|digest_bytes|hash_bytes)$'
 GHOST_RE_SHA+='|foundation_spark__sha2__sha256_stream__(models|absorbed|finished|joined|tail_blocks|tail_pad|empty)$'
