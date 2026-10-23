@@ -283,8 +283,21 @@ Not yet, and not filed:
   installed, in files, commit messages or PR and issue text. Machine-specific
   setup goes to memcp. The bootstrap uses a tool when it is present and
   matches the pin, and fetches it otherwise (#100).
-* **Unfold SAW's linear recursions** (Tony, 2026-10-22): worth doing, as
-  follow-on work (#99), not in the session that found it.
+* **Unfold SAW's linear recursions** (Tony, 2026-10-22; done in #99): a
+  spec-layer recursion that calls itself once per level is proved once,
+  unfolded, at the size its caller uses, where that is measured cheaper;
+  a lemma per index stays where the recursion is exponential (AES `W`,
+  SHA-2 `W`) or the solver's goal grows faster unfolded than the lemmas
+  cost. #69's numbers: `Rounds.Foldl` 2.4 s unfolded against 23.2 s for
+  its 65 lemmas, `To_Bits` 1.4 s against 43.8 s; AES `W` unfolded grows
+  1.38× per index (about 35 min for `KeyExpansion` against 16 s of
+  lemmas), `Word_Of` at Count = 8 took 230 s unfolded against 179.5 s for
+  all 33 lemmas. #99 measured each linear one
+  (`spark/saw/experiments/issue-99/`): unfolded `Rounds.Foldl`,
+  `Literal`, `Blocks.Foldl_Take`, GF28's `Products` and `Pmod_Fold`; kept
+  per index, measured dearer unfolded, the cipher folds (24.3 s against
+  14.2 s at M = 13) and GF2's `Pmod_Fold` and `Pdiv_Fold` (34.1 s each
+  against 12.5 s for both chains).
 * **Re-proved Cryptol properties are optional** (Tony, 2026-10-20). The
   spec layer is proved equal to the Cryptol (SAW), so the Cryptol's
   properties already hold of it. Re-proving them in SPARK is, in general, a
@@ -350,9 +363,8 @@ Not yet, and not filed:
 * **The spec layer keeps Cryptol's meaning, not its evaluation strategy.**
   Recursive definitions stay recursive ghost functions (e.g.
   `KeyExpansion.W`); sharing is the implementation's job, and SAW gets it by
-  per-index overrides (#59 discussion, 2026-10-19). #69 measured that the
-  linear recursions are 10–30× cheaper for SAW unfolded: #99 changes that
-  (decision above).
+  per-index overrides (#59 discussion, 2026-10-19) where the recursion is
+  exponential, and by unfolding where it is linear (#99, decision above).
 * **The blog post** (Tony, 2026-10-22, #102): Tony writes it; Claude
   provides bullets, data, snippets and the figure's content only. It has a
   "what we used, and what the results rest on" section. Performance is AES

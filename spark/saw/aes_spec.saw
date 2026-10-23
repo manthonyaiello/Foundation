@@ -5,12 +5,15 @@
  * layer equal to it, so that spec = Cryptol is a proof at these sizes and
  * not only the FFI check's tests.
  *
- * The spec layer's recursions are never unfolded. A recursive ghost
- * function whose variant is a size (the folds Pmult_Fold, Pmod_Fold,
- * Pdiv_Fold, Foldl_Round and the rest; KeyExpansion's W) is proved one
- * index at a time, each lemma with the lemmas at the smaller indices it
- * calls as overrides, as algorithms/AES/rust/Cipher/theorems/saw.py
- * composes its leaf lemmas. GF2's Inner, whose variant is a value (the
+ * The spec layer's recursions (#99; README "SAW", "The spec layer"). A
+ * recursive ghost function whose variant is a size is proved one index
+ * at a time, each lemma with the lemmas at the smaller indices it calls
+ * as overrides, as algorithms/AES/rust/Cipher/theorems/saw.py composes
+ * its leaf lemmas, where unfolding it costs more: KeyExpansion's W (two
+ * recursive calls), the cipher folds' Foldl_Take and GF2's Pmod_Fold and
+ * Pdiv_Fold (measured dearer unfolded, saw/experiments/issue-99). GF28's
+ * Products and Pmod_Fold, cheaper unfolded, are proved once, at the size
+ * their callers use, SAW unfolding the recursion. GF2's Inner, whose variant is a value (the
  * degree of r'), has no such index: Pgcd and Inverse, which call it, are
  * proved exhaustively, for each of the 256 bytes, on concrete values.
  *
