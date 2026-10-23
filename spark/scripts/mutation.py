@@ -22,12 +22,21 @@ Usage (from anywhere; the checkout needs `alr -n build` once):
   mutation.py check                      every mutant applies to the sources
   mutation.py list                       the mutants, one per line
   mutation.py setup TREE                 copy the checkout to TREE, build it
+  mutation.py saw TREE ID ...            the SAW column (an IOD; not run on hex)
   mutation.py ffi TREE [ID ...] [--full] [--baseline]
   mutation.py prove TREE [ID ...] [--baseline]
   mutation.py report TREE                the results table, as Markdown
+  mutation.py reclassify TREE            classify the saved proof logs again
+  mutation.py diagnose TREE ID ... -- GNATPROVE_ARGS
+                                         gnatprove again, directly, with
+                                         more time (diagnostic only)
+  mutation.py witness TREE ID MODULE EXPR TESTS
+                                         one Cryptol :check of EXPR (from
+                                         cryptol/MODULE) against the mutant
 
 With no ID, ffi and prove take every mutant without a result yet (--redo:
-every mutant). --baseline runs the column on the unmutated tree: the union
+every mutant). A mutant's properties run one at a time and stop at the
+first that fails (its killer); a survivor has passed them all. --baseline runs the column on the unmutated tree: the union
 of the mutants' properties, or of their units; it must pass.
 
 Env:
@@ -204,6 +213,19 @@ class Applied(object):
         return False
 
 
+class Unmutated(object):
+    """Context manager: the tree as it is (the control of a witness)."""
+
+    def __init__(self, tree):
+        self.tree = tree
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
 def run(cmd, cwd, log, env=None, timeout=None):
     """Run cmd with output to log; (exit status, seconds). A run past
     timeout is killed with its process group and returns status None."""
@@ -337,7 +359,7 @@ def build_ffi(spark, log):
                 "-j" + jobs, "-P", "foundation_spark_ffi.gpr"], spark, log)
 
 
-def ffi_once(tree, props, logbase):
+def ffi_once(tree, props, logbase, stop_early=True):
     """Build the library from the tree as it is and run props (all when
     props is None). A dict: outcome, failed properties, times."""
     _, spark, _, _ = tree_paths(tree)
@@ -346,11 +368,28 @@ def ffi_once(tree, props, logbase):
         return {"outcome": "nocompile", "build_s": bsecs}
     env = dict(os.environ)
     env["FFI_LIB"] = "obj/ffi/lib/libfoundation_spark_ffi.%s" % EXT
-    cmd = ["scripts/check-ffi.sh"] + (props or [])
-    status, secs = run(cmd, spark, logbase + ".log", env=env,
-                       timeout=timeout())
-    with open(logbase + ".log") as f:
-        out = f.read()
+    if props is None or not stop_early:
+        cmd = ["scripts/check-ffi.sh"] + (props or [])
+        status, secs = run(cmd, spark, logbase + ".log", env=env,
+                           timeout=timeout())
+        with open(logbase + ".log") as f:
+            out = f.read()
+    else:
+        # One property per check-ffi.sh run (each is its own cryptol run
+        # anyway), stopping at the first that fails: a killed mutant needs
+        # one killer, and only a survivor needs them all.
+        out, secs, status = "", 0, 0
+        for p in props:
+            st, s = run(["scripts/check-ffi.sh", p], spark,
+                        logbase + ".one.log", env=env, timeout=timeout())
+            secs += s
+            with open(logbase + ".one.log") as f:
+                out += f.read()
+            if st != 0:
+                status = st
+                break
+        with open(logbase + ".log", "w") as f:
+            f.write(out)
     failed = re.findall(r"^\s+FAIL\s+(\S+):", out, re.M)
     passed = re.findall(r"^\s+PASS\s+(\S+):", out, re.M)
     res = {"build_s": bsecs, "run_s": secs, "failed": failed,
@@ -387,7 +426,8 @@ def cmd_ffi(args):
     if "--baseline" in rest:
         props = None if full else expand(
             [p for m in mutants for p in m.ffi], groups)
-        res = ffi_once(tree, props, os.path.join(logs, "baseline"))
+        res = ffi_once(tree, props, os.path.join(logs, "baseline"),
+                       stop_early=False)
         res["properties"] = "all" if full else len(props)
         save(tree, "ffi", "baseline" + ("-full" if full else ""), res)
         print("baseline: %s (%s properties, %s passed)" % (
@@ -416,94 +456,83 @@ def cmd_ffi(args):
     return 0
 
 
-# gnatprove's messages: file:line:col: severity: text, and the indented
-# lines after one (the counterexample, "e.g. when ...", among them).
-MSG = re.compile(r"^(\S+\.ad[sb]):(\d+):(\d+): (high|medium|low|error|warning|"
-                 r"info): (.*)$")
+# gnatprove 16's messages. A check or flow message is a header line
+# " medium: postcondition might fail" (severity high, medium or low; error
+# and warning likewise), then "--> file:line:col", the source excerpt, and
+# notes starting with "+": "+ e.g. when B = 128 ..." for a counterexample,
+# "+ provers reached time limit ..." for a timeout. A compiler error is the
+# classic "file:line:col: error: text".
+HEAD = re.compile(r"^ ?(high|medium|low|error|warning|info|"
+                  r"check|style): (.*)$")
+LOC = re.compile(r"^\s*--> (\S+\.ad[sb]):(\d+):(\d+)")
+CLASSIC = re.compile(r"^(\S+\.ad[sb]):(\d+):(\d+): (error|warning|"
+                     r"high|medium|low): (.*)$")
+FLOW = re.compile(r"might not be initialized|is not initialized|"
+                  r"might be used uninitialized|not set before|"
+                  r"unused assignment|is not modified|has no effect|"
+                  r"might not be written|is not used|statement has no effect")
+LIMIT = re.compile(r"reached (time|step|steps|resource|memory) limit|"
+                   r"time limit|timeout|resource limit|step limit")
 
 
-def spark_results(spark, units):
-    """From the units' .spark files: each unproved check's location and
-    the results of its prover attempts."""
-    out = {}
-    for u in units:
-        base = os.path.splitext(u)[0]
-        for root, _, files in os.walk(os.path.join(spark, "obj")):
-            if base + ".spark" in files and root.endswith("gnatprove"):
-                with open(os.path.join(root, base + ".spark")) as f:
-                    try:
-                        data = json.load(f)
-                    except ValueError:
-                        continue
-                for p in data.get("proof", []):
-                    if p.get("severity") in (None, "info"):
-                        continue
-                    attempts = []
-
-                    def walk(node):
-                        if isinstance(node, dict):
-                            if "result" in node and isinstance(
-                                    node.get("result"), str):
-                                attempts.append(node["result"])
-                            for v in node.values():
-                                walk(v)
-                        elif isinstance(node, list):
-                            for v in node:
-                                walk(v)
-
-                    walk(p.get("check_tree", []))
-                    key = "%s:%s:%s" % (p.get("file"), p.get("line"),
-                                        p.get("col"))
-                    out[key] = attempts
-    return out
-
-
-def classify(log_text, attempts):
-    """The proof column's outcome from the log and the prover attempts."""
+def parse_messages(log_text):
+    """Every message of gnatprove's output: dicts of severity, location,
+    text and notes."""
     msgs = []
-    lines = log_text.splitlines()
-    for i, line in enumerate(lines):
-        m = MSG.match(line)
-        if not m or m.group(4) == "info":
+    cur = None
+    for line in log_text.splitlines():
+        m = CLASSIC.match(line)
+        if m:
+            cur = {"severity": m.group(4), "text": m.group(5),
+                   "at": "%s:%s:%s" % m.group(1, 2, 3), "notes": []}
+            msgs.append(cur)
             continue
-        follow = []
-        for nxt in lines[i + 1:i + 6]:
-            if nxt.startswith(" ") and not MSG.match(nxt):
-                follow.append(nxt.strip())
-            else:
-                break
-        text = m.group(5)
-        whole = " ".join([text] + follow)
-        key = "%s:%s:%s" % (m.group(1), m.group(2), m.group(3))
-        kind = "other"
-        if m.group(4) == "error":
+        m = HEAD.match(line)
+        if m:
+            cur = {"severity": m.group(1), "text": m.group(2), "at": "?",
+                   "notes": []}
+            msgs.append(cur)
+            continue
+        if cur is None:
+            continue
+        m = LOC.match(line)
+        if m and cur["at"] == "?":
+            cur["at"] = "%s:%s:%s" % m.group(1, 2, 3)
+            continue
+        st = line.strip()
+        if st.startswith("+ "):
+            cur["notes"].append(st[2:])
+        elif st.startswith(("Summary logged", ">> ", "Phase ")):
+            cur = None
+    return [x for x in msgs if x["severity"] not in ("info",)]
+
+
+def classify(log_text):
+    """The proof column's outcome, and each message with its kind: cex
+    (a counterexample), timeout (the provers reached a time or step limit,
+    no counterexample), nocex (unproved, neither), flow (flow analysis),
+    error (the compiler), warning."""
+    msgs = []
+    for x in parse_messages(log_text):
+        notes = " ".join(x["notes"])
+        if x["severity"] == "error":
             kind = "error"
-        elif m.group(4) == "warning":
+        elif x["severity"] in ("warning", "style"):
             kind = "warning"
-        elif "might not be initialized" in text or "is not initialized" in text \
-                or "might be referenced" in text or "is not modified" in text:
+        elif FLOW.search(x["text"]) and "might fail" not in x["text"]:
             kind = "flow"
-        elif "might fail" in text or "cannot prove" in whole:
-            res = attempts.get(key, [])
-            if re.search(r"\be\.g\. when\b|counterexample", whole):
-                kind = "cex"
-            elif res and all(r in ("Timeout", "StepLimitExceeded",
-                                   "OutOfMemory") for r in res):
-                kind = "timeout"
-            elif re.search(r"time limit|timeout|resource limit|steps limit",
-                           whole):
-                kind = "timeout"
-            else:
-                kind = "nocex"
-        msgs.append({"at": key, "severity": m.group(4), "kind": kind,
-                     "text": whole[:400],
-                     "provers": attempts.get(key, [])})
+        elif re.search(r"\be\.g\. when\b|counterexample", notes):
+            kind = "cex"
+        elif LIMIT.search(notes) or LIMIT.search(x["text"]):
+            kind = "timeout"
+        else:
+            kind = "nocex"
+        msgs.append({"at": x["at"], "severity": x["severity"], "kind": kind,
+                     "text": (x["text"] + (" | " + notes if notes else ""))[:500]})
     kinds = set(x["kind"] for x in msgs)
     if not msgs:
         outcome = "proved"
-    elif "error" in kinds and "Compilation" in log_text or \
-            re.search(r"^\S+\.ad[sb]:\d+:\d+: error:", log_text, re.M) and \
-            not kinds & {"cex", "nocex", "timeout", "flow"}:
+    elif "error" in kinds and not kinds & {"cex", "nocex", "timeout", "flow"}:
         outcome = "nocompile"
     elif "cex" in kinds:
         outcome = "refuted"
@@ -513,10 +542,8 @@ def classify(log_text, attempts):
         outcome = "flow"
     elif "timeout" in kinds:
         outcome = "timeout"
-    elif kinds == {"warning"}:
-        outcome = "warning"
     else:
-        outcome = "unproved"
+        outcome = "warning"
     return outcome, msgs
 
 
@@ -550,9 +577,9 @@ def prove_once(tree, units, logbase):
             res["outcome"] = "nocompile"
         else:
             res["outcome"] = "stale"
-        res["messages"] = [l for l in text.splitlines() if MSG.match(l)][:20]
+        res["messages"] = classify(text)[1][:20]
         return res
-    outcome, msgs = classify(text, spark_results(spark, units))
+    outcome, msgs = classify(text)
     if status != 0 and outcome == "proved":
         outcome = "error"
     res["outcome"] = outcome
@@ -597,12 +624,159 @@ def cmd_prove(args):
     return 0
 
 
+def cmd_diagnose(args):
+    """Prove mutants again with gnatprove called directly (not through
+    prove.sh, which refuses level and timeout switches), with the extra
+    arguments after --, to see whether more prover time turns a timeout
+    into a counterexample. Diagnostic only: the proof column is prove's,
+    at the committed levels. Results in TREE/results/diagnose/."""
+    if "--" not in args or len(args) < 3:
+        die("diagnose TREE ID ... -- GNATPROVE_ARGS ...")
+    k = args.index("--")
+    tree, ids, extra = args[0], args[1:k], args[k + 1:]
+    mutants, groups = load()
+    _, spark, _, results = tree_paths(tree)
+    logs = os.path.join(results, "diagnose")
+    os.makedirs(logs, exist_ok=True)
+    restore_all(tree)
+    jobs = os.environ.get("SPARK_SCHEDULER_TOKENS",
+                          os.environ.get("PROVE_JOBS", "1"))
+    alr = os.environ.get("ALR", "alr")
+    for m in select(ids, mutants):
+        units = expand(m.prove, groups)
+        cmd = [alr, "-n", "exec", "--", "gnatprove", "-P",
+               "foundation_spark.gpr", "-j" + jobs, "-f"]
+        for u in units:
+            cmd += ["-u", u]
+        cmd += extra
+        log = os.path.join(logs, m.id + ".log")
+        with Applied(tree, m):
+            status, secs = run(cmd, spark, log, timeout=timeout())
+        with open(log) as f:
+            outcome, msgs = classify(f.read())
+        res = {"outcome": outcome, "messages": msgs, "run_s": secs,
+               "status": status, "args": extra}
+        save(tree, "diagnose", m.id, res)
+        print("diagnose %s: %s (%d s)" % (m.id, outcome, secs))
+        for x in msgs:
+            print("   %s %s %s" % (x["kind"], x["at"], x["text"][:300]))
+        sys.stdout.flush()
+    return 0
+
+
+def cmd_witness(args):
+    """Run one Cryptol :check against the library built with a mutant (or
+    with none, ID "none", the control)
+    applied, typically at an input the properties never try (a longer
+    message): a concrete witness that an FFI survivor is a real bug.
+    MODULE is under cryptol/; EXPR is a Cryptol expression of a function
+    to Bit that may use the module's definitions."""
+    if len(args) != 5:
+        die("witness TREE ID MODULE EXPR TESTS")
+    tree, mid, module, expr, tests = args
+    mutants, _ = load()
+    m = None if mid == "none" else select([mid], mutants)[0]
+    _, spark, _, results = tree_paths(tree)
+    repo = os.path.dirname(spark)
+    logs = os.path.join(results, "witness")
+    os.makedirs(logs, exist_ok=True)
+    restore_all(tree)
+    icry = os.path.join(logs, mid + ".icry")
+    with open(icry, "w") as f:
+        f.write(":set tests=%s\n:load %s\n:check %s\n"
+                % (tests, os.path.join(spark, "cryptol", module), expr))
+    # check-ffi.sh's ad hoc signed copy on macOS (made by any earlier run
+    # in this tree), else CRYPTOL.
+    cryptol = os.path.join(spark, "obj", "ffi", "cryptol-adhoc", "cryptol")
+    if not os.path.exists(cryptol):
+        cryptol = os.environ.get("CRYPTOL", "cryptol")
+    env = dict(os.environ)
+    env["CRYPTOLPATH"] = "%s:%s" % (repo, os.path.join(spark, "cryptol"))
+    with (Applied(tree, m) if m else Unmutated(tree)):
+        st, _ = build_ffi(spark, os.path.join(logs, mid + ".build.log"))
+        if st != 0:
+            die("%s does not build" % mid)
+        st, secs = run([cryptol, "-b", icry], repo,
+                       os.path.join(logs, mid + ".log"), env=env,
+                       timeout=timeout())
+    with open(os.path.join(logs, mid + ".log")) as f:
+        out = f.read()
+    verdict = ("counterexample" if "Counterexample" in out or
+               re.search(r"^\s*= False", out, re.M) else
+               "passed" if re.search(r"Passed \d+ tests", out) else "error")
+    print("witness %s: %s (%s s; log %s)" % (mid, verdict, secs,
+                                           os.path.join(logs, mid + ".log")))
+    return 0 if verdict == "counterexample" else 1
+
+
+def cmd_saw(args):
+    """The SAW column (on a machine with GNAT Pro's LLVM back end and SAW,
+    the IOD): per mutant, scripts/check-saw.sh --print in the tree with the
+    mutant applied, SAW_LAYERS=impl (all for SHA2.Functions, which the spec
+    layer shares). A mutant SAW catches makes an llvm_verify fail; a
+    negative control that stops failing is reported as an error. Needs
+    GNAT_LLVM_DIR and LLVM_LINK_DIR, as check-saw.sh does."""
+    if len(args) < 2:
+        die("saw TREE ID ...")
+    tree, ids = args[0], args[1:]
+    mutants, _ = load()
+    _, spark, _, results = tree_paths(tree)
+    logs = os.path.join(results, "saw")
+    os.makedirs(logs, exist_ok=True)
+    restore_all(tree)
+    for m in select(ids, mutants):
+        env = dict(os.environ)
+        env.setdefault("SAW_LAYERS",
+                       "all" if m.id.startswith("F") else "impl")
+        log = os.path.join(logs, m.id + ".log")
+        with Applied(tree, m):
+            status, secs = run(["scripts/check-saw.sh", "--print"], spark,
+                               log, env=env, timeout=timeout())
+        with open(log) as f:
+            out = f.read()
+        failed = sorted(set(re.findall(
+            r"(?:FAIL|failed)[^\n]*?(\b[A-Za-z_]+\.saw\b[^\n]*)", out)))
+        res = {"status": status, "run_s": secs, "layers": env["SAW_LAYERS"],
+               "outcome": ("hang" if status is None else
+                           "proved" if status == 0 else "failed"),
+               "failed": failed[:20]}
+        save(tree, "saw", m.id, res)
+        print("saw %s: %s (%d s)" % (m.id, res["outcome"], secs))
+        sys.stdout.flush()
+    return 0
+
+
+def cmd_reclassify(args):
+    """Re-read every saved proof log and classify it again (after a change
+    to the classifier; the logs are the record)."""
+    if len(args) != 1:
+        die("reclassify TREE")
+    tree = args[0]
+    for path in sorted(os.listdir(os.path.join(tree_paths(tree)[3], "prove"))):
+        if not path.endswith(".json"):
+            continue
+        mid = path[:-5]
+        res = loaded(tree, "prove", mid)
+        log = os.path.join(tree_paths(tree)[3], "prove", mid + ".log")
+        if not os.path.exists(log) or res.get("outcome") in ("hang", "stale"):
+            continue
+        with open(log) as f:
+            text = f.read()
+        outcome, msgs = classify(text)
+        if res.get("status") not in (0, None) and outcome == "proved":
+            outcome = "error"
+        res["outcome"], res["messages"] = outcome, msgs
+        save(tree, "prove", mid, res)
+        print("%s: %s" % (mid, outcome))
+    return 0
+
+
 def cell_ffi(r, rf):
     if not r:
         return "not run"
     o = r["outcome"]
     if o == "killed":
-        return "killed (%d of %d)" % (len(r["failed"]), r["properties"])
+        return "killed by %s" % " ".join(r["failed"])
     if o == "survived":
         if rf:
             if rf["outcome"] == "killed":
@@ -659,13 +833,15 @@ def cmd_report(args):
         rf = loaded(tree, "ffi", m.id)
         rff = loaded(tree, "ffi-full", m.id)
         rp = loaded(tree, "prove", m.id)
+        rs = loaded(tree, "saw", m.id)
         v = verdict(m, rf, rff, rp)
         counts[v] = counts.get(v, 0) + 1
-        rows.append("| %s | `%s`:%d | %s | %s | %s | %s |" % (
+        rows.append("| %s | `%s`:%d | %s | %s | %s | %s | %s |" % (
             m.id, os.path.basename(m.file), m.line, m.what,
-            cell_ffi(rf, rff), cell_prove(rp), v))
-    print("| id | where | mutant | FFI | gnatprove | caught by |")
-    print("|---|---|---|---|---|---|")
+            cell_ffi(rf, rff), cell_prove(rp),
+            rs["outcome"] if rs else "", v))
+    print("| id | where | mutant | FFI | gnatprove | SAW | caught by |")
+    print("|---|---|---|---|---|---|---|")
     for r in rows:
         print(r)
     print()
@@ -679,7 +855,9 @@ def main(argv):
         sys.stderr.write(__doc__)
         return 2
     cmds = {"check": cmd_check, "list": cmd_list, "setup": cmd_setup,
-            "ffi": cmd_ffi, "prove": cmd_prove, "report": cmd_report}
+            "ffi": cmd_ffi, "prove": cmd_prove, "report": cmd_report,
+            "reclassify": cmd_reclassify, "diagnose": cmd_diagnose,
+            "witness": cmd_witness, "saw": cmd_saw}
     if argv[0] not in cmds:
         die("unknown command %s" % argv[0])
     return cmds[argv[0]](argv[1:])

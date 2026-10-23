@@ -141,7 +141,7 @@ H05 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 551 | K0 (0 .. 31) := D; 
 H06 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 654 | SHA2.SHA256_Stream.Update (D, C.O_Pad); | null; | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Final: the outer pad dropped
 H07 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 627 | SHA2.SHA256_Stream.Update (C.Inner, I_Pad); | SHA2.SHA256_Stream.Update (C.Inner, K0); | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Init: the inner hash absorbs K0, not K0 xor ipad
 H08 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 577 | K0 (0 .. Stream_Index (Key'Length) - 1) := Key; | K0 (1 .. Stream_Index (Key'Length)) := Key; | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Init_Key: a short key copied one byte late
-H09 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 28 | for J in Key_Block'Range loop | for J in 0 .. 62 loop | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Xor_Pad: the last byte not xored
+H09 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 28 | for J in Key_Block'Range loop | for J in Key_Block'First .. Key_Block'Last - 1 loop | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Xor_Pad: the last byte not xored
 
 # ---------------------------------------------------------------- SHA2.Functions (spec and implementation)
 
