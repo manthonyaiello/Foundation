@@ -20,7 +20,7 @@ from datetime import datetime
 CATS = [  # first match wins
     ("saw-record", r"check-saw\.sh(?![^|;&]*--print)"),
     ("saw-check-print", r"check-saw\.sh"),
-    ("saw-experiment", r"experiments/issue-69|run(-all)?\.sh\b"),
+    ("saw-experiment", r"experiments/issue-69|(?<![\w-])run(-all)?\.sh\b"),
     ("saw-hand", r"(^|[\s/])saw\s"),
     ("gnatprove", r"prove(-slow)?\.sh|gnatprove|check-proof\.sh"),
     ("ffi", r"check-ffi\.sh|cryptol"),
@@ -30,6 +30,7 @@ CATS = [  # first match wins
     ("github", r"\bgh\b"),
     ("git", r"\bgit\b"),
     ("board", r"board\.py|slow_proofs\.py"),
+    ("poll-wait", r"\b(until|while)\b.*\bsleep\b"),  # polling a background job's output
 ]
 SCRUB = [
     (re.compile(r"(?:(?<![\w.])|(?<=-[A-Za-z]))/(?:[\w.+-]+/)+[\w.+-]*"), "<path>"),  # absolute paths
@@ -117,10 +118,17 @@ def analyse(path, who, session):
                     row["seconds"] = ""
                     bg[m.group(1)] = (t0, row)
                 rows.append(row)
-        # background completion notifications
+        # background completion notifications: in a user message, or queued
+        # as an attachment while the agent was busy (completed, failed or
+        # killed: the agent waited on it until then either way)
         raw = json.dumps(d.get("message", "")) if d.get("type") == "user" else ""
-        for tid in re.findall(r"<task-id>(\w+)</task-id>", raw):
-            if tid in bg and "completed" in raw:
+        a = d.get("attachment") if d.get("type") == "attachment" else None
+        if isinstance(a, dict) and a.get("type") == "queued_command":
+            raw = str(a.get("prompt", ""))
+        for note in raw.split("<task-notification>")[1:]:
+            m = re.search(r"<task-id>(\w+)</task-id>", note)
+            tid = m.group(1) if m and "<status>" in note else None
+            if tid in bg:
                 t0, row = bg.pop(tid)
                 row["seconds"] = round((t - t0).total_seconds(), 1)
     agent = {"who": who, "session": session,
