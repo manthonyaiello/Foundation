@@ -57,7 +57,7 @@
 #
 # Env:
 #   GNAT_LLVM_DIR  REQUIRED: the GNAT Pro LLVM install, with bin/llvm-gcc and
-#                  bin/llvm-nm (e.g. .../gnatpro-llvm-ada/install).
+#                  bin/llvm-nm (e.g. /opt/gnat-llvm).
 #   LLVM_LINK_DIR  REQUIRED: a directory with bin/llvm-link of the LLVM
 #                  release pinned in toolchain-pins.env (LLVM_LINK_VERSION),
 #                  which must also be the LLVM of GNAT_LLVM_DIR's llvm-gcc.
@@ -564,11 +564,17 @@ record() {
   done
   # The sources the front end read for the units (their ALIs' D lines),
   # each once: ours by sha256; the GNAT Pro runtime's by name and the ALI's
-  # checksum.
+  # checksum. A D line names a configuration file (-gnatec, saw/spec.adc)
+  # by its absolute path: it is recorded relative to spark/ (or, outside
+  # it, by its name alone), so that no record holds a machine's paths.
   for ali in "${ALL_ALIS[@]}"; do
     grep '^D ' "$ali"
   done | awk '!seen[$2]++' | while read -r _ file _ cksum _; do
-    src="$(find "$SPARK_DIR/src" "$SAW_DIR" -maxdepth 3 -name "$file" -print -quit)"
+    case "$file" in
+      "$SPARK_DIR"/*) src="$file" ;;
+      /*) src=""; file="${file##*/}" ;;
+      *) src="$(find "$SPARK_DIR/src" "$SAW_DIR" -maxdepth 3 -name "$file" -print -quit)" ;;
+    esac
     if [ -n "$src" ]; then
       echo "source      $(sha "$src") ${src#"$SPARK_DIR"/}"
     else
