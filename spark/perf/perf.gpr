@@ -1,0 +1,90 @@
+--  The size and performance harness of issue #51 (M5.3): the SPARK AES
+--  built as release code, against NSA's Rust (algorithms/AES/rust/, driven
+--  by perf/rust/). Not part of the library, not proved, and not scanned by
+--  the proof, trust or docs gates. scripts/perf-aes.sh builds every variant
+--  of this project and of the Rust and prints the tables; README
+--  "Performance" says what they show.
+--
+--  One build is one point of the matrix, chosen by external variables:
+--
+--    PERF_OPT     O2 | O3          the optimization level (-O2 / -O3)
+--    PERF_CHECKS  off | on         off: -gnatp (no run-time checks); on: the
+--                                  language's run-time checks are kept
+--    PERF_LTO     on | off         -flto at compile and link time
+--    PERF_OS      darwin | linux   which Perf_Clock body (the clock source)
+--    PERF_SRC     the crate sources to build: ../src (default), or another
+--                 tree, such as the table S-box's src/ at b967ebb
+--    PERF_NAME    the object and exec subdirectory of ../obj/perf/
+--
+--  Every variant compiles with perf.adc, Assertion_Policy (Ignore): no
+--  pre- or postcondition, assertion, predicate, invariant or ghost code is
+--  compiled in. That is the point of the proof: the absence of run-time
+--  errors and the contracts are established before the code runs.
+
+project Perf is
+
+   type OS_Type is ("darwin", "linux");
+   OS : OS_Type := external ("PERF_OS", "linux");
+
+   type Opt_Type is ("O2", "O3");
+   Opt : Opt_Type := external ("PERF_OPT", "O3");
+
+   type Switch_Type is ("off", "on");
+   Checks : Switch_Type := external ("PERF_CHECKS", "off");
+   LTO    : Switch_Type := external ("PERF_LTO", "on");
+
+   Src  := external ("PERF_SRC", "../src");
+   Name := external ("PERF_NAME", "default");
+
+   for Source_Dirs use ("src", "src/os-" & OS, Src & "/**");
+   for Object_Dir use "../obj/perf/" & Name;
+   for Exec_Dir use "../obj/perf/" & Name;
+   for Create_Missing_Dirs use "True";
+   for Main use ("perf_bench.adb");
+
+   --  Alire's release profile (-O3 -gnatn, section switches), with the
+   --  level from PERF_OPT.
+   Base_Switches :=
+     ("-" & Opt, "-gnatn", "-ffunction-sections", "-fdata-sections",
+      "-gnat2022", "-gnatW8");
+
+   Check_Switches := ();
+   case Checks is
+      when "off" => Check_Switches := ("-gnatp");
+      when "on"  => null;
+   end case;
+
+   LTO_Switches := ();
+   case LTO is
+      when "on"  => LTO_Switches := ("-flto");
+      when "off" => null;
+   end case;
+
+   --  Unreferenced sections are dropped at link time on both systems. On
+   --  macOS the linker also writes a map (perf_bench.map, beside the
+   --  executable), which scripts/perf-report.py reads for symbol sizes:
+   --  Mach-O symbol tables have none.
+   GC_Switches := ();
+   case OS is
+      when "darwin" =>
+         GC_Switches := ("-Wl,-dead_strip", "-Wl,-map,perf_bench.map");
+      when "linux"  => GC_Switches := ("-Wl,--gc-sections");
+   end case;
+
+   package Builder is
+      for Global_Configuration_Pragmas use "perf.adc";
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        Base_Switches & Check_Switches & LTO_Switches;
+   end Compiler;
+
+   package Linker is
+      --  With -flto the code is generated at link time: the linker gets
+      --  the optimization level too.
+      for Default_Switches ("Ada") use
+        LTO_Switches & ("-" & Opt) & GC_Switches;
+   end Linker;
+
+end Perf;

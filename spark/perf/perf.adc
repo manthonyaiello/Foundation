@@ -1,0 +1,5 @@
+--  The configuration pragmas of every perf/perf.gpr build (issue #51): no
+--  contract, assertion or ghost code is compiled in. The policy Ignore
+--  covers Pre, Post, Assert, Assume, the predicates, the type invariants,
+--  Loop_Invariant, Loop_Variant and Ghost.
+pragma Assertion_Policy (Ignore);
