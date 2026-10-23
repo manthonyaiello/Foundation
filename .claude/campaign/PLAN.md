@@ -1,18 +1,24 @@
 # The campaign plan: SPARK AES, SHA-256 and HMAC against the Cryptol
 
-**Provenance.** Rewritten 2026-10-22 (evening) on **hex**, at `main` =
-`f7a2366` (the merge of PR #111). **The campaign now runs on hex**, Tony's
-arm64 Mac; the `foundation` container is retired ("Machines"). This session
-merged PRs #108 (#100), #109 (#107) and #111 (part of #75), and refiled the
-remaining work around **a technical blog post** (#102).
-**Board, counted on hex at `f7a2366`:** 4264/4264 proved; SAW **STALE**
-(PR #111 changed five of its inputs; the next IOD session re-records).
-**Open PRs:** none besides this plan's.
-**Open issues:** #102 blog post and its prerequisites #103 #104 #51 #113;
-the IOD batch #99 #110 and #75 (item 3, the re-record, four AES
-statements); #106 effort analysis; E5's epic #48. #105 and #67 closed
-(Tony's decisions, "Decisions").
-**E0–E4 are closed**; E5: #49 and #50 closed, #51 open.
+**Provenance.** Rewritten 2026-10-22/23 on **hex**, at `main` = `a4cf229`
+(the merge of PR #117). **The campaign now runs on hex**, Tony's arm64
+Mac; the `foundation` container is retired ("Machines"). This session
+merged PRs #108 (#100), #109 (#107), #111 (part of #75), #116 (#113, the
+FFI on macOS), #115 (#51's aarch64 half) and #117 (#106, done in the
+`foundation` container), and refiled the remaining work around **a
+technical blog post** (#102).
+**Board, counted on hex at `f7a2366`** (no proof input changed since):
+4264/4264 proved; SAW **STALE** (PR #111 changed five of its inputs; the
+next IOD session re-records).
+**Open PRs:** #118 (#106 follow-up: relabels the after-a-change layers;
+docs only), and this plan. **In flight:** the #104 tick (mutation testing,
+FFI and gnatprove columns, on hex).
+**Open issues:** #102 blog post and its prerequisites #103 #104 #51
+(x86_64 half); the IOD batch #99 #110 and #75 (item 3, the re-record,
+four AES statements); E5's epic #48. #105, #67, #106 and #113 closed.
+**E0–E4 are closed**; E5: #49 and #50 closed, #51 half done.
+**GitHub disabled this repository's workflows on 2026-10-23** (reason not
+recorded; Tony re-enabled them): push once per PR, not per commit.
 **Measurements:** `.claude/campaign/measurements/2026-10-19-iod.md` (the E4
 day) and `2026-10-22-saw-cost.md` (#69). The AES spec crosswalks are in
 `.claude/campaign/walkthroughs/` (links in its README).
@@ -107,9 +113,8 @@ and never drafts it. A `/campaign` run never takes #102 as a writing task.
 **The order** (A → B: A first):
 
 ```
-#113 FFI on macOS ──► #104a mutants: FFI + gnatprove (hex) ─┐
-#51a  AES perf, aarch64 (hex; Rust via `use rust`) ─────────┤
-                          IOD session ◄─────────────────────┘
+#104a mutants: FFI + gnatprove (hex, in flight) ───┐
+                          IOD session ◄────────────┘
                             #99 unfold linear recursions
                             #110 check-saw.sh portable
                             #75 item 3, prelude SAW proofs
@@ -117,13 +122,14 @@ and never drafts it. A `/campaign` run never takes #102 as a writing task.
                             SAW re-record, default + long, once
                             #104 SAW column · #51b AES perf, x86_64
                           ──► #103 docs ──► #102 data ──► tag, clean FSF repro ──► publish
-#106 effort analysis: Tony, in the `foundation` container (2026-10-23), from a brief
 ```
 
-**On hex now:** #113 (the FFI library as a `.dylib`: macOS gprbuild has no
-encapsulated libraries), then #104's FFI and gnatprove columns; #51's
-aarch64 half. Cryptol 3.6.0 (macOS ARM64, with solvers, FFI enabled) is
-installed on hex (2026-10-22); Rust is `use rust`.
+**Done on hex:** #113 (PR #116: the FFI library as an encapsulated
+`.dylib`, Cryptol run through an ad hoc signed copy; 147/147 in about
+463 s); #51's aarch64 half (PR #115: `scripts/perf-aes.sh`; constant-time
+SPARK 1.5–1.7× Rust on blocks, the table S-box 0.8–1.1×); #106 (PR #117,
+from the `foundation` container). **In flight:** #104's FFI and gnatprove
+columns.
 
 **The IOD session** (Tony builds one; it dies 24 h after start, so **upload
 the session to memcp before then**): everything under "IOD session" above,
@@ -136,7 +142,8 @@ Not in the post (Tony, 2026-10-22): constant time; offering the work to NSA
 (undecided; possibly after GNAT-LLVM is in the community release).
 
 Not yet, and not filed:
-* A T-table AES (only if speed matters; #51 will say).
+* A T-table AES (only if speed matters: #51 on aarch64 has the table
+  S-box at 0.8–1.1× NSA's Rust, the constant-time circuit at 1.5–1.7×).
 * `FinalBits` for SHA-256; SHA-224/384/512 instances; truncated HMAC.
 * The four AES statements still inline (`pmod`, GF2 `pmult` [9], `pdiv`,
   `Types.Split`/`Join`): each sits in `SBox_Entries`' closure (PR #111
@@ -155,13 +162,14 @@ Not yet, and not filed:
   `FOUNDATION_SPARK_PROOF_ALLOWANCE=ci`**: at the local default (5 s at
   level 2) three `aes-lemmas` checks time out under load. Cryptol 3.6.0 (FFI, with solvers) in
   `~/Local/Software/cryptol-3.6.0-macos-15-ARM64-with-solvers/bin`, not
-  on PATH; `check-ffi.sh` needs #113 first. Rust through `use rust`
+  on PATH; `check-ffi.sh` runs on hex since #113 (about 8 min for the
+  147 properties). Rust through `use rust`
   (`source $HOME/.cargo/env`, 1.95.0). No gnatcov, Valgrind or SAW. Whole-crate
   gate: about 550 s cold at `-j8`. hex is also Tony's desktop: never
   idle, so benchmarks go last or elsewhere.
 * **`foundation`** (retired 2026-10-22): the aarch64 Linux container on
-  niss where E0–E3 and the reviews ran. Its session transcripts are needed
-  for #106.
+  niss where E0–E3 and the reviews ran. Its transcripts fed #106 (PR #117);
+  Tony can still start it.
 * **The x86_64 IOD**: dies 24 hours after it starts. **8 CPUs, 15.7 GB RAM,
   no swap.** Bootstrap with `spark/scripts/bootstrap-x86_64.sh`: since #100
   it uses each tool already present at its pin and fetches the rest. The IOD
@@ -355,14 +363,21 @@ Not yet, and not filed:
 * **#67 item 11 is done enough** (Tony, 2026-10-22): the README and
   `Properties` carry the note; the generated `sbox_entries.ads` gets it
   only if a later change touches the generator.
-* **#106 is Tony's**, in the `foundation` container, from a brief this
-  session writes at its end.
+* **#106 was done in the `foundation` container** (PR #117), and its
+  after-a-change layers relabelled (PR #118): they measure making the
+  review's changes versus following them in SAW, not upkeep of either
+  tool. Comparable: 6.78 h of gnatprove against 6.80 h of SAW.
 * **Coverage is not the argument against FFI-only testing**: it is near
   100%. Mutation testing (#104) is.
 * **Plan location.** This file. There is one `PLAN.md`; its history is git's.
 
 ## Open for Tony
 
+* **Report to AdaCore:** gprbuild 26's `gnat.xml` enables encapsulated
+  libraries for x86_64, i686 and powerpc Darwin but not aarch64 Darwin
+  (#113 worked around it in `foundation_spark_ffi.gpr`).
+* **35 merged branches** (plus `issue-113-ffi-macos`, the branch of the
+  superseded PR #114) are still on the remote: delete them?
 * **crucible-llvm and wide GEP indices**: optional (draft in PR #65).
 * **The constant-time S-box's cost** (#50): aarch64 encrypt 1.64×, decrypt
   1.42×, `Expand_Key` 2.9×; x86_64 1.64×, 1.54×, 1.9–2.1× (PR #90). Accept
