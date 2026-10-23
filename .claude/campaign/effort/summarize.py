@@ -48,7 +48,7 @@ LAYERS = {
     ("foundation", "agent-aec083e4"): "ffi",       # FFI onto the AES spec
     ("foundation", "agent-a20f3c9a"): "ffi",       # FFI for SHA-256 and HMAC
     ("foundation", "agent-a1885e7d"): "ffi",       # AES impl FFI export (#11)
-    ("foundation", "agent-a4bd897a"): "reobtain-spark",  # x86_64 proof margins (#54)
+    ("foundation", "agent-a4bd897a"): "other",  # x86_64 proof margins (#54): an investigation, later dropped
     ("foundation", "agent-ad7b5bc3"): "infra",     # CI (#3)
     ("foundation", "agent-abeb7273"): "infra",     # Cryptol from source (#2)
     ("foundation", "agent-a51e7923"): "infra",     # levels and board (#5)
@@ -58,14 +58,14 @@ LAYERS = {
     ("foundation", "agent-a53e6730"): "infra",     # x86_64 bootstrap (#6)
     ("foundation", "agent-a2d2e245"): "other",     # M5.1 coverage (#49)
     # foundation, 0022b46d (2026-10-20/21): review follow-ups
-    ("foundation", "agent-a812b736"): "reobtain-spark",  # #72 remove SPARKlib
-    ("foundation", "agent-af9201bd"): "reobtain-spark",  # #68 narrow Bit_Index
-    ("foundation", "agent-a65a31dc"): "reobtain-spark",  # #74 spike, generic AES spec
-    ("foundation", "agent-aa4c1a67"): "reobtain-spark",  # #80 full AES generic
-    ("foundation", "agent-ab0acb6a"): "reobtain-spark",  # #75 prelude + SHA-2/HMAC
-    ("foundation", "agent-ab79f9a4"): "reobtain-spark",  # #75 AES migration
-    ("foundation", "agent-adc5fb7f"): "reobtain-spark",  # #70 cheap part: move SBox_Entries
-    ("foundation", "agent-a0ce48f4"): "reobtain-spark",  # #70 cheaper SBoxCorrect
+    ("foundation", "agent-a812b736"): "spec-change",  # #72 remove SPARKlib
+    ("foundation", "agent-af9201bd"): "spec-change",  # #68 narrow Bit_Index
+    ("foundation", "agent-a65a31dc"): "spec-change",  # #74 spike, generic AES spec
+    ("foundation", "agent-aa4c1a67"): "spec-change",  # #80 full AES generic
+    ("foundation", "agent-ab0acb6a"): "spec-change",  # #75 prelude + SHA-2/HMAC
+    ("foundation", "agent-ab79f9a4"): "spec-change",  # #75 AES migration
+    ("foundation", "agent-adc5fb7f"): "spec-change",  # #70 cheap part: move SBox_Entries
+    ("foundation", "agent-a0ce48f4"): "spec-change",  # #70 cheaper SBoxCorrect
     ("foundation", "agent-a1200683"): "infra",     # #67 board kinds, docs
     ("foundation", "agent-a4bd4fed"): "other",     # #50 constant-time AES
     ("foundation", "agent-a3bd5bae"): "other",     # crosswalk snapshot (docs)
@@ -78,15 +78,15 @@ LAYERS = {
     ("iod", "agent-a418d907"): "saw-spec",         # #59 gaps
     ("iod", "agent-aef69b74"): "other",            # unnamed helper
     # iod, bfed13a5 (2026-10-21/22): SAW after the spec changes
-    ("iod", "agent-aaaef209"): "reobtain-saw",     # tick A, SAW impl repair
-    ("iod", "agent-a175171e"): "reobtain-saw",     # tick B, SAW spec-layer repair
+    ("iod", "agent-aaaef209"): "saw-follow",     # tick A, SAW impl repair
+    ("iod", "agent-a175171e"): "saw-follow",     # tick B, SAW spec-layer repair
     ("iod", "agent-ae15b4fa"): "saw-spec",         # tick C, SAW Parse (#67): a new spec-layer proof
-    ("iod", "agent-abfcdb36"): "reobtain-saw",     # tick E, record staleness fix (#95): a new record
+    ("iod", "agent-abfcdb36"): "saw-follow",     # tick E, record staleness fix (#95): a new record
     ("iod", "agent-aa4121a9"): "other",            # tick D, #69 cost analysis
     ("iod", "agent-a8a83d08"): "other",            # #50 x86_64 constant time
 }
 ORDER = ["spec", "spec-properties", "impl", "ffi", "saw-impl", "saw-spec",
-         "reobtain-spark", "reobtain-saw", "infra", "other",
+         "spec-change", "saw-follow", "infra", "other",
          "orchestration, foundation", "orchestration, iod", "review"]
 REVIEW = {"9388b3d5", "3cff259e"}  # sessions with Tony, no ticks
 TOOLS = ["gnatprove", "ffi", "saw", "ci-wait", "build+ct", "poll-wait"]

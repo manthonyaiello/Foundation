@@ -42,14 +42,19 @@ worked on (`LAYERS` in `summarize.py`, with the tick's issue):
   M4.3);
 * **saw-spec**: the SAW proofs of the spec layer (M4.4, #59 gaps, and
   tick C, `Parse`, a spec-layer proof added later);
-* **reobtain-spark**: SPARK proofs re-obtained after a change (#54
-  x86_64 margins, #72, #68, #74, #80, #75 ×2, #70 ×2);
-* **reobtain-saw**: SAW re-obtained after those changes (ticks A, B; E,
-  the record re-written);
+* **spec-change**: the changes after the 2026-10-20 review, each made
+  and re-proved by gnatprove (#72, #68, #74, #80, #75 ×2, #70 ×2). Each
+  tick designed and wrote its change as well as re-proving it, and the
+  data cannot split the two. The ticks also edited the SAW contracts their
+  change touched (unverified until the IOD session), so part of SAW's
+  upkeep is in this layer;
+* **saw-follow**: SAW brought back in line after those changes (ticks A,
+  B; E, the record re-written). It made no change of its own;
 * **infra**: CI, Cryptol build, levels and board, restacks, slow-proof
   machinery, bootstrap, #67's board kinds;
 * **other**: coverage, constant time (#50, both machines), the #69
-  analysis, docs pages, two unnamed helpers;
+  analysis, the x86_64 proof-margin investigation (#54, later dropped),
+  docs pages, two unnamed helpers;
 * **orchestration**: the orchestrator sessions (choosing ticks, briefing
   them, verifying each tick's claims, merging), per machine;
 * **review**: the two sessions with Tony.
@@ -75,10 +80,10 @@ short commands). Tokens are the assistant's output tokens only.
 | ffi | 4 | 4.63 | 0.00 | 611 | 56182 | 3.71 | 0.36 | 1.70 | 0.00 | 2.10 | 0.01 | 0.18 | 0.92 |
 | saw-impl | 3 | 8.89 | 4.71 | 474 | 90022 | 3.25 | 0.00 | 0.00 | 0.67 | 2.26 | 0.00 | 0.31 | 0.94 |
 | saw-spec | 3 | 14.22 | 0.00 | 777 | 151553 | 12.08 | 0.00 | 0.00 | 11.25 | 0.83 | 0.00 | 0.00 | 2.14 |
-| reobtain-spark | 9 | 14.63 | 0.00 | 1862 | 259813 | 12.84 | 7.31 | 0.69 | 0.00 | 5.12 | 0.01 | 0.00 | 1.80 |
-| reobtain-saw | 3 | 8.19 | 0.00 | 359 | 21729 | 7.54 | 0.00 | 0.00 | 6.80 | 0.74 | 0.00 | 0.00 | 0.65 |
+| spec-change | 8 | 12.26 | 0.00 | 1699 | 248396 | 10.60 | 6.78 | 0.69 | 0.00 | 3.33 | 0.01 | 0.00 | 1.66 |
+| saw-follow | 3 | 8.19 | 0.00 | 359 | 21729 | 7.54 | 0.00 | 0.00 | 6.80 | 0.74 | 0.00 | 0.00 | 0.65 |
 | infra | 8 | 8.98 | 0.00 | 1229 | 190928 | 7.47 | 1.85 | 0.62 | 0.00 | 5.01 | 0.00 | 0.00 | 1.51 |
-| other | 7 | 6.57 | 1.50 | 911 | 103504 | 3.15 | 0.57 | 0.09 | 1.06 | 1.49 | 0.11 | 0.00 | 1.92 |
+| other | 8 | 8.94 | 1.50 | 1074 | 114921 | 5.38 | 1.10 | 0.09 | 1.06 | 3.28 | 0.11 | 0.00 | 2.06 |
 | orchestration, foundation | 2 | 49.41 | 40.13 | 400 | 830921 | 2.35 | 0.13 | 0.10 | 0.00 | 2.13 | 0.00 | 0.00 | 6.93 |
 | orchestration, iod | 2 | 39.77 | 31.86 | 310 | 661478 | 3.77 | 1.05 | 0.00 | 2.47 | 0.20 | 0.05 | 0.00 | 4.14 |
 | review | 2 | 6.19 | 3.71 | 145 | 353596 | 0.02 | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | 0.00 | 2.45 |
@@ -91,9 +96,9 @@ short commands). Tokens are the assistant's output tokens only.
 * **Everything after the spec was mostly waiting on tools.** The
   implementation and its proof spent 2.53 of 3.87 h waiting (gnatprove
   1.16 h, CI 1.07 h); the FFI properties 3.71 of 4.63 h; the SAW spec
-  layer 12.08 of 14.22 h, 11.25 h of it SAW; re-obtaining SPARK proofs
-  12.84 of 14.63 h (gnatprove 7.31 h, CI 5.12 h); re-obtaining SAW 7.54 of
-  8.19 h (SAW 6.80 h).
+  layer 12.08 of 14.22 h, 11.25 h of it SAW; the spec changes 10.60 of
+  12.26 h (gnatprove 6.78 h, CI 3.33 h); the SAW follow-up 7.54 of 8.19 h
+  (SAW 6.80 h).
 * **SAW cost more to obtain than SPARK's spec and implementation
   together**: 23.1 agent-hours for saw-impl + saw-spec (18.4 h less the
   silent gaps), against 8.27 h for spec + spec-properties + impl. The
@@ -101,11 +106,18 @@ short commands). Tokens are the assistant's output tokens only.
   without M4.3's idle tail) include M4.1, the spike that set up the
   whole SAW pipeline (GNAT-LLVM bitcode, the secondary stack, the
   record).
-* **Re-obtaining after the 2026-10-20 review cost about as much as
-  obtaining**: 14.63 h on the SPARK side and 8.19 h on the SAW side,
-  against 8.27 h and 23.1 h for the first pass. It was mostly the spec
-  layer's restructuring (the generic AES spec, the Cryptol prelude), so it
-  re-proved both layers.
+* **The two "after a change" layers are not comparable, and say nothing
+  about which tool costs more to maintain.** spec-change (12.26 h) is the
+  cost of *making* the review's changes (the generic AES spec, the Cryptol
+  prelude, a narrower index type, a cheaper `SBoxCorrect`) and re-proving
+  them; saw-follow (8.19 h) is only the cost of bringing SAW back in line
+  afterwards, and some of that is inside spec-change (the SAW contract
+  edits) and some is missing (the IOD's undercounted background waits,
+  below). What is comparable is the machine time: 6.78 h of gnatprove
+  against 6.80 h of SAW. One structural difference: a SAW record is all or
+  nothing, so any change to one of its inputs costs a full record (about
+  an hour, two for the long one), where gnatprove's gate re-proves only
+  what changed.
 
 ## Obtain vs. check
 
@@ -137,8 +149,8 @@ Check costs on a green tree, from the tools' own records:
 | FFI properties | 4.63 h | FFI 1.70 h | FFI job: about 8–16 min | 17–35× | 6–13 |
 | SAW impl | 8.89 h (4.18 h) | SAW 0.67 h (undercounted, below) | 35 s (4 + 31) | 430× (less silent) | ≥ 69 |
 | SAW spec layer | 14.22 h | SAW 11.25 h | 2747 s (395 + 2352); long 7009 s | 19× | 15 |
-| re-obtain, SPARK | 14.63 h | gnatprove 7.31 h | gate + slow unit: 530 + 493 s | 51× | 26 |
-| re-obtain, SAW | 8.19 h | SAW 6.80 h | the record: 3543 s | 8× | 7 |
+| spec changes, made and re-proved (SPARK) | 12.26 h | gnatprove 6.78 h | gate + slow unit: 530 + 493 s | 43× | 24 |
+| SAW re-proof after those changes | 8.19 h | SAW 6.80 h | the record: 3543 s | 8× | 7 |
 
 "Checker time ÷ one check" is the time the layer's own checker ran
 during obtaining, in units of one check of that layer on a green tree.
@@ -148,7 +160,7 @@ foundation pool shared with parallel ticks.
 
 **What it says.**
 
-* **Checking is cheap beside obtaining on every layer**: 8× to 51×
+* **Checking is cheap beside obtaining on every layer**: 8× to 43×
   wall-clock, except the SAW implementation proofs (430×), whose check is
   35 s while their obtaining included building the SAW pipeline.
 * **The two tools check in very different times for the same
@@ -158,13 +170,13 @@ foundation pool shared with parallel ticks.
   against the Cryptol by testing in 8–16 min.
 * **SAW's obtain cost follows its check cost.** The SAW spec layer's
   obtaining was 79% SAW time (11.25 of 14.22 h), about 15 checks' worth;
-  re-obtaining SAW was 83% SAW time. A layer whose check takes 46
+  the SAW follow-up was 83% SAW time. A layer whose check takes 46
   minutes is expensive to iterate on, whatever the agent's own effort
   (2.14 h of rest).
-* **gnatprove's re-obtaining was the most tool time of any layer**
-  (7.31 h: about 50 gates' worth, 26 of gate plus slow unit), because the review's changes (#80,
-  #75) restructured the spec layer and each tick re-proved its closure,
-  several ticks at once on one pool.
+* **gnatprove during the spec changes was the most tool time of any
+  layer** (6.78 h: about 46 gates' worth, 24 of gate plus slow unit),
+  because the review's changes (#80, #75) restructured the spec layer and
+  each tick re-proved its closure, several ticks at once on one pool.
 
 ### SAW's cost by cause (#69)
 
@@ -236,7 +248,7 @@ sigmas) they cost the same. The #69 analysis itself cost a tick of
   background commands lack a duration), but the IOD rows (PR #98) were
   not re-extracted: their transcripts are not on `foundation`. 45 of the 77 IOD
   background commands lack a duration (saw-impl 13, saw-spec 11,
-  reobtain-saw 13, other 7, orchestration 1), so the IOD layers' tool
+  saw-follow 13, other 7, orchestration 1), so the IOD layers' tool
   waits are low and their **rest** high by an unknown amount.
 * **Wall-clock spans the transcript**, first event to last. Agent hours
   of parallel ticks overlap; the orchestrators' spans are the sessions'
@@ -269,18 +281,17 @@ sigmas) they cost the same. The #69 analysis itself cost a tick of
 | iod | 0f6e209a | agent-a418d907 | #59 gaps SAW tick | saw-spec | 7.22 | 0.00 | 256 | 38068 | 6.35 | 0.00 | 0.00 | 5.52 | 0.83 | 0.00 | 0.00 | 0.87 |
 | iod | 0f6e209a | agent-ab3f8564 | M4.4 SAW spec-layer tick (#59) | saw-spec | 3.31 | 0.00 | 387 | 103531 | 2.44 | 0.00 | 0.00 | 2.44 | 0.00 | 0.00 | 0.00 | 0.86 |
 | iod | bfed13a5 | agent-ae15b4fa | Tick C: SAW Parse (#67) | saw-spec | 3.70 | 0.00 | 134 | 9954 | 3.29 | 0.00 | 0.00 | 3.29 | 0.00 | 0.00 | 0.00 | 0.41 |
-| foundation | 0022b46d | agent-a0ce48f4 | Tick #70 cheaper SBoxCorrect | reobtain-spark | 1.17 | 0.00 | 130 | 6955 | 1.06 | 0.69 | 0.00 | 0.00 | 0.37 | 0.00 | 0.00 | 0.10 |
-| foundation | 0022b46d | agent-a65a31dc | Spike #74 generic AES spec | reobtain-spark | 1.97 | 0.00 | 240 | 33507 | 1.70 | 1.17 | 0.00 | 0.00 | 0.52 | 0.01 | 0.00 | 0.26 |
-| foundation | 0022b46d | agent-a812b736 | Tick #72 remove SPARKlib | reobtain-spark | 1.15 | 0.00 | 126 | 9790 | 1.10 | 0.23 | 0.00 | 0.00 | 0.86 | 0.00 | 0.00 | 0.05 |
-| foundation | 0022b46d | agent-aa4c1a67 | Tick #80 full AES generic | reobtain-spark | 1.40 | 0.00 | 329 | 44894 | 1.22 | 0.85 | 0.00 | 0.00 | 0.39 | 0.00 | 0.00 | 0.17 |
-| foundation | 0022b46d | agent-ab0acb6a | Tick #75 prelude + SHA-2/HMAC | reobtain-spark | 1.91 | 0.00 | 346 | 95904 | 1.57 | 1.07 | 0.45 | 0.00 | 0.22 | 0.00 | 0.00 | 0.34 |
-| foundation | 0022b46d | agent-ab79f9a4 | Tick #75 AES migration | reobtain-spark | 2.40 | 0.00 | 267 | 38397 | 2.11 | 1.64 | 0.24 | 0.00 | 0.25 | 0.00 | 0.00 | 0.29 |
-| foundation | 0022b46d | agent-adc5fb7f | Tick #70 cheap part: move sbox_entries | reobtain-spark | 0.66 | 0.00 | 107 | 8254 | 0.33 | 0.33 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.33 |
-| foundation | 0022b46d | agent-af9201bd | Tick #68 narrow Bit_Index | reobtain-spark | 1.61 | 0.00 | 154 | 10695 | 1.50 | 0.79 | 0.00 | 0.00 | 0.71 | 0.00 | 0.00 | 0.11 |
-| foundation | 0f5e52b6 | agent-a4bd897a | Tick: x86_64 proof margins | reobtain-spark | 2.37 | 0.00 | 163 | 11417 | 2.23 | 0.53 | 0.00 | 0.00 | 1.79 | 0.00 | 0.00 | 0.14 |
-| iod | bfed13a5 | agent-a175171e | Tick B: SAW spec-layer repair | reobtain-saw | 4.59 | 0.00 | 162 | 10082 | 4.17 | 0.00 | 0.00 | 3.60 | 0.57 | 0.00 | 0.00 | 0.42 |
-| iod | bfed13a5 | agent-aaaef209 | Tick A: SAW impl repair | reobtain-saw | 0.17 | 0.00 | 115 | 7615 | 0.05 | 0.00 | 0.00 | 0.04 | 0.00 | 0.00 | 0.00 | 0.13 |
-| iod | bfed13a5 | agent-abfcdb36 | Tick E: SAW record staleness fix | reobtain-saw | 3.43 | 0.00 | 82 | 4032 | 3.33 | 0.00 | 0.00 | 3.16 | 0.17 | 0.00 | 0.00 | 0.11 |
+| foundation | 0022b46d | agent-a0ce48f4 | Tick #70 cheaper SBoxCorrect | spec-change | 1.17 | 0.00 | 130 | 6955 | 1.06 | 0.69 | 0.00 | 0.00 | 0.37 | 0.00 | 0.00 | 0.10 |
+| foundation | 0022b46d | agent-a65a31dc | Spike #74 generic AES spec | spec-change | 1.97 | 0.00 | 240 | 33507 | 1.70 | 1.17 | 0.00 | 0.00 | 0.52 | 0.01 | 0.00 | 0.26 |
+| foundation | 0022b46d | agent-a812b736 | Tick #72 remove SPARKlib | spec-change | 1.15 | 0.00 | 126 | 9790 | 1.10 | 0.23 | 0.00 | 0.00 | 0.86 | 0.00 | 0.00 | 0.05 |
+| foundation | 0022b46d | agent-aa4c1a67 | Tick #80 full AES generic | spec-change | 1.40 | 0.00 | 329 | 44894 | 1.22 | 0.85 | 0.00 | 0.00 | 0.39 | 0.00 | 0.00 | 0.17 |
+| foundation | 0022b46d | agent-ab0acb6a | Tick #75 prelude + SHA-2/HMAC | spec-change | 1.91 | 0.00 | 346 | 95904 | 1.57 | 1.07 | 0.45 | 0.00 | 0.22 | 0.00 | 0.00 | 0.34 |
+| foundation | 0022b46d | agent-ab79f9a4 | Tick #75 AES migration | spec-change | 2.40 | 0.00 | 267 | 38397 | 2.11 | 1.64 | 0.24 | 0.00 | 0.25 | 0.00 | 0.00 | 0.29 |
+| foundation | 0022b46d | agent-adc5fb7f | Tick #70 cheap part: move sbox_entries | spec-change | 0.66 | 0.00 | 107 | 8254 | 0.33 | 0.33 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.33 |
+| foundation | 0022b46d | agent-af9201bd | Tick #68 narrow Bit_Index | spec-change | 1.61 | 0.00 | 154 | 10695 | 1.50 | 0.79 | 0.00 | 0.00 | 0.71 | 0.00 | 0.00 | 0.11 |
+| iod | bfed13a5 | agent-a175171e | Tick B: SAW spec-layer repair | saw-follow | 4.59 | 0.00 | 162 | 10082 | 4.17 | 0.00 | 0.00 | 3.60 | 0.57 | 0.00 | 0.00 | 0.42 |
+| iod | bfed13a5 | agent-aaaef209 | Tick A: SAW impl repair | saw-follow | 0.17 | 0.00 | 115 | 7615 | 0.05 | 0.00 | 0.00 | 0.04 | 0.00 | 0.00 | 0.00 | 0.13 |
+| iod | bfed13a5 | agent-abfcdb36 | Tick E: SAW record staleness fix | saw-follow | 3.43 | 0.00 | 82 | 4032 | 3.33 | 0.00 | 0.00 | 3.16 | 0.17 | 0.00 | 0.00 | 0.11 |
 | foundation | 0022b46d | agent-a1200683 | Tick #67 board kinds, docs | infra | 0.80 | 0.00 | 154 | 39608 | 0.66 | 0.39 | 0.00 | 0.00 | 0.27 | 0.00 | 0.00 | 0.13 |
 | foundation | 0f5e52b6 | agent-a0002a4a | Tick: on-demand slow proofs + restack #36/#41 | infra | 2.57 | 0.00 | 291 | 54689 | 2.29 | 1.29 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 | 0.27 |
 | foundation | 0f5e52b6 | agent-a51e7923 | Tick: M0.4 levels and board (#5) | infra | 0.28 | 0.00 | 111 | 18498 | 0.06 | 0.03 | 0.00 | 0.00 | 0.04 | 0.00 | 0.00 | 0.22 |
@@ -293,6 +304,7 @@ sigmas) they cost the same. The #69 analysis itself cost a tick of
 | foundation | 0022b46d | agent-a4bd4fed | Tick #50 constant-time AES | other | 1.01 | 0.00 | 281 | 50270 | 0.75 | 0.39 | 0.00 | 0.00 | 0.49 | 0.03 | 0.00 | 0.26 |
 | foundation | 0022b46d | agent-a6ac2127 | Write AES spec old-vs-new page | other | 0.15 | 0.00 | 46 | 983 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.14 |
 | foundation | 0f5e52b6 | agent-a2d2e245 | Tick: M5.1 GNATcoverage (#49) | other | 1.27 | 0.00 | 137 | 15130 | 0.97 | 0.12 | 0.09 | 0.00 | 0.76 | 0.00 | 0.00 | 0.31 |
+| foundation | 0f5e52b6 | agent-a4bd897a | Tick: x86_64 proof margins | other | 2.37 | 0.00 | 163 | 11417 | 2.23 | 0.53 | 0.00 | 0.00 | 1.79 | 0.00 | 0.00 | 0.14 |
 | iod | 0f6e209a | agent-aef69b74 | (none) | other | 0.34 | 0.00 | 79 | 1912 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.34 |
 | iod | bfed13a5 | agent-a8a83d08 | Tick: #50 x86_64 CT | other | 1.75 | 1.50 | 96 | 7398 | 0.14 | 0.06 | 0.00 | 0.00 | 0.00 | 0.08 | 0.00 | 0.12 |
 | iod | bfed13a5 | agent-aa4121a9 | Tick D: SAW cost analysis (#69) | other | 1.99 | 0.00 | 233 | 27056 | 1.29 | 0.00 | 0.00 | 1.05 | 0.24 | 0.00 | 0.00 | 0.69 |
