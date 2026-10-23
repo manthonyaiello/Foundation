@@ -1126,7 +1126,7 @@ What it shows, at `-O3`:
 
 ### x86_64, Linux (the x86_64 instance)
 
-Intel Xeon 6975P-C (AWS c8i.2xlarge, 8 vCPUs), Ubuntu 24.04, GNAT FSF
+Intel Xeon 6975P-C (8 vCPUs), Ubuntu 24.04, GNAT FSF
 16.1.0, gprbuild 26.0.0, rustc 1.95.0, at `6023e8a`, the script
 unmodified. Two full runs, 2026-10-23 18:02 UTC, back to back; the
 numbers are the first's; the second's medians are within 3% of them in
