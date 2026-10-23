@@ -167,3 +167,7 @@ if saw_long then do {
   verify_hmac 100 32;
   return ();
 } else return ();
+
+/* --- the prelude's instances on their own (#75 item 3) ------------------ */
+
+include "sha256_spec_prelude.saw";

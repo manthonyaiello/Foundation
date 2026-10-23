@@ -683,9 +683,11 @@ against Cryptol's built-in through the FFI (`FFI.Prelude`), through the
 spec layers' own instances where there are some: 22 properties, `:exhaust`
 where the domain allows. A fold takes a function, which C cannot pass, so
 the shims fold fixed ones whose result depends on the order of the
-elements. SAW does not prove the prelude on its own; the spec-layer SAW
-proofs of SHA-2 and HMAC go through its instances (their lemmas now name
-the instances' recursions).
+elements. The spec-layer SAW proofs go through its instances (their
+lemmas name the instances' recursions), and since #75's item 3 SAW also
+proves each instance the spec layers call on its own, at the sizes they
+call it at, against the Cryptol built-in it states (`saw/aes_spec_prelude.saw`,
+`saw/sha256_spec_prelude.saw`; "SAW", "The spec layer", below).
 
 ## Coverage
 
@@ -1768,6 +1770,34 @@ it text for text, the spec's `HMAC_init` is proved against the copy, and
 overrides, which ties the copy to `Main.cry` (as `Step` ties
 `SHA256Step.cry`).
 
+**The prelude's instances on their own** (#75 item 3;
+`saw/aes_spec_prelude.saw` and `saw/sha256_spec_prelude.saw`, each
+included last by its module's script). The proofs above execute the
+Cryptol prelude's instances (README "The Cryptol prelude"), or take their
+recursions' lemmas as overrides. These prove each instance a spec layer
+calls by itself, at the sizes it is called at, against the Cryptol
+built-in it states:
+
+| instance (generic) | Cryptol built-in | sizes | overrides | tactic |
+|---|---|---|---|---|
+| GF28's `Byte_Bits`, `Product_Bits`, GF2's `Poly_Bits`, `Main.Byte_Bits.Word_Bits` (`Words`): `Bit`, `Head` | `x @ j`, `head x` | `[8]` in a byte, `[15]` and `[9]` in a `Poly`, `[8]` | | z3, rme |
+| `GF28.Products.Pmult` (`Polynomial_Products`) | `pmult` | `[8] x [8] -> [15]` | `Products` at 8 | rme |
+| `Cipher.Table_Indexing.Bulk_Index`, `Cipher.Block_Indexing.Bulk_Index` (`Bulk_Indexing`) | `xs @@ is` | `[256][8] @@ [16][8]`, any table; `[16][8] @@` 16 indices below 16, any permutation | | z3 |
+| `Cipher.Round_Folds.Foldl`, `.InvRound_Folds.`, `.InvRound_Prime_Folds.` (`Folds`) | `foldl f z xs` | M = 9, 11, 13 round keys | `Foldl_Take` at M | z3, the round uninterpreted |
+| `Cipher.Key_Sequences.Reverse_Of` (`Sequences`) | `reverse` | 9, 11, 13 round keys | | z3 |
+| `Main.Byte_Bits.Join`, `.Split_At` (`Join_Split`) | `join`, `split` | 16 bytes; 128, 192, 256 bits | | z3 |
+| `SHA2.Lengths.Ceil_Div`, `.Ceil_Mod` (`Numeric`) | `` `(a /^ b) ``, `` `(a %^ b) `` (type operators, so constants) | A = l + 65, B = 512, at the 14 lengths l `Hash` and HMAC's hashes are proved at | | z3 |
+| `SHA2.Sequences_Of_Bits.Zero`, `.Literal` (`Bit_Sequences`) | `zero : [n]`; the `[64]` literal of `v`, ``drop`{64} v`` | the 9 counts `Pad` and `HMAC_init` use; W = 64, unfolded | | z3 |
+| SHA-256's `Word_Sequences.Word_Bits.Bit`, `HMAC.Byte_Words.Word_Bits.Bit` (`Words`) | `x @ j` | `[32]`, `[8]` | | z3 |
+| SHA-256's `Word_Sequences.Join`, `.Split_At`; `HMAC.Byte_Words.Join` (`Join_Split`) | `join`, `split` | `[8][32]`; 512 and 1024 bits (with `SAW_LONG=1` also 1536, 2048), `Split_At` at each word index, as `Parse_Block` calls it (one `RESULTS` line per length; with the index symbolic the proof reached the 10G cap); keys of 0, 32, 64, 65, 100 bytes | `Value` at 32 for `Split_At` | z3 |
+| `HMAC.Byte_Sequences.Repeat` (`Sequences`) | `repeat` | `[64][8]` | | z3 |
+
+The recursions `Folds.Foldl_Take`, `Enumeration_Folds.Foldl` and
+`Polynomial_Products.Products` are proved in the tables above, against
+`foldl` and `pmult`. `Join_Split.Value`, the conversion from bits to a
+word, is not a Cryptol built-in: it is proved per bit count for SHA-256
+(`Word_Of`, above) and executed within `Split_At`'s proofs for AES.
+
 **Measured** (`results.txt`, the default run at `937e485` on the x86_64
 IOD, 2026-10-21): 2800 proofs of the spec layer, 1137 of AES (768 of them
 the exhaustive `Pgcd`, `Inverse` and `Affine`, recorded as three
@@ -1817,7 +1847,7 @@ this says about checking a C-to-SPARK translation.
   (`Pad`, `Zero`, `To_Bits`) again; the default run proves one length per case of
   `HMAC_init`. HMAC at other lengths, or λ < 256: not attempted.
 - On their own: `Parse_Block`, `Join` and `Bit` (executed within
-  `Hash`, and `Parse_Block` within `Parse`'s own results), `Ceil_Div` and `Ceil_Mod` (within `Small_K`), GF2's `Inner`,
+  `Hash`, and `Parse_Block` within `Parse`'s own results), GF2's `Inner`,
   `Inner_Step`, `Inner_Next`, `Sub_Mult`, `Term`, `Lead`, `Reduce` and
   `Bit` (within `Pgcd` and the folds; `Inner` and the rest are pgcd's
   locals, with no Cryptol name), `SBox.Reversed_Bit` and `Affine_Bit`,
