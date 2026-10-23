@@ -1798,23 +1798,26 @@ The recursions `Folds.Foldl_Take`, `Enumeration_Folds.Foldl` and
 word, is not a Cryptol built-in: it is proved per bit count for SHA-256
 (`Word_Of`, above) and executed within `Split_At`'s proofs for AES.
 
-**Measured** (`results.txt`, the default run at `937e485` on the x86_64
-IOD, 2026-10-21): 2800 proofs of the spec layer, 1137 of AES (768 of them
-the exhaustive `Pgcd`, `Inverse` and `Affine`, recorded as three
-`RESULTS 256` lines; 108 the fold lemmas, `Foldl_Take` at N = 0 .. M for
-M = 9, 11, 13 and each of the three rounds) and 1663 of SHA-256 and HMAC
-(1396 of them in the lax-arithmetic load; `Parse` at 1 and 2 blocks, 4 s
-and 15 s, are the two added by #67), with 12 negative controls of the
-spec layer failing as they must. `aes_spec.saw` takes 393 s,
-`sha256_spec.saw` 2337 s (most of it the `To_Bits` chains, 15 of them,
-and `Word_Of`), the whole `check-saw.sh` 3516 s. At `65ee4c2`, before
-#67's `Parse`: 2798, 3707 s. Before #75 and #80 (at
-`d874133`): 2742, of which AES 1083 and SHA-256 and HMAC 1659; peak
-memory then 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at `a3e7c74`): 3582
-proofs of the spec layer (2178 lax; `Parse` at 1 to 4 blocks, 4, 15, 33
-and 53 s), `sha256_spec.saw` 6523 s, the whole 7708 s (at `a4ea138`,
-before #67's `Parse`: 3578, 7857 s; before #75, at `c31472e`: 3522, 7784 s, peak 7.2 GB; below, "Running
-it").
+**Measured** (`results.txt`, the default run at `82b10e6` on the x86_64
+instance, 2026-10-23, after #99 and #75's item 3): 1808 proofs of the spec
+layer, 1141 of AES (768 of them the exhaustive `Pgcd`, `Inverse` and
+`Affine`, recorded as three `RESULTS 256` lines; 108 the cipher folds'
+lemmas, `Foldl_Take` at N = 0 .. M for M = 9, 11, 13 and each of the three
+rounds; 27 the prelude's instances on their own) and 667 of SHA-256 and
+HMAC (419 of them in the lax-arithmetic load; 95 the prelude's
+instances, 48 of them `Split_At` index by index), with 12 negative
+controls of the spec layer failing as they must. `aes_spec.saw` takes
+648 s (226 s of it the prelude's `@@` on a symbolic table),
+`sha256_spec.saw` 1385 s (most of it `Word_Of`), the whole
+`check-saw.sh` 2749 s. Before #99 (`5bf56ac`): 2800 proofs of the spec
+layer (AES 1137, SHA-256 and HMAC 1663, most of the difference the 975
+`To_Bits` lemmas, now 15 unfolded proofs), 3543 s; the same scripts at
+`6023e8a`, re-run on 2026-10-23 before this change, 3686 s. Before #75
+and #80 (at `d874133`): 2742; peak memory then 3.8 GB. `SAW_LONG=1`
+(`results-long.txt`, at `82b10e6`): 2055 proofs of the spec layer (666
+lax), `sha256_spec.saw` 4899 s, the whole 6257 s; before #99 (at
+`babab6f`) 3582, 7819 s (before #75, at `c31472e`: 3522, 7784 s, peak
+7.2 GB; below, "Running it").
 
 **Why the spec layer costs about 76 times the implementation** (#69;
 `.claude/campaign/measurements/2026-10-22-saw-cost.md`, experiments in
@@ -2055,11 +2058,12 @@ layer alone, with the `spec_*` controls. A one-layer run is never a
 record: the script requires `--print` with it, and prints its
 `layers` line.
 
-**What the default run proves, and `SAW_LONG`.** The default run (about
-an hour on the x86_64 IOD) proves everything above but `Hash` at 120, 128
-and 200 bytes and HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and
-(100, 32) bytes; `SAW_LONG=1` adds those (`Word_Of`'s lemmas for 1536 and
-2048 bits, `Foldl_Step` at 3 and 4 blocks, and four more HMAC lengths
+**What the default run proves, and `SAW_LONG`.** The default run (2749 s
+on the x86_64 instance, `results.txt`) proves everything above but `Hash`
+at 120, 128 and 200 bytes and HMAC at (key, text) = (0, 0), (32, 32),
+(64, 3) and (100, 32) bytes; `SAW_LONG=1` (6257 s) adds those (`Word_Of`'s
+lemmas for 1536 and 2048 bits, `Foldl_Step` at 3 and 4 blocks, the
+prelude's `Split_At` at those lengths, and four more HMAC lengths
 with their hashes' lemmas at their stack bases) and records the run in
 `saw/results-long.txt`. Each record's `options` line says which it was.
 

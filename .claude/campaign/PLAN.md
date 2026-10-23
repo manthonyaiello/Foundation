@@ -80,12 +80,13 @@ gate green on PR #111's head):
   the object-code check finds 0 violations; dudect max |t| ≤ 2.3; x86_64
   Valgrind `ct_grind` 0 errors. Cost at `-O3`: encrypt 1.64×, decrypt
   1.42–1.54×, `Expand_Key` 1.9–2.9×. **Left out of the blog post** (Tony).
-* **SAW: STALE.** Last records: `results.txt` at `5bf56ac`, **2890 proved**
-  (implementation 90, 24 lax; spec layer 2800: AES 1137, SHA-256 + HMAC
-  1663), 20 negative controls fail, 3543 s; `results-long.txt` at
-  `babab6f`, 3672 proved, 7819 s. PR #111 changed `sha2.ads`,
-  `sha2-main.ads`, `hmac.ads`, `hmac-sha256_impl.adb` and
-  `aes-spec-cipher.ads`; the re-record's changes are listed on #99.
+* **SAW: current** (the #99/#110/#75-item-3 batch, recorded at
+  `82b10e6`): `results.txt` **1898 proved** (implementation 90, 24 lax;
+  spec layer 1808: AES 1141, SHA-256 + HMAC 667), 20 negative controls
+  fail, 2749 s (was 2890 and 3543 s at `5bf56ac`); `results-long.txt`
+  2145 proved (spec 2055), 6257 s (was 3672 and 7819 s at `babab6f`).
+  The count fell because linear recursions are now unfolded (#99), and
+  rose by 122 for the prelude's instances on their own (#75 item 3).
   GNAT Pro 27 LLVM 21.1.8, SAW 1.6.
 
 ## The issues
