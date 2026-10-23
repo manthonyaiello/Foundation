@@ -89,14 +89,10 @@ command -v "$CRYPTOL" >/dev/null 2>&1 || die "cryptol not found (set CRYPTOL)"
 
 # --- 0. macOS: a Cryptol that may load our library -------------------------------
 
-# Galois signs the macOS release of Cryptol with the hardened runtime and
-# without the com.apple.security.cs.disable-library-validation entitlement,
-# so its dlopen refuses a library that Galois did not sign ("mapping process
-# and mapped file (non-platform) have different Team IDs"): every module of
-# ours would fail to load its foreign implementations. On macOS the script
-# therefore runs an ad hoc signed copy of that binary, which has no hardened
-# runtime (#113). The copy is made under $OUT/cryptol-adhoc, and made again
-# when CRYPTOL names another binary or a newer one.
+# Why re-sign: Galois's macOS Cryptol has the hardened runtime without
+# disable-library-validation, so dlopen refuses our (differently signed)
+# library. We run an ad hoc signed copy under $OUT/cryptol-adhoc instead;
+# the installed binary is never modified (#113).
 if [ "$(uname -s)" = Darwin ]; then
   # Captured, not piped into grep -q: under pipefail, codesign killed by
   # SIGPIPE would fail the test.
