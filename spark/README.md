@@ -1000,7 +1000,8 @@ $ alr -n exec -- scripts/perf-aes.sh       # prints and writes obj/perf/perf-rep
 $ PERF_SKIP_BENCH=1 alr -n exec -- scripts/perf-aes.sh   # builds and sizes only
 ```
 
-It runs on Linux and macOS, x86_64 and arm64, and needs the crate's
+It runs on Linux and macOS, x86_64 and arm64 (run so far on aarch64
+macOS and x86_64 Linux, below), and needs the crate's
 toolchain, cargo, `git` (the table S-box comes from `git archive
 b967ebb`), `nm`, `size` and `python3`. It builds:
 
@@ -1054,8 +1055,8 @@ reports, with the quartiles and every function's size, are in
 shared desktop, not an idle machine**: the 1-minute load was 1.9 before and
 2.4–2.7 after (the benchmark is one of it), the proof scheduler's pool
 was idle, and desktop daemons used about one core between them. macOS
-cannot pin a thread to a core; the quartiles are 5–8% apart, wider than on
-an idle Linux machine would be.
+cannot pin a thread to a core; the quartiles are 5–8% apart, against 1%
+(the median cell) on the idle x86_64 instance below.
 
 Size (bytes):
 
@@ -1123,7 +1124,89 @@ What it shows, at `-O3`:
   3 than at 2 (and with the release default's 16 codegen units and no LTO,
   as fast as at 2). Not investigated further.
 
-x86_64: to be run on the IOD with the same script (#51).
+### x86_64, Linux (the x86_64 instance)
+
+Intel Xeon 6975P-C (AWS c8i.2xlarge, 8 vCPUs), Ubuntu 24.04, GNAT FSF
+16.1.0, gprbuild 26.0.0, rustc 1.95.0, at `6023e8a`, the script
+unmodified. Two full runs, 2026-10-23 18:02 UTC, back to back; the
+numbers are the first's; the second's medians are within 3% of them in
+86 of 87 cells and within 5.4% in all, and the sizes are identical. Both
+reports are in
+`../.claude/campaign/measurements/2026-10-23-aes-perf-x86_64.md`. **An
+idle machine**: nothing else ran on it, the 1-minute load was 0.65 before
+and 0.97 after. The quartiles are 1% apart in the median cell; the 8 of
+87 cells wider than 3% (up to 9%) are all table S-box builds.
+
+Size (bytes):
+
+| build | AES text | AES data | wrappers | AES total | executable text (with runtime / std) |
+|---|---:|---:|---:|---:|---:|
+| `spark-O2` | 2873 | 0 | 2158 | 5031 | 276 201 |
+| `spark-O3` | 3580 | 0 | 3463 | 7043 | 280 617 |
+| `spark-O3-checks` | 3595 | 0 | 4001 | 7596 | 283 561 |
+| `spark-table-O2` | 726 | 512 | 2856 | 4094 | 274 665 |
+| `spark-table-O3` | 1187 | 512 | 5416 | 7115 | 280 169 |
+| `rust-O2` | 3405 | 812 | 15 | 4232 | 276 810 |
+| `rust-O3` | 3535 | 812 | 15 | 4362 | 281 034 |
+| `rust-release` | 3339 | 812 | 18 | 4169 | 291 427 |
+
+* **Read "AES total" here, not "AES text".** On Linux GCC's LTO inlines
+  `Expand_Key`, `Encrypt_Block`, `Decrypt_Block` and
+  `Decrypt_Block_Prime` into `Perf_AES`'s wrappers (on macOS they stayed
+  4-byte branches), so most of the SPARK AES is counted under
+  "wrappers". What stays out of line at `-O3` is the S-box circuits
+  (`SBox_Lanes` 1103, `Inv_SBox_Lanes` 1223), `Inv_Mix_Columns` 821 and
+  small helpers. Rust's wrappers are tail calls; its `key_expansion` is
+  1412, `cipher` 645, `inv_cipher` 643.
+* At `-O3` the SPARK AES is 1.6× the Rust's (7043 against 4362 bytes),
+  and the table S-box build is no smaller (7115): GCC unrolls its
+  encryption into a 1988-byte `Perf_AES.Encrypt`. At `-O2` the table
+  build is the smallest (4094, Rust 4232).
+* The run-time checks add 553 bytes (8%) at `-O3`.
+* Both sides link their runtimes statically here, and the executables
+  are within 17 KB of each other: the 190 KB gap on macOS is not there.
+
+Time (ns per call, median; first and third quartile in the report):
+
+| op | `spark-O3` | `spark-O3-checks` | `spark-table-O3` | `rust-O3` | `spark-O2` | `spark-table-O2` | `rust-O2` |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| AES-128 `Expand_Key` | 269.4 | 208.8 | 132.1 | 310.9 | 317.5 | 202.3 | 251.3 |
+| AES-128 encrypt | 465.1 | 468.6 | 221.7 | 421.9 | 643.0 | 463.8 | 419.9 |
+| AES-128 decrypt (`Decrypt_Block`) | 1012.8 | 1009.4 | 680.0 | 671.7 | 1217.7 | 878.2 | 669.2 |
+| AES-128 `Decrypt_Block_Prime` | 1013.6 | 1034.8 | 677.6 | 671.7 | 1220.6 | 878.3 | 669.2 |
+| AES-192 `Expand_Key` | 252.2 | 187.9 | 140.8 | 356.8 | 311.8 | 211.9 | 283.0 |
+| AES-192 encrypt | 559.9 | 565.7 | 264.6 | 501.5 | 774.3 | 565.1 | 501.1 |
+| AES-192 decrypt (`Decrypt_Block`) | 1227.1 | 1231.2 | 835.1 | 811.2 | 1484.6 | 1062.0 | 807.4 |
+| AES-256 `Expand_Key` | 341.9 | 269.6 | 172.0 | 415.6 | 422.7 | 269.1 | 334.9 |
+| AES-256 encrypt | 654.5 | 660.8 | 302.4 | 588.3 | 908.5 | 665.1 | 583.0 |
+| AES-256 decrypt (`Decrypt_Block`) | 1438.7 | 1436.6 | 970.1 | 941.3 | 1736.8 | 1251.5 | 945.5 |
+
+(The Rust columns of the `Decrypt_Block_Prime` row repeat Rust's one
+decryption. `rust-release` is within 3% of `rust-O3` except at
+`Expand_Key`, where it is 25–27% faster.)
+
+What it shows, at `-O3`, against aarch64:
+
+* **Like for like (table S-box), the SPARK is faster than the Rust, by
+  more than on aarch64**: encrypt 0.51–0.53× (aarch64 0.81–0.85×), key
+  expansion 0.39–0.42× (0.27–0.35×), decrypt 1.01–1.03× (1.06–1.13×).
+* **The constant-time SPARK costs 1.1× the Rust on encrypt and 1.5× on
+  decrypt, and is faster on key expansion** (0.71–0.87×); on aarch64,
+  1.5–1.6×, 1.7× and 0.67–0.93×. Its cost against the table SPARK is
+  2.1–2.2× encrypt, 1.5× decrypt and 1.8–2.0× key expansion, close to
+  aarch64's 1.9× / 1.5–1.6× / 2.5–2.7×: the constant-time SPARK gains on
+  the Rust here because the table SPARK does.
+* **Keeping the run-time checks makes `Expand_Key` 21–25% faster**
+  (208.8 against 269.4 ns at AES-128), the reverse of aarch64's 7–12% cost;
+  on the ciphers the two builds are within 3%. Not investigated further
+  (the checked build's inlined key expansion is compiled differently; why
+  it is faster was not looked into). So on neither chip does `-gnatp` buy
+  a consistent speed-up; it saves code, 553 bytes here.
+* **`-O2` against `-O3`**: the SPARK at `-O2` is 1.4× slower on encrypt,
+  1.2× on decrypt and 1.2× on `Expand_Key` (aarch64: 1.1–1.3× and
+  2.0–2.2×); the table SPARK's encrypt is 2.1–2.2× slower at `-O2`. Rust's
+  `key_expansion` is again slower at `opt-level` 3 than at 2, by 1.24–1.26×
+  (aarch64 1.4–1.6×).
 
 ## Gates
 
