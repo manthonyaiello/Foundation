@@ -6,7 +6,8 @@
  * + reverse h`, as negative/compress_reversed_feed_forward.saw does for
  * the implementation's Compress (it says why no stronger control of a
  * 64-round term is run), with the overrides of sha256_spec.saw's proof
- * (Foldl_Step3's lemma at 64, which rests on the per-round lemmas, and
+ * (Foldl_Step3's lemma at 64, which rests on Rounds.Foldl's, unfolded
+ * over the per-round lemmas, and
  * "+"'s) and its tactic (z3 with the SIGMA and sigma functions
  * uninterpreted). It runs sha256_spec_step.saw first, for the lemmas.
  * The proof must fail with a counterexample.

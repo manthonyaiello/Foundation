@@ -22,8 +22,8 @@
  * select (Lo > Hi, 0, (Hi - Lo) +nuw 1): the add wraps to a poison value
  * that the select discards, which crucible refuses at its creation (the
  * case M4.3 met in Final; README "The bitcode ABI"). Pad on an empty
- * message does the same. So To_Bits' lemmas, which rest on the one at
- * width 1, and Pad's, which rest on them, are proved in a load of the
+ * message does the same. So To_Bits' lemma, whose unfolding reaches
+ * width 1, and Pad's, which rests on it, are proved in a load of the
  * module with lax arithmetic, under which overflow is not an obligation:
  * absence of overflow in these functions is gnatprove's (it proves it).
  */
@@ -36,7 +36,7 @@ let bytes_of = {{ \x -> [ if b then (1 : [8]) else 0 | b <- x ] }};
 
 /*
  * The message lengths, in bits, grouped by their k = Small_K (l) (447,
- * 439, 7, 511, 455, 159, 383): Zero's lemma and To_Bits' chain (below)
+ * 439, 7, 511, 455, 159, 383): Zero's lemma and To_Bits' (below)
  * depend on k alone, and are proved once per group.
  */
 let pad_length_groups = [[0, 512, 1024], [8, 520], [440, 952], [448, 960], [504], [800], [1600]];
@@ -162,29 +162,33 @@ let verify_zero (k : Int) = verify_zero_at 0 0 0 k;
 
 /*
  * To_Bits (V, W): the W-bit big-endian representation of V, Cryptol's
- * (`l : [2 * w]) in pad at W = 64: drop`{128 - W} (v : [128]). One lemma
- * per width W in 0 .. 64, each with the lemma at W - 1 as the override for
- * its recursive call, all with the secondary stack at `used` bytes when
- * the chain starts (Pad calls To_Bits after Zero), of which the first
- * `keep` (Zero's result) are left as found: To_Bits (V, W) calls
- * To_Bits (V / 2, W - 1) first, which leaves its own result and every
- * shorter one on the stack (to_bits_used), and then allocates its
+ * (`l : [2 * w]) in pad at W = 64: drop`{128 - W} (v : [128]), with the
+ * secondary stack at `used` bytes when it is called (Pad calls To_Bits
+ * after Zero), of which the regions kept (Zero's result, and Pad's
+ * message when it is on the stack) are left as found: To_Bits (V, W)
+ * calls To_Bits (V / 2, W - 1) first, which leaves its own result and
+ * every shorter one on the stack (to_bits_used), and then allocates its
  * result.
  *
  * Since #75 the recursion is the prelude's: To_Bits calls SHA2's
  * Sequences_Of_Bits.Literal (Cryptol.Bit_Sequences) with the same
- * arguments, so these lemmas are Literal's, and Pad reaches the one at 64
- * through To_Bits, which SAW executes; likewise Zero now calls
+ * arguments, so this lemma is Literal's, and Pad reaches it through
+ * To_Bits, which SAW executes; likewise Zero now calls
  * Sequences_Of_Bits.Zero. The wrappers pass their callee's fat pointer
  * through, with no copy on the secondary stack (GNAT-LLVM 27's IR,
  * 2026-10-21), so the byte counts here and in Pad's contract are as
  * before #75.
+ *
+ * Literal recurses once per level, and since #99 SAW unfolds it: one
+ * proof at W = 64 for each stack state, with no override (#69 measured
+ * 1.4 s for it against 43.8 s for a lemma per width in 0 .. 64, a chain
+ * that each stack state needed again).
  */
 let to_bits_used (w : Int) = eval_int {{ sum [ ((32 + j + 15) / 16) * 16 | j <- [0 .. w] ] : [64] }};
 /*
  * The two regions kept are (o1, n1) and (o2, n2): Zero's result, and
  * Pad's message when it is on the stack (else n2 = 0). Pad on an empty
- * stack keeps the first 32 + k bytes, (0, 32 + k): to_bits_lemmas.
+ * stack keeps the first 32 + k bytes, (0, 32 + k): to_bits.
  */
 let to_bits_contract_at (used : Int) (o1 : Int) (n1 : Int) (o2 : Int) (n2 : Int) (w : Int) = do {
   let is0 = eval_bool {{ `w == (0 : Integer) }};
@@ -207,15 +211,11 @@ let to_bits_contract_at (used : Int) (o1 : Int) (n1 : Int) (o2 : Int) (n2 : Int)
   else llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (drop`{128 - w} v) }});
   llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
 };
-rec to_bits_lemmas_at (used : Int) (o1 : Int) (n1 : Int) (o2 : Int) (n2 : Int) (w : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "sequences_of_bits__literal" prev (to_bits_contract_at used o1 n1 o2 n2 w) z3 "z3"
-             (str_concat (str_concat (str_concat (str_concat "W = " (show w)) ", the secondary stack at ") (show used))
-                " bytes: drop`{128 - W} (v : [128]) ((`l : [2 * w]) in Preprocessing.cry's pad)");
-  if eval_bool {{ `w == (64 : Integer) }} then return lemma
-  else to_bits_lemmas_at used o1 n1 o2 n2 (eval_int {{ `w + 1 : [32] }}) [lemma];
-};
-let to_bits_lemmas (used : Int) (keep : Int) (w : Int) (prev : [LLVMSpec]) =
-  to_bits_lemmas_at used 0 keep 0 0 w prev;
+let to_bits_at (used : Int) (o1 : Int) (n1 : Int) (o2 : Int) (n2 : Int) =
+  verify_spec "sequences_of_bits__literal" [] (to_bits_contract_at used o1 n1 o2 n2 64) z3 "z3"
+    (str_concat (str_concat "W = 64, unfolded, the secondary stack at " (show used))
+       " bytes: drop`{128 - W} (v : [128]) ((`l : [2 * w]) in Preprocessing.cry's pad)");
+let to_bits (used : Int) (keep : Int) = to_bits_at used 0 keep 0 0;
 
 /*
  * Pad (M) = Preprocessing.cry's pad`{m = 512, w = 32, l, k} M
@@ -223,7 +223,7 @@ let to_bits_lemmas (used : Int) (keep : Int) (w : Int) (prev : [LLVMSpec]) =
  * at each length l, with k = Small_K (l). M is a fat pointer to l bits
  * with bounds {0, l - 1}. Pad calls Small_K, then Zero (on the empty
  * stack), then To_Bits (l, 64) (the stack at Zero's result), and then
- * allocates its result: their lemmas are the overrides, To_Bits' chain
+ * allocates its result: their lemmas are the overrides, To_Bits'
  * proved for this stack.
  */
 let pad_contract_at (base : Int) (mode : Int) (lo : Int) (moff : Int) (l : Int) = do {
@@ -250,7 +250,7 @@ let pad_contract (l : Int) = pad_contract_at 0 0 0 0 l;
  * Pad's lemma at length l, on the stack at `base` bytes with its message
  * where `mode` says (msg_frame), and the lemmas it rests on, proved for
  * that stack: Small_K's, Zero's (keeping the message if it is on the
- * stack) and To_Bits' chain (keeping Zero's result, and the message).
+ * stack) and To_Bits' (keeping Zero's result, and the message).
  */
 let verify_pad_at (base : Int) (mode : Int) (lo : Int) (moff : Int) (l : Int) = do {
   let k = small_k l;
@@ -258,7 +258,7 @@ let verify_pad_at (base : Int) (mode : Int) (lo : Int) (moff : Int) (l : Int) = 
   let mk = msg_keep_size mode lo moff l;
   sk <- verify_small_k l;
   z <- verify_zero_at base lo mk k;
-  tb <- to_bits_lemmas_at (eval_int {{ `base + `uz : [64] }}) base (eval_int {{ 32 + `k : [64] }}) lo mk 0 [];
+  tb <- to_bits_at (eval_int {{ `base + `uz : [64] }}) base (eval_int {{ 32 + `k : [64] }}) lo mk;
   verify_spec "sha256__pad" [sk, z, tb] (pad_contract_at base mode lo moff l) z3 "z3"
     (at_base base (str_concat (str_concat "l = " (show l)) ": Preprocessing::pad`{512, 32, l, (l + 65) %^ 512}"));
 };

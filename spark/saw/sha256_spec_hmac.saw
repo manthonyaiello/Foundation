@@ -27,7 +27,7 @@
  * message mode 2) and Zero (256), or, for a shorter key, Zero; then it
  * allocates its result (except for k = B, where it returns Join's). So
  * each hash is called with the stack at a base of its own, and its lemma,
- * with the lemmas it rests on (Pad, Zero, To_Bits' chain; Word_Of and
+ * with the lemmas it rests on (Pad, Zero, To_Bits; Word_Of and
  * Foldl_Step take no stack), is proved at that base. Hn and HL get
  * HMAC's concatenations, temporaries on the primary stack (mode 1).
  *
@@ -38,8 +38,8 @@
  * calls Hn; HMAC_init reads Hk's result and Zero's).
  *
  * Since #75, HMAC's Repeat and Zero call the prelude's instances
- * (HMAC.Byte_Sequences.Repeat, SHA2.Sequences_Of_Bits.Zero; Join keeps
- * its own body), and SHA-2's Word_Of, Foldl_Step and
+ * (HMAC.Byte_Sequences.Repeat, SHA2.Sequences_Of_Bits.Zero), and since
+ * #111 so does Join (HMAC.Byte_Words.Join); SHA-2's Word_Of, Foldl_Step and
  * To_Bits recurse in theirs (sha256_spec_hash.saw, sha256_spec_pad.saw).
  * None of them is overridden here, so no symbol changes. Each wrapper
  * returns its callee's unconstrained result as it is, with no second
@@ -74,7 +74,8 @@ let key_arg (k : Int) = do {
 
 /*
  * Hash's lemma at length l on the stack at `base`, with the message
- * where `mode` says, with Pad's and its chain proved for that stack.
+ * where `mode` says, with Pad's and the lemmas under it proved for that
+ * stack.
  */
 let mode_name (mode : Int) (moff : Int) =
   if eval_bool {{ `mode == (0 : Integer) }} then ""

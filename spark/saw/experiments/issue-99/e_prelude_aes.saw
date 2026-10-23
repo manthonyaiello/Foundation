@@ -1,0 +1,13 @@
+/*
+ * #75 item 3, a trial run of saw/aes_spec_prelude.saw: the AES spec
+ * scripts it rests on, without aes_spec.saw's exhaustive proofs, then the
+ * prelude's proofs.
+ */
+include "aes_spec_common.saw";
+include "aes_spec_gf.saw";
+include "aes_spec_cipher.saw";
+include "aes_spec_keyexpansion.saw";
+include "aes_spec_main.saw";
+print "== aes_spec_prelude.saw";
+include "aes_spec_prelude.saw";
+print "== done";

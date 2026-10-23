@@ -21,13 +21,16 @@
  * lemma and "+"'s as the overrides: that proof is what ties the copies to
  * Main.cry.
  *
- * The recursions are never unfolded: W (Main.cry: W@t = sigma_1 (W@(t-2))
- * + W@(t-7) + sigma_0 (W@(t-15)) + W@(t-16)) one index t at a time, 64
- * lemmas, each with the lemmas below it as the overrides for its four
- * recursive calls; Foldl_Step3 (foldl step3 H [0 ..< N]) one N at a
- * time, 65 lemmas. T1 and Step3 take the round t and are proved at each,
- * 64 lemmas apiece. To_Bits, Word_Of and Foldl_Step likewise, one width,
- * count or block count at a time.
+ * The recursions (#99; README "SAW", "The spec layer"): W (Main.cry:
+ * W@t = sigma_1 (W@(t-2)) + W@(t-7) + sigma_0 (W@(t-15)) + W@(t-16)),
+ * with four recursive calls, is proved one index t at a time, 64 lemmas,
+ * each with the lemmas below it as the overrides for its four recursive
+ * calls; Word_Of (Value) one bit count at a time, because unfolded its
+ * goal blows up (a symbolic index per level). T1 and Step3 take the round
+ * t and are proved at each, 64 lemmas apiece. The recursions with one
+ * call per level, Foldl_Step3's (Rounds.Foldl), To_Bits' (Literal) and
+ * Foldl_Step's (Blocks.Foldl_Take), SAW unfolds: each is proved once, at
+ * the size its caller uses.
  *
  * No SAW proof of hash over bytes (#67 item 4; README "SAW", "What SAW
  * proves on its own, in place, or not at all"): SHA256_Bytes.Hash_Bytes is
@@ -78,12 +81,12 @@ include "obj/options.saw";
  */
 i_word_of_1 <- word_of_lemmas 512 0 [];
 i_word_of_2 <- word_of_lemmas 1024 0 [];
-i_foldl_step_1 <- foldl_step_lemmas 1 0 [];
-i_foldl_step_2 <- foldl_step_lemmas 2 0 [];
+i_foldl_step_1 <- verify_foldl_step 1;
+i_foldl_step_2 <- verify_foldl_step 2;
 i_word_of_3 <- if saw_long then word_of_lemmas 1536 0 [] else return i_word_of_2;
 i_word_of_4 <- if saw_long then word_of_lemmas 2048 0 [] else return i_word_of_2;
-i_foldl_step_3 <- if saw_long then foldl_step_lemmas 3 0 [] else return i_foldl_step_2;
-i_foldl_step_4 <- if saw_long then foldl_step_lemmas 4 0 [] else return i_foldl_step_2;
+i_foldl_step_3 <- if saw_long then verify_foldl_step 3 else return i_foldl_step_2;
+i_foldl_step_4 <- if saw_long then verify_foldl_step 4 else return i_foldl_step_2;
 let word_of_for (nb : Int) =
   if eval_bool {{ `nb == (1 : Integer) }} then i_word_of_1
   else if eval_bool {{ `nb == (2 : Integer) }} then i_word_of_2
@@ -115,7 +118,7 @@ if saw_long then do {
 /*
  * Pad, and Hash where the padded message has 1 or 2 blocks (3 or 4 too
  * with saw_long), at each length, by groups of the same k (Zero's lemma
- * and To_Bits' chain are proved once per group). Hash at 0 bytes has no
+ * and To_Bits' are proved once per group). Hash at 0 bytes has no
  * symbolic input: the overrides' step is evaluated on constants, so the
  * Cryptol's must be too, and nothing is left uninterpreted (as
  * sha256_impl.saw's Hash at 0).
@@ -123,7 +126,7 @@ if saw_long then do {
 let verify_pad_hash_group (ls : [Int]) = do {
   let k = small_k (head ls);
   z <- verify_zero k;
-  tb <- to_bits_lemmas (ss_size 32 k) (eval_int {{ 32 + `k : [64] }}) 0 [];
+  tb <- to_bits (ss_size 32 k) (eval_int {{ 32 + `k : [64] }});
   for ls (\l -> do {
     sk <- verify_small_k l;
     pad_l <- verify_spec "sha256__pad" [sk, z, tb] (pad_contract l) z3 "z3"
@@ -148,8 +151,8 @@ for pad_length_groups verify_pad_hash_group;
 /*
  * HMAC.SHA256's HMAC_init and HMAC at M4.3's (key, text) lengths in
  * bytes (sha256_spec_hmac.saw), each with the Hash lemmas its calls need,
- * proved at the secondary stack's base for each call (each base costs a
- * To_Bits chain, about 70 s). By default one length per case of
+ * proved at the secondary stack's base for each call (each base costs
+ * Pad's lemmas again, To_Bits' among them). By default one length per case of
  * HMAC_init: (32, 3) for k < B, (64, 32) for k = B, (65, 3) for k > B;
  * with saw_long also (0, 0), (32, 32), (64, 3) and (100, 32).
  */
@@ -164,3 +167,7 @@ if saw_long then do {
   verify_hmac 100 32;
   return ();
 } else return ();
+
+/* --- the prelude's instances on their own (#75 item 3) ------------------ */
+
+include "sha256_spec_prelude.saw";

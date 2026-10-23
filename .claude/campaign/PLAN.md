@@ -80,12 +80,13 @@ gate green on PR #111's head):
   the object-code check finds 0 violations; dudect max |t| ≤ 2.3; x86_64
   Valgrind `ct_grind` 0 errors. Cost at `-O3`: encrypt 1.64×, decrypt
   1.42–1.54×, `Expand_Key` 1.9–2.9×. **Left out of the blog post** (Tony).
-* **SAW: STALE.** Last records: `results.txt` at `5bf56ac`, **2890 proved**
-  (implementation 90, 24 lax; spec layer 2800: AES 1137, SHA-256 + HMAC
-  1663), 20 negative controls fail, 3543 s; `results-long.txt` at
-  `babab6f`, 3672 proved, 7819 s. PR #111 changed `sha2.ads`,
-  `sha2-main.ads`, `hmac.ads`, `hmac-sha256_impl.adb` and
-  `aes-spec-cipher.ads`; the re-record's changes are listed on #99.
+* **SAW: current** (the #99/#110/#75-item-3 batch, recorded at
+  `82b10e6`): `results.txt` **1898 proved** (implementation 90, 24 lax;
+  spec layer 1808: AES 1141, SHA-256 + HMAC 667), 20 negative controls
+  fail, 2749 s (was 2890 and 3543 s at `5bf56ac`); `results-long.txt`
+  2145 proved (spec 2055), 6257 s (was 3672 and 7819 s at `babab6f`).
+  The count fell because linear recursions are now unfolded (#99), and
+  rose by 122 for the prelude's instances on their own (#75 item 3).
   GNAT Pro 27 LLVM 21.1.8, SAW 1.6.
 
 ## The issues
@@ -283,8 +284,21 @@ Not yet, and not filed:
   installed, in files, commit messages or PR and issue text. Machine-specific
   setup goes to memcp. The bootstrap uses a tool when it is present and
   matches the pin, and fetches it otherwise (#100).
-* **Unfold SAW's linear recursions** (Tony, 2026-10-22): worth doing, as
-  follow-on work (#99), not in the session that found it.
+* **Unfold SAW's linear recursions** (Tony, 2026-10-22; done in #99): a
+  spec-layer recursion that calls itself once per level is proved once,
+  unfolded, at the size its caller uses, where that is measured cheaper;
+  a lemma per index stays where the recursion is exponential (AES `W`,
+  SHA-2 `W`) or the solver's goal grows faster unfolded than the lemmas
+  cost. #69's numbers: `Rounds.Foldl` 2.4 s unfolded against 23.2 s for
+  its 65 lemmas, `To_Bits` 1.4 s against 43.8 s; AES `W` unfolded grows
+  1.38× per index (about 35 min for `KeyExpansion` against 16 s of
+  lemmas), `Word_Of` at Count = 8 took 230 s unfolded against 179.5 s for
+  all 33 lemmas. #99 measured each linear one
+  (`spark/saw/experiments/issue-99/`): unfolded `Rounds.Foldl`,
+  `Literal`, `Blocks.Foldl_Take`, GF28's `Products` and `Pmod_Fold`; kept
+  per index, measured dearer unfolded, the cipher folds (24.3 s against
+  14.2 s at M = 13) and GF2's `Pmod_Fold` and `Pdiv_Fold` (34.1 s each
+  against 12.5 s for both chains).
 * **Re-proved Cryptol properties are optional** (Tony, 2026-10-20). The
   spec layer is proved equal to the Cryptol (SAW), so the Cryptol's
   properties already hold of it. Re-proving them in SPARK is, in general, a
@@ -350,9 +364,8 @@ Not yet, and not filed:
 * **The spec layer keeps Cryptol's meaning, not its evaluation strategy.**
   Recursive definitions stay recursive ghost functions (e.g.
   `KeyExpansion.W`); sharing is the implementation's job, and SAW gets it by
-  per-index overrides (#59 discussion, 2026-10-19). #69 measured that the
-  linear recursions are 10–30× cheaper for SAW unfolded: #99 changes that
-  (decision above).
+  per-index overrides (#59 discussion, 2026-10-19) where the recursion is
+  exponential, and by unfolding where it is linear (#99, decision above).
 * **The blog post** (Tony, 2026-10-22, #102): Tony writes it; Claude
   provides bullets, data, snippets and the figure's content only. It has a
   "what we used, and what the results rest on" section. Performance is AES

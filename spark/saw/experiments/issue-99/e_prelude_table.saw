@@ -1,0 +1,21 @@
+/*
+ * #75 item 3: the prelude's @@ on a symbolic [256][8] table indexed by a
+ * symbolic block (aes_spec_prelude.saw's Table_Indexing proof), by yices
+ * and by rme, against z3's 226.5 s in e_prelude_aes.saw. Run 2026-10-23:
+ * yices had not finished after 15 minutes and the run was stopped (rme
+ * not reached), so the recorded proof keeps z3.
+ */
+include "aes_spec_common.saw";
+let table_contract = do {
+  xs <- llvm_fresh_var "xs" (llvm_array 256 byte_t);
+  xsp <- llvm_alloc_readonly (llvm_array 256 byte_t);
+  llvm_points_to xsp (llvm_term xs);
+  ixs <- llvm_fresh_var "ixs" block_t;
+  llvm_execute_func [xsp, llvm_term ixs];
+  llvm_return (llvm_term {{ xs @@ ixs }});
+};
+print "== table @@, yices";
+time (llvm_verify aes_spec (spec_symbol "cipher__table_indexing__bulk_index") [] false table_contract yices);
+print "== table @@, rme";
+time (llvm_verify aes_spec (spec_symbol "cipher__table_indexing__bulk_index") [] false table_contract rme);
+print "== done";
