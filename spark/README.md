@@ -282,6 +282,24 @@ checker needs it), and bash 4. It sets
 `CRYPTOLPATH` to the repository root and `cryptol/`, so a property module
 imports `algorithms::AES::GF28` by its NSA name.
 
+**On macOS** (#113) the check runs as on Linux, with `.dylib` for `.so`,
+and two differences, neither of which touches the Linux build:
+
+- gprbuild 26.0.1 does not enable encapsulated libraries for aarch64
+  Darwin (it does for x86_64 Darwin), so `foundation_spark_ffi.gpr` sets
+  `Library_Encapsulated_Supported` itself when Alire's host is `macos`. The
+  library is still encapsulated (`libgnat_pic.a` and a static libgcc linked
+  in) and depends on `libSystem` only. Apple's `ld` fails a dylib link on
+  an undefined name by default, so it gets no `--no-undefined`.
+- Galois signs the macOS release of Cryptol with the hardened runtime, which
+  refuses to `dlopen` a library not signed by Galois ("different Team
+  IDs"). `check-ffi.sh` detects that signature and runs an ad hoc signed
+  copy of the binary (`obj/ffi/cryptol-adhoc/cryptol`), made once and
+  remade when the original changes.
+
+The coverage build (`check-coverage.sh`) is not run on macOS: gnatcov is
+not installed on hex, and CI runs it on Linux.
+
 **The pieces.**
 
 - `foundation_spark_ffi.gpr` builds the crate's sources with `-gnata`

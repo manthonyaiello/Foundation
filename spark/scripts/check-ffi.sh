@@ -43,7 +43,9 @@
 #
 # Env:
 #   CRYPTOL     the cryptol binary (default: cryptol). It must report
-#               "FFI enabled" in `cryptol --version`.
+#               "FFI enabled" in `cryptol --version`. On macOS, a binary
+#               signed with the hardened runtime (Galois's release) is run
+#               through an ad hoc signed copy under FFI_OUT (see step 0).
 #   FFI_JOBS    gprbuild -j (default: nproc). On a shared machine, set it.
 #   ALR         the alr binary (default: alr).
 #   FFI_LIB     a library already built, to run the properties against
@@ -84,6 +86,37 @@ command -v "$CRYPTOL" >/dev/null 2>&1 || die "cryptol not found (set CRYPTOL)"
 "$CRYPTOL" --version | grep -q "FFI enabled" \
   || die "$CRYPTOL was built without FFI support"
 [ -f "$PROPS" ] || die "missing $PROPS"
+
+# --- 0. macOS: a Cryptol that may load our library -------------------------------
+
+# Why re-sign: Galois's macOS Cryptol has the hardened runtime without
+# disable-library-validation, so dlopen refuses our (differently signed)
+# library. We run an ad hoc signed copy under $OUT/cryptol-adhoc instead;
+# the installed binary is never modified (#113).
+if [ "$(uname -s)" = Darwin ]; then
+  # Captured, not piped into grep -q: under pipefail, codesign killed by
+  # SIGPIPE would fail the test.
+  src="$(command -v "$CRYPTOL")"
+  sig="$(codesign -dv "$src" 2>&1 || true)"
+  ent="$(codesign -d --entitlements - "$src" 2>/dev/null || true)"
+  if [[ "$sig" == *"flags="*"(runtime)"* ]] \
+     && [[ "$ent" != *"com.apple.security.cs.disable-library-validation"* ]]; then
+    adhoc_dir="$ROOT/$OUT/cryptol-adhoc"
+    adhoc="$adhoc_dir/cryptol"
+    if [ ! -x "$adhoc" ] || [ "$src" -nt "$adhoc" ] \
+       || [ "$(cat "$adhoc_dir/source" 2>/dev/null)" != "$src" ]; then
+      echo ">> $src has the hardened runtime: making an ad hoc signed copy in $OUT/cryptol-adhoc"
+      mkdir -p "$adhoc_dir"
+      cp "$src" "$adhoc"
+      codesign --force --sign - "$adhoc" 2>/dev/null \
+        || die "codesign could not re-sign $adhoc"
+      printf '%s\n' "$src" > "$adhoc_dir/source"
+    fi
+    CRYPTOL="$adhoc"
+    "$CRYPTOL" --version | grep -q "FFI enabled" \
+      || die "$CRYPTOL (the ad hoc signed copy of $src) does not run"
+  fi
+fi
 
 # --- 1. the library ------------------------------------------------------------
 

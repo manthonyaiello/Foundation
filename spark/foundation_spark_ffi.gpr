@@ -13,6 +13,20 @@
 --    prefixed link names (Foundation_Spark.FFI). A name that does not
 --    resolve fails the link here, not the first call from Cryptol.
 --
+--  On macOS (#113) the library is the same: encapsulated, as
+--  libfoundation_spark_ffi.dylib, depending on libSystem only. Two things
+--  differ, both below, both under Host = "macos" so that Linux is
+--  untouched:
+--
+--  * gprbuild 26.0.1's knowledge base enables encapsulated libraries for
+--    x86_64 Darwin but not aarch64 Darwin (gprconfig/gnat.xml, "Whether
+--    encapsulated library is supported"), although its Darwin linker
+--    settings carry the encapsulated link options and gnat_native ships
+--    libgnat_pic.a. Without Library_Encapsulated_Supported, gprbuild stops
+--    with "encapsulated library projects not supported on this platform".
+--  * Apple's ld has no --no-undefined: it fails a dylib link on an
+--    undefined name by default, which is the same check.
+--
 --  Not a proof project: gnatprove reads foundation_spark.gpr.
 
 with "config/foundation_spark_config.gpr";
@@ -44,6 +58,21 @@ project Foundation_Spark_FFI is
    for Library_Kind use "relocatable";
    for Library_Standalone use "encapsulated";
    for Library_Auto_Init use "true";
+
+   --  The host, as Alire saw it when it generated the config project:
+   --  "macos" or "linux" (or one of Alire's other names, which build as
+   --  Linux does).
+   type Host_Kind is
+     ("linux", "macos", "windows", "freebsd", "openbsd", "os-unknown");
+   Host : Host_Kind := Foundation_Spark_Config.Alire_Host_OS;
+
+   case Host is
+      when "macos" =>
+         for Library_Encapsulated_Supported use "true";
+         for Library_Options use ();
+      when others =>
+         for Library_Options use ("-Wl,--no-undefined");
+   end case;
 
    --  The export units (one per Cryptol module checked), the ghost shim
    --  units they call, and the parents those need. The shims must be
@@ -123,8 +152,6 @@ project Foundation_Spark_FFI is
          for Library_Interface use
            Interface_Units & ("Foundation_Spark_Coverage");
    end case;
-
-   for Library_Options use ("-Wl,--no-undefined");
 
    package Compiler is
       for Default_Switches ("Ada") use
