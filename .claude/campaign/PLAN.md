@@ -8,9 +8,10 @@ remaining work around **a technical blog post** (#102).
 **Board, counted on hex at `f7a2366`:** 4264/4264 proved; SAW **STALE**
 (PR #111 changed five of its inputs; the next IOD session re-records).
 **Open PRs:** none besides this plan's.
-**Open issues:** #102 blog post and its prerequisites #103 #104 #105 #51;
+**Open issues:** #102 blog post and its prerequisites #103 #104 #51 #113;
 the IOD batch #99 #110 and #75 (item 3, the re-record, four AES
-statements); #106 effort analysis; #67 (item 11 only); E5's epic #48.
+statements); #106 effort analysis; E5's epic #48. #105 and #67 closed
+(Tony's decisions, "Decisions").
 **E0–E4 are closed**; E5: #49 and #50 closed, #51 open.
 **Measurements:** `.claude/campaign/measurements/2026-10-19-iod.md` (the E4
 day) and `2026-10-22-saw-cost.md` (#69). The AES spec crosswalks are in
@@ -91,9 +92,9 @@ gate green on PR #111's head):
 | **#18** E3 HMAC-SHA-256 | #19 #20 | all closed |
 | **#21** E4 SAW | #22 #23 #24 #59 | all closed |
 | **#48** E5 assurance beyond the proofs | #49 coverage · #50 constant time · #51 binaries and performance (AES only) | #49 #50 closed; #51 open |
-| review of 2026-10-20 | #67 … #80 | all closed but #67 (item 11) and #75 (item 3, four AES statements) |
+| review of 2026-10-20 | #67 … #80 | all closed but #75 (item 3, four AES statements) |
 | IOD session 2026-10-21/22 | #95 #99 #100 | #95 #100 closed; #99 open (IOD) |
-| **#102** blog post (2026-10-22) | #103 docs · #104 mutation testing · #105 fork history · #51 · #75 · #99 | all open |
+| **#102** blog post (2026-10-22) | #103 docs · #104 mutation testing · #105 fork history · #51 · #75 · #99 · #113 FFI on macOS | #105 closed (accepted); the rest open |
 | hex move (2026-10-22) | #107 scripts on macOS · #110 `check-saw.sh` on macOS | #107 closed; #110 open (IOD) |
 | other | #106 effort analysis | open |
 
@@ -106,29 +107,23 @@ and never drafts it. A `/campaign` run never takes #102 as a writing task.
 **The order** (A → B: A first):
 
 ```
-#105 decision (Tony) ───────────────────────────────────────────────────┐
-#104a mutants: FFI + gnatprove (hex, needs Cryptol) ─┐                   │
-#51a  AES perf, aarch64 (hex, needs Rust, idle) ─────┤                   │
-                          IOD session ◄──────────────┘                   │
-                            #99 unfold linear recursions                 │
-                            #110 check-saw.sh portable                   │
-                            #75 item 3, prelude SAW proofs               │
-                            check-saw: relative runtime path (#105)      │
-                            SAW re-record, default + long, once          │
-                            #104 SAW column · #51b AES perf, x86_64      │
+#113 FFI on macOS ──► #104a mutants: FFI + gnatprove (hex) ─┐
+#51a  AES perf, aarch64 (hex; Rust via `use rust`) ─────────┤
+                          IOD session ◄─────────────────────┘
+                            #99 unfold linear recursions
+                            #110 check-saw.sh portable
+                            #75 item 3, prelude SAW proofs
+                            check-saw: relative runtime path, generic comment (#105)
+                            SAW re-record, default + long, once
+                            #104 SAW column · #51b AES perf, x86_64
                           ──► #103 docs ──► #102 data ──► tag, clean FSF repro ──► publish
-#106 effort analysis: independent; add the IOD session's transcript to it
+#106 effort analysis: Tony, in the `foundation` container (2026-10-23), from a brief
 ```
 
-**Doable on hex now, waiting on Tony:**
-1. **#105**: accept the history, or rewrite plus a GitHub Support purge
-   (options on the issue; the 60 PR refs cannot be force-pushed).
-2. **#104 and #51** need Cryptol (with FFI) and Rust installed on hex;
-   Tony has not yet said yes. #51's benchmarks want an idle machine, so run
-   them last.
-3. **#106** needs the `foundation` container's session transcripts.
-4. **#67 item 11**: fold into #103 and close #67 (proposed, not yet
-   answered).
+**On hex now:** #113 (the FFI library as a `.dylib`: macOS gprbuild has no
+encapsulated libraries), then #104's FFI and gnatprove columns; #51's
+aarch64 half. Cryptol 3.6.0 (macOS ARM64, with solvers, FFI enabled) is
+installed on hex (2026-10-22); Rust is `use rust`.
 
 **The IOD session** (Tony builds one; it dies 24 h after start, so **upload
 the session to memcp before then**): everything under "IOD session" above,
@@ -158,8 +153,10 @@ Not yet, and not filed:
   (written out in full: the scheduler's child does not expand `~`).
   `spark-scheduler` pool of 8, key prefix `hex|`. **Prove with
   `FOUNDATION_SPARK_PROOF_ALLOWANCE=ci`**: at the local default (5 s at
-  level 2) three `aes-lemmas` checks time out under load. **No Cryptol, Rust,
-  gnatcov, Valgrind or SAW** (yet): CI runs the FFI and coverage. Whole-crate
+  level 2) three `aes-lemmas` checks time out under load. Cryptol 3.6.0 (FFI, with solvers) in
+  `~/Local/Software/cryptol-3.6.0-macos-15-ARM64-with-solvers/bin`, not
+  on PATH; `check-ffi.sh` needs #113 first. Rust through `use rust`
+  (`source $HOME/.cargo/env`, 1.95.0). No gnatcov, Valgrind or SAW. Whole-crate
   gate: about 550 s cold at `-j8`. hex is also Tony's desktop: never
   idle, so benchmarks go last or elsewhere.
 * **`foundation`** (retired 2026-10-22): the aarch64 Linux container on
@@ -353,20 +350,19 @@ Not yet, and not filed:
   "what we used, and what the results rest on" section. Performance is AES
   only (no reference SHA-256/HMAC). Constant time and upstreaming stay out.
   A tag and a clean-machine FSF reproduction come after the post is written.
+* **The fork's history is accepted** (Tony, 2026-10-22, #105): no rewrite;
+  the two places at the tip are fixed in the next SAW re-record.
+* **#67 item 11 is done enough** (Tony, 2026-10-22): the README and
+  `Properties` carry the note; the generated `sbox_entries.ads` gets it
+  only if a later change touches the generator.
+* **#106 is Tony's**, in the `foundation` container, from a brief this
+  session writes at its end.
 * **Coverage is not the argument against FFI-only testing**: it is near
   100%. Mutation testing (#104) is.
 * **Plan location.** This file. There is one `PLAN.md`; its history is git's.
 
 ## Open for Tony
 
-* **The fork's history (#105)**: reviewed 2026-10-22 (comment on #105):
-  30 distinct lines in 31 files; commit messages clean; two places at the
-  tip are SAW inputs (fixed in the IOD re-record). The 60 GitHub PR refs
-  cannot be force-pushed: a rewrite needs a GitHub Support purge to matter.
-  Accept, or rewrite + Support. Patterns in memcp (summary 1267).
-* **Installing Cryptol (FFI) and Rust on hex**, for #104 and #51.
-* **The `foundation` transcripts**, for #106.
-* **#67 item 11**: fold into #103 and close #67?
 * **crucible-llvm and wide GEP indices**: optional (draft in PR #65).
 * **The constant-time S-box's cost** (#50): aarch64 encrypt 1.64×, decrypt
   1.42×, `Expand_Key` 2.9×; x86_64 1.64×, 1.54×, 1.9–2.1× (PR #90). Accept
