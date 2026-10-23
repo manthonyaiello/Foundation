@@ -743,6 +743,51 @@ push to `main` that touches the sources, the properties or the coverage
 tooling, and by hand (`workflow_dispatch`). The report is the artifact
 `spark-coverage`, and the table goes in the job summary.
 
+## Mutation testing
+
+Coverage says which code the FFI properties run, not which inputs they
+try. `scripts/mutation.py` (#104) measures the difference: it applies each
+one-line mutant of `mutation/mutants.txt` (84 of them, in `AES.Impl`,
+`AES.Impl.Main`, `SHA2.SHA256_Stream`, `HMAC.SHA256_Impl` and
+`SHA2.Functions`) in a scratch copy of the checkout, never in the
+checkout itself, and records what catches it:
+
+* **FFI**: the library built from the mutated tree, against the
+  properties that reach the mutated unit (stopping at the first failure),
+  and for a survivor of those, against every property;
+* **gnatprove**: `prove.sh -u` on the mutated unit at its committed level,
+  the failure sorted into refuted (a counterexample), timeout (the provers
+  reached their time limit, no counterexample: not a refutation),
+  unproved, or flow;
+* **SAW**: `check-saw.sh --print` per mutant, on a machine with SAW.
+
+```console
+$ scripts/mutation.py check                      # every mutant applies
+$ scripts/mutation.py setup /tmp/mut             # the scratch copy
+$ scripts/mutation.py ffi /tmp/mut --baseline    # the controls: the
+$ scripts/mutation.py prove /tmp/mut --baseline  #   unmutated tree passes
+$ scripts/mutation.py ffi /tmp/mut               # every mutant
+$ scripts/mutation.py ffi /tmp/mut --full        # survivors: every property
+$ MUTATION_PROVE_WRAP="spark-scheduler run --up-to 6 --key 'hex|mutation' --" \
+    scripts/mutation.py prove /tmp/mut
+$ scripts/mutation.py report /tmp/mut            # the table, as Markdown
+```
+
+`witness` runs one Cryptol `:check` against a mutant at an input the
+properties never try, and `diagnose` re-proves a mutant with more prover
+time; both are diagnostics, outside the two columns.
+
+The results (2026-10-23, `.claude/campaign/measurements/2026-10-23-mutation.md`):
+the FFI kills 68 of the 84. Of the 16 survivors, 10 are equivalent
+mutants, and 6 are real bugs in `SHA256_Stream` that only show on
+messages longer than the properties try (from 4 KiB for one, up to 2^53
+bytes for another), or on a message array that does not start at 0. gnatprove fails all six at the
+assertion each one falsifies, by timeout rather than with a
+counterexample. Conversely, the 7 mutants of `SHA2.Functions`, which the
+spec and the implementation share, are killed by the FFI and not by
+gnatprove, which proves the implementation against the same, mutated,
+spec.
+
 ## Constant time
 
 Issue #50 (M5.2), after SPARKNaCl: the executable code must take the same
