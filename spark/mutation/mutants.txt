@@ -1,0 +1,154 @@
+# mutants.txt -- the mutants of the executable SPARK (#104), read by
+# scripts/mutation.py.
+#
+# Each mutant is one small change to one line of one source, in the
+# executable code (never a contract, an assertion or ghost code): an
+# operator, a constant, an off-by-one bound, a loop bound, an index, a
+# dropped statement or a swapped call. The script copies the checkout to a
+# scratch tree, applies one mutant at a time there, and never writes a
+# mutant into this checkout.
+#
+# Mutant lines:
+#
+#     id | file | line | from | to | ffi | prove | what
+#
+# id     A (AES.Impl), M (AES.Impl.Main), S (SHA2.SHA256_Stream),
+#        H (HMAC.SHA256_Impl), F (SHA2.Functions), and a number.
+# file   The source, relative to spark/.
+# line   The line the change is on, in the source at the commit that adds
+#        this list; `mutation.py check` fails if from is not on it, once.
+# from   The text replaced, which must occur exactly once on that line.
+# to     Its replacement (`null;` for a dropped statement).
+# ffi    The FFI properties run for the mutant: group names (below) and
+#        property names, space-separated. A survivor of these is then run
+#        against every property (`mutation.py ffi --full`).
+# prove  The units gnatprove proves for the mutant (-u, by file name), or a
+#        group. The mutated unit, and for SHA2.Functions, which the spec and
+#        the implementation share, every SHA-2 and HMAC unit.
+# what   What the change is, in words.
+#
+# Group lines:  group NAME = MEMBER ...   (a member may be another group,
+# by its name).
+
+# ---------------------------------------------------------------- FFI groups
+
+# AES.Impl, through each export that reaches it (FFI.AES_Impl).
+group aes_gf = prop_Impl_Dot prop_Impl_xTimes
+group aes_sbox = prop_Impl_SBox prop_Impl_InvSBox prop_Impl_SubBytes prop_Impl_InvSubBytes prop_Impl_SubWord
+group aes_key = prop_Expand_Key128 prop_Expand_Key192 prop_Expand_Key256 prop_Expand_Key_FIPS
+group aes_block = prop_Encrypt_Block128 prop_Encrypt_Block192 prop_Encrypt_Block256 prop_Decrypt_Block128 prop_Decrypt_Block192 prop_Decrypt_Block256 prop_Decrypt_Block_Prime128 prop_Decrypt_Block_Prime192 prop_Decrypt_Block_Prime256 prop_Block_CipherExample
+# AES.Impl.Main (and through it all of AES.Impl's cipher).
+group aes_main = prop_Impl_Encrypt128 prop_Impl_Encrypt192 prop_Impl_Encrypt256 prop_Impl_Decrypt128 prop_Impl_Decrypt192 prop_Impl_Decrypt256 prop_Impl_AESExamples prop_Impl_FIPS197_C prop_Exec_Encrypt128 prop_Exec_Encrypt192 prop_Exec_Encrypt256 prop_Exec_Decrypt128 prop_Exec_Decrypt192 prop_Exec_Decrypt256 prop_Exec_AESExamples prop_Exec_FIPS197_C
+group aes_impl = aes_gf aes_sbox aes_key aes_block aes_main
+
+# HMAC.SHA256_Impl (FFI.HMAC_SHA256_Impl).
+group hmac_impl = prop_HMAC_SHA256_texts prop_HMAC_SHA256_keys prop_HMAC_SHA256_long prop_HMAC_SHA256_RFC4231 prop_HMAC_Chunked prop_HMAC_Chunked_long prop_HMAC_Chunked_RFC4231 prop_Init_Key
+# SHA2.SHA256_Stream (FFI.SHA2_SHA256_Stream), and HMAC.SHA256_Impl, which
+# hashes through it.
+group sha_stream = prop_Compress prop_Load_Block prop_Stream_Hash prop_Stream_Hash_long prop_Stream_Hash_FIPS prop_Stream_Chunked prop_Stream_Chunked_long prop_Stream_Chunked_FIPS hmac_impl
+# SHA2.Functions: its own exports, and everything that computes with it,
+# spec layer included (the spec and the implementation share it).
+group sha_functions = prop_Ch prop_Maj prop_SIGMA_256_0 prop_SIGMA_256_1 prop_sigma_256_0 prop_sigma_256_1 prop_K_256 prop_step prop_hash prop_hash_bits prop_hash_FIPS prop_Hash_Bytes prop_Hash_Bytes_FIPS sha_stream prop_HMAC_texts prop_HMAC_keys prop_HMAC_RFC4231
+
+# ---------------------------------------------------------------- proof groups
+
+group sha_units = foundation_spark-sha2-functions.ads foundation_spark-sha2-sha256.ads foundation_spark-sha2-sha256_bytes.adb foundation_spark-sha2-sha256_blocks.adb foundation_spark-sha2-sha256_stream.adb foundation_spark-hmac-sha256_impl.adb
+
+# ---------------------------------------------------------------- AES.Impl
+
+A01 | src/aes/foundation_spark-aes-impl.ads | 40 | 16#1b# | 16#1d# | aes_gf aes_main | foundation_spark-aes-impl.ads | X_Times: the reduction constant 0x1b changed to 0x1d
+A02 | src/aes/foundation_spark-aes-impl.ads | 40 | Shift_Right (B, 7) | Shift_Right (B, 6) | aes_gf aes_main | foundation_spark-aes-impl.ads | X_Times: the top-bit mask taken from bit 6
+A03 | src/aes/foundation_spark-aes-impl.ads | 81 | [A (1), A (2), A (3), A (0)] | [A (1), A (2), A (0), A (3)] | aes_key aes_main | foundation_spark-aes-impl.ads | Rot_Word: two bytes swapped
+A04 | src/aes/foundation_spark-aes-impl.ads | 103 | when 9 => 16#1b# | when 9 => 16#1d# | aes_key aes_main | foundation_spark-aes-impl.ads | Rcon: Rcon(9), read by AES-128 only, changed
+A05 | src/aes/foundation_spark-aes-impl.ads | 104 | when 10 => 16#36# | when 10 => 16#37# | aes_key aes_main | foundation_spark-aes-impl.ads | Rcon: Rcon(10), read by AES-128's last word only, changed
+A06 | src/aes/foundation_spark-aes-impl.adb | 18 | for N in 1 .. 8 loop | for N in 1 .. 7 loop | aes_gf | foundation_spark-aes-impl.adb | Dot: the product loop one bit short
+A07 | src/aes/foundation_spark-aes-impl.adb | 28 | 16#11B# | 16#11D# | aes_gf | foundation_spark-aes-impl.adb | Dot: the modulus 0x11b changed to 0x11d
+A08 | src/aes/foundation_spark-aes-impl.adb | 25 | for N in 1 .. 15 loop | for N in 1 .. 14 loop | aes_gf | foundation_spark-aes-impl.adb | Dot: the reduction loop one bit short
+A09 | src/aes/foundation_spark-aes-impl.adb | 95 | Shift_Left (P (7), 7) | Shift_Left (P (7), 6) | aes_sbox aes_main | foundation_spark-aes-impl.adb | From_Planes: plane 7 shifted to bit 6
+A10 | src/aes/foundation_spark-aes-impl.adb | 102 | P (7) xor P (5) xor P (2) xor Ones | P (7) xor P (5) xor P (2) | aes_sbox aes_main | foundation_spark-aes-impl.adb | Inv_Affine: the constant dropped from bit 0
+A11 | src/aes/foundation_spark-aes-impl.adb | 126 | U0 xor U3 | U0 xor U4 | aes_sbox aes_main | foundation_spark-aes-impl.adb | S-box circuit: gate T1 reads the wrong input
+A12 | src/aes/foundation_spark-aes-impl.adb | 153 | T13 and T6 | T13 or T6 | aes_sbox aes_main | foundation_spark-aes-impl.adb | S-box circuit: AND gate M1 made an OR
+A13 | src/aes/foundation_spark-aes-impl.adb | 247 | L16 xor L26 xor Ones | L16 xor L26 | aes_sbox aes_main | foundation_spark-aes-impl.adb | S-box circuit: XNOR output S1 made an XOR
+A14 | src/aes/foundation_spark-aes-impl.adb | 319 | Lanes (S (F + 7)), 56 | Lanes (S (F + 7)), 48 | aes_sbox aes_main | foundation_spark-aes-impl.adb | Pack: byte 7 packed into lane 6
+A15 | src/aes/foundation_spark-aes-impl.adb | 348 | Lanes (A (3)), 24 | Lanes (A (3)), 16 | aes_sbox aes_key aes_main | foundation_spark-aes-impl.adb | Sub_Word: byte 3 packed into lane 2
+A16 | src/aes/foundation_spark-aes-impl.adb | 442 | Lane (Hi, 6), Lane (Hi, 7)] | Lane (Hi, 6), Lane (Hi, 6)] | aes_sbox aes_main | foundation_spark-aes-impl.adb | Sub_Bytes: the last byte taken from the wrong lane
+A17 | src/aes/foundation_spark-aes-impl.adb | 473 | State (0), State (5), | State (0), State (1), | aes_block aes_main | foundation_spark-aes-impl.adb | Shift_Rows: an index changed
+A18 | src/aes/foundation_spark-aes-impl.adb | 489 | State (12), State (9), State (6), State (3)] | State (12), State (9), State (6), State (7)] | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Shift_Rows: an index changed
+A19 | src/aes/foundation_spark-aes-impl.adb | 512 | S (2) xor X (3)] | S (2) xor S (3)] | aes_block aes_main | foundation_spark-aes-impl.adb | Mix_Column: 0x02 * s3 read as s3
+A20 | src/aes/foundation_spark-aes-impl.adb | 509 | [X (0) xor (X (1) xor S (1)) | [(X (1) xor S (1)) xor X (0) | aes_block aes_main | foundation_spark-aes-impl.adb | Mix_Column: operands of a xor swapped (equivalent)
+A21 | src/aes/foundation_spark-aes-impl.adb | 550 | xor (X_Times (D4) xor D) | xor (X_Times (D4) xor D2) | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Mix_Byte: 0x09 * d computed as 0x0a * d
+A22 | src/aes/foundation_spark-aes-impl.adb | 559 | Inv_Mix_Byte (S (3), S (0), S (1), S (2)) | Inv_Mix_Byte (S (3), S (1), S (0), S (2)) | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Mix_Column: the last row's rotation wrong
+A23 | src/aes/foundation_spark-aes-impl.adb | 612 | State (I) xor Key (I) | State (I) xor Key (15 - I) | aes_block aes_main | foundation_spark-aes-impl.adb | Add_Round_Key: the key's bytes reversed
+A24 | src/aes/foundation_spark-aes-impl.adb | 624 | Shift_Rows (State); | null; | aes_block aes_main | foundation_spark-aes-impl.adb | Round: ShiftRows dropped
+A25 | src/aes/foundation_spark-aes-impl.adb | 681 | for R in 1 .. Nr (K) - 1 loop | for R in 1 .. Nr (K) - 2 loop | aes_block aes_main | foundation_spark-aes-impl.adb | Encrypt_Block: one round short
+A26 | src/aes/foundation_spark-aes-impl.adb | 693 | Add_Round_Key (State, W (Nr (K))); | Add_Round_Key (State, W (Nr (K) - 1)); | aes_block aes_main | foundation_spark-aes-impl.adb | Encrypt_Block: the last round key off by one
+A27 | src/aes/foundation_spark-aes-impl.adb | 717 | Inv_Round (State, W (Nr (K) - J)); | Inv_Round (State, W (Nr (K) - J - 1)); | aes_block aes_main | foundation_spark-aes-impl.adb | Decrypt_Block: the round keys off by one
+A28 | src/aes/foundation_spark-aes-impl.adb | 755 | Add_Round_Key (State, W (0)); | Add_Round_Key (State, W (1)); | aes_block | foundation_spark-aes-impl.adb | Decrypt_Block_Prime: the last round key W (1) for W (0)
+A29 | src/aes/foundation_spark-aes-impl.adb | 381 | Ws   : Word_Schedule := [others => [others => 0]]; | Ws   : Word_Schedule; | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the schedule's initialization dropped (every word is written before it is read)
+A30 | src/aes/foundation_spark-aes-impl.adb | 385 | for I in 0 .. 4 * (Nr (K) + 1) - 1 loop | for I in 0 .. 4 * Nr (K) - 1 loop | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the last round key's words never computed
+A31 | src/aes/foundation_spark-aes-impl.adb | 394 | if I mod Nk_K = 0 then | if I mod Nk_K = 1 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the RotWord step on the wrong word
+A32 | src/aes/foundation_spark-aes-impl.adb | 401 | and then Nk_K > 6 then | and then Nk_K > 4 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the extra SubWord step also for AES-192
+A33 | src/aes/foundation_spark-aes-impl.adb | 401 | and then Nk_K > 6 then | and then Nk_K > 7 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: Nk > 6 as Nk > 7 (equivalent: Nk is 4, 6 or 8)
+A34 | src/aes/foundation_spark-aes-impl.adb | 417 | Ws (4 * R + I / 4) (I mod 4) | Ws (4 * R + I mod 4) (I / 4) | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the round key's bytes transposed
+
+# ---------------------------------------------------------------- AES.Impl.Main
+
+M01 | src/aes/foundation_spark-aes-impl-main.adb | 16 | Key (4 * J + 1) | Key (4 * J + 2) | aes_main | foundation_spark-aes-impl-main.adb | Key_Words_Of: an index changed
+M02 | src/aes/foundation_spark-aes-impl-main.adb | 15 | for J in Ws'Range loop | for J in 0 .. Nk (K) - 2 loop | aes_main | foundation_spark-aes-impl-main.adb | Key_Words_Of: the last key word never read
+M03 | src/aes/foundation_spark-aes-impl-main.adb | 37 | Encrypt_Block (K, W, State); | Decrypt_Block (K, W, State); | aes_main | foundation_spark-aes-impl-main.adb | Encrypt: the wrong cipher called
+M04 | src/aes/foundation_spark-aes-impl-main.adb | 75 | Decrypt_Block (K, W, State); | Decrypt_Block_Prime (K, W, State); | aes_main | foundation_spark-aes-impl-main.adb | Decrypt: InvCipher' for InvCipher (equivalent: Cipher.cry proves them equal)
+M05 | src/aes/foundation_spark-aes-impl-main.adb | 74 | Expand_Key (K, Ws, W); | Expand_Key (128, Ws (0 .. 3), W (0 .. 10)); | aes_main | foundation_spark-aes-impl-main.adb | Decrypt: the key schedule always AES-128's
+
+# ---------------------------------------------------------------- SHA2.SHA256_Stream
+
+S01 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 86 | + Sched (T - 7) | + Sched (T - 6) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Compress: the schedule reads W(t-6) for W(t-7)
+S02 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 87 | + Sched (T - 16) | + Sched (T - 15) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Compress: the schedule reads W(t-15) for W(t-16)
+S03 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 84 | for T in 16 .. 63 loop | for T in 16 .. 62 loop | sha_stream | foundation_spark-sha2-sha256_stream.adb | Compress: the schedule's last word never computed
+S04 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 105 | Functions.K_256 (T) | Functions.K_256 (63 - T) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Compress: the round constants in reverse
+S05 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 111 | V (3) + T1 | V (3) + T2 | sha_stream | foundation_spark-sha2-sha256_stream.adb | Compress: e = d + T2 for d + T1
+S06 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 133 | H := SHA256."+" (H, V); | H := V; | sha_stream | foundation_spark-sha2-sha256_stream.adb | Compress: the feed-forward dropped
+S07 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 147 | + 2 ** 16 * | + 2 ** 15 * | sha_stream | foundation_spark-sha2-sha256_stream.adb | Load_Block: byte 1 of a word shifted by 15
+S08 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 147 | + 2 ** 16 * | or 2 ** 16 * | sha_stream | foundation_spark-sha2-sha256_stream.adb | Load_Block: a + made an or (equivalent: the bits are disjoint)
+S09 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 168 | 24 - 8 * Natural (I mod 4) | 24 - 8 * Natural (I mod 3) | sha_stream | foundation_spark-sha2-sha256_stream.adb | To_Digest: mod 4 made mod 3
+S10 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 199 | if R > 0 then | if R >= 0 then | sha_stream | foundation_spark-sha2-sha256_stream.adb | Update: the buffer filled even when empty (equivalent)
+S11 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 200 | Byte_Index'Min (64 - R, Len) | Byte_Index'Min (63 - R, Len) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Update: the buffer filled one byte short
+S12 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 205 | if R + Done = 64 then | if R + Done >= 64 then | sha_stream | foundation_spark-sha2-sha256_stream.adb | Update: = 64 as >= 64 (equivalent: R + Done <= 64)
+S13 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 223 | while Len - Done >= 64 loop | while Len - Done > 64 loop | sha_stream | foundation_spark-sha2-sha256_stream.adb | Update: a whole last block left in the buffer
+S14 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 248 | if Done < Len then | if Done <= Len then | sha_stream | foundation_spark-sha2-sha256_stream.adb | Update: < as <= (equivalent: the copy is then of null slices)
+S15 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 252 | Count => C.Count + Len | Count => C.Count + Done | sha_stream | foundation_spark-sha2-sha256_stream.adb | Update: the buffered bytes not counted
+S16 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 261 | (if R < 56 then 1 else 2) | (if R < 55 then 1 else 2) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the two-block padding from 55 bytes
+S17 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 261 | (if R < 56 then 1 else 2) | (if R <= 56 then 1 else 2) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the two-block padding from 57 bytes
+S18 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 269 | Last (R) := 16#80#; | Last (R) := 16#01#; | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the padding's marker bit at the wrong end
+S19 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 268 | Last (0 .. R - 1) := C.Buf (0 .. R - 1); | null; | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the buffered bytes dropped
+S20 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 262 | 8 * Unsigned_64 (C.Count) | 8 * Unsigned_64 (C.Count mod 2 ** 32) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the length counted in 32 bits
+S21 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 270 | Shift_Right (L, 56) | Shift_Right (L, 57) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the length's top byte shifted by 57
+S22 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 271 | Shift_Right (L, 48) | Shift_Right (L, 40) | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the length's byte 1 taken from bits 40-47
+S23 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 274 | Shift_Right (L, 24) and 16#FF# | Shift_Right (L, 24) and 16#7F# | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the length's byte 4 masked to 7 bits
+S24 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 276 | Shift_Right (L, 8) and 16#FF# | Shift_Right (L, 8) and 16#7F# | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the length's byte 6 masked to 7 bits (wrong from 4 KiB)
+S25 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 277 | Shift_Right (L, 0) and 16#FF# | Shift_Right (L, 0) and 16#F8# | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: the length's low 3 bits masked off (equivalent: L = 8 * Count)
+S26 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 306 | if TB = 2 then | if TB >= 2 then | sha_stream | foundation_spark-sha2-sha256_stream.adb | Final: = 2 as >= 2 (equivalent: TB is 1 or 2)
+S27 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 445 | Update (C, M (M'First + Done .. M'First + E - 1)); | Update (C, M (Done .. E - 1)); | sha_stream | foundation_spark-sha2-sha256_stream.adb | Hash_Chunked: a chunk sliced from 0, not M'First
+S28 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 232 | Load_Block (Data, Data'First + Done); | Load_Block (Data, Done); | sha_stream | foundation_spark-sha2-sha256_stream.adb | Update: a block read from 0, not Data'First
+S29 | src/sha2/foundation_spark-sha2-sha256_stream.adb | 201 | Buf (R .. R + Done - 1) := Data (Data'First .. Data'First + Done - 1); | Buf (R .. R + Done - 1) := Data (0 .. Done - 1); | sha_stream | foundation_spark-sha2-sha256_stream.adb | Update: the buffer filled from 0, not Data'First
+
+# ---------------------------------------------------------------- HMAC.SHA256_Impl
+
+H01 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 547 | if Key'Length > 64 then | if Key'Length >= 64 then | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Init_Key: a 64-byte key hashed
+H02 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 29 | K0 (J) xor X | K0 (J) or X | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Xor_Pad: xor made or
+H03 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 621 | Xor_Pad (K0, 16#36#) | Xor_Pad (K0, 16#5C#) | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Init: ipad for opad
+H04 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 624 | Xor_Pad (K0, 16#5C#) | Xor_Pad (K0, 16#5D#) | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Init: opad's constant changed
+H05 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 551 | K0 (0 .. 31) := D; | null; | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Init_Key: a long key's digest dropped
+H06 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 654 | SHA2.SHA256_Stream.Update (D, C.O_Pad); | null; | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Final: the outer pad dropped
+H07 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 627 | SHA2.SHA256_Stream.Update (C.Inner, I_Pad); | SHA2.SHA256_Stream.Update (C.Inner, K0); | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Init: the inner hash absorbs K0, not K0 xor ipad
+H08 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 577 | K0 (0 .. Stream_Index (Key'Length) - 1) := Key; | K0 (1 .. Stream_Index (Key'Length)) := Key; | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Init_Key: a short key copied one byte late
+H09 | src/hmac/foundation_spark-hmac-sha256_impl.adb | 28 | for J in Key_Block'Range loop | for J in 0 .. 62 loop | hmac_impl | foundation_spark-hmac-sha256_impl.adb | Xor_Pad: the last byte not xored
+
+# ---------------------------------------------------------------- SHA2.Functions (spec and implementation)
+
+F01 | src/sha2/foundation_spark-sha2-functions.ads | 31 | ((X and Y) xor ((not X) and Z)) | ((X and Y) xor (X and Z)) | sha_functions | sha_units | Ch: the not dropped
+F02 | src/sha2/foundation_spark-sha2-functions.ads | 41 | xor (Y and Z)) | xor (Y or Z)) | sha_functions | sha_units | Maj: an and made an or
+F03 | src/sha2/foundation_spark-sha2-functions.ads | 56 | Notation (13, 32, Unsigned_32) | Notation (12, 32, Unsigned_32) | sha_functions | sha_units | SIGMA_256_0: ROTR 13 made ROTR 12
+F04 | src/sha2/foundation_spark-sha2-functions.ads | 117 | By_3.SHR (X) | By_3.ROTR (X) | sha_functions | sha_units | sigma_256_0: SHR made ROTR
+F05 | src/sha2/foundation_spark-sha2-functions.ads | 124 | By_10.SHR (X) | By_10.ROTR (X) | sha_functions | sha_units | sigma_256_1: SHR made ROTR
+F06 | src/sha2/foundation_spark-sha2-functions.ads | 109 | By_25.ROTR (X) | By_22.ROTR (X) | sha_functions | sha_units | SIGMA_256_1: ROTR 25 made ROTR 22
+F07 | src/sha2/foundation_spark-sha2-functions.ads | 146 | 16#c67178f2# | 16#c67178f3# | sha_functions | sha_units | K_256: the last constant's low bit flipped
