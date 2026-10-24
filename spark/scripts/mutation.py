@@ -22,7 +22,8 @@ Usage (from anywhere; the checkout needs `alr -n build` once):
   mutation.py check                      every mutant applies to the sources
   mutation.py list                       the mutants, one per line
   mutation.py setup TREE                 copy the checkout to TREE, build it
-  mutation.py saw TREE ID ...            the SAW column (an IOD; not run on hex)
+  mutation.py saw TREE ID ... [--baseline]
+                                         the SAW column (GNAT Pro LLVM, SAW)
   mutation.py ffi TREE [ID ...] [--full] [--baseline]
   mutation.py prove TREE [ID ...] [--baseline]
   mutation.py report TREE                the results table, as Markdown
@@ -709,39 +710,116 @@ def cmd_witness(args):
     return 0 if verdict == "counterexample" else 1
 
 
+def saw_git(tree):
+    """check-saw.sh reads the commit (git rev-parse HEAD) and checks NSA's
+    Cryptol against it (git diff HEAD), but setup copies no .git: give the
+    tree's repo a git of its own, one commit of the pristine copy, so that
+    a mutant is an uncommitted change (check-saw.sh --print says "with
+    uncommitted changes: not a record")."""
+    repo = os.path.dirname(tree_paths(tree)[1])
+    if os.path.exists(os.path.join(repo, ".git")):
+        return
+    git = ["git", "-c", "user.name=mutation.py",
+           "-c", "user.email=mutation@localhost", "-c", "commit.gpgsign=false"]
+    log = os.path.join(tree_paths(tree)[0], "git.log")
+    for cmd in (["init", "-q"], ["add", "-A"],
+                ["commit", "-q", "-m", "pristine copy (mutation.py saw)"]):
+        status, _ = run(git + cmd, repo, log)
+        if status != 0:
+            die("git %s failed in %s (%s)" % (cmd[0], repo, log))
+
+
+def saw_once(tree, logbase, layers):
+    """check-saw.sh --print on the tree as it is. A dict: outcome (proved,
+    failed: an llvm_verify failed, with a counterexample or not; killed: the
+    memory cap; error: anything else), the script and subprogram that
+    failed, and the per-script times."""
+    _, spark, _, _ = tree_paths(tree)
+    env = dict(os.environ)
+    env["SAW_LAYERS"] = layers
+    log = logbase + ".log"
+    status, secs = run(["scripts/check-saw.sh", "--print"], spark, log,
+                       env=env, timeout=timeout())
+    # check-saw.sh clears saw/obj/ each run: keep this run's saw logs.
+    keep = logbase + ".logs"
+    if os.path.exists(keep):
+        shutil.rmtree(keep)
+    src = os.path.join(spark, "saw", "obj", "logs")
+    if os.path.isdir(src):
+        shutil.copytree(src, keep)
+    with open(log) as f:
+        out = f.read()
+    res = {"status": status, "run_s": secs, "layers": layers}
+    m = re.search(r"^>> SAW: (\d+) proved", out, re.M)
+    res["proved"] = int(m.group(1)) if m else None
+    res["times"] = re.findall(r"(\d+ s for \S+\.saw)", out)
+    script = re.search(r"saw (\S+\.saw) (FAILED|was KILLED)", out)
+    neg = re.search(r"NEGATIVE CONTROL PROVED: (\S+)", out)
+    if status is None:
+        res["outcome"] = "hang"
+    elif status == 0:
+        res["outcome"] = "proved"
+    elif script:
+        res["script"] = script.group(1)
+        res["outcome"] = "killed" if script.group(2) != "FAILED" else "failed"
+        slog = os.path.join(keep, script.group(1)[:-4] + ".log")
+        text = ""
+        if os.path.exists(slog):
+            with open(slog) as f:
+                text = f.read()
+        # The subprogram being verified when the proof failed.
+        verifying = re.findall(r"^Verifying (\S+?) *\.\.\.$", text, re.M)
+        res["subprogram"] = verifying[-1] if verifying else None
+        res["cex"] = "-Counterexample-" in text
+        err = [x for x in text.splitlines()
+               if re.search(r"Proof failed|error|Error|failed", x)]
+        res["errors"] = [x.strip()[:300] for x in err[:10]]
+    elif neg:
+        res["outcome"] = "error"
+        res["script"] = neg.group(1)
+        res["errors"] = ["negative control proved"]
+    else:
+        res["outcome"] = "error"
+        res["errors"] = [x[:300] for x in out.splitlines() if
+                         x.startswith("!!")][:10]
+    return res
+
+
 def cmd_saw(args):
     """The SAW column (on a machine with GNAT Pro's LLVM back end and SAW,
-    the IOD): per mutant, scripts/check-saw.sh --print in the tree with the
-    mutant applied, SAW_LAYERS=impl (all for SHA2.Functions, which the spec
-    layer shares). A mutant SAW catches makes an llvm_verify fail; a
-    negative control that stops failing is reported as an error. Needs
-    GNAT_LLVM_DIR and LLVM_LINK_DIR, as check-saw.sh does."""
+    the x86_64 instance): per mutant, scripts/check-saw.sh --print in the
+    tree with the mutant applied, SAW_LAYERS=impl (all for SHA2.Functions,
+    which the spec layer shares). A mutant SAW catches makes an llvm_verify
+    fail (check-saw.sh stops at the first script that fails); a negative
+    control that stops failing is reported as an error. --baseline: the
+    unmutated tree, SAW_LAYERS=impl (it must prove). Needs GNAT_LLVM_DIR
+    and LLVM_LINK_DIR, as check-saw.sh does. Results in TREE/results/saw/,
+    with each run's saw logs in <ID>.logs/."""
     if len(args) < 2:
-        die("saw TREE ID ...")
-    tree, ids = args[0], args[1:]
+        die("saw TREE ID ... | saw TREE --baseline")
+    tree, rest = args[0], args[1:]
     mutants, _ = load()
-    _, spark, _, results = tree_paths(tree)
-    logs = os.path.join(results, "saw")
+    logs = os.path.join(tree_paths(tree)[3], "saw")
     os.makedirs(logs, exist_ok=True)
     restore_all(tree)
-    for m in select(ids, mutants):
-        env = dict(os.environ)
-        env.setdefault("SAW_LAYERS",
-                       "all" if m.id.startswith("F") else "impl")
-        log = os.path.join(logs, m.id + ".log")
+    saw_git(tree)
+    if "--baseline" in rest:
+        res = saw_once(tree, os.path.join(logs, "baseline"), "impl")
+        save(tree, "saw", "baseline", res)
+        print("saw baseline: %s, %s proved (%d s)" % (
+            res["outcome"], res.get("proved"), res["run_s"]))
+        return 0 if res["outcome"] == "proved" else 1
+    for m in select(rest, mutants):
+        layers = os.environ.get("SAW_LAYERS",
+                                "all" if m.id.startswith("F") else "impl")
         with Applied(tree, m):
-            status, secs = run(["scripts/check-saw.sh", "--print"], spark,
-                               log, env=env, timeout=timeout())
-        with open(log) as f:
-            out = f.read()
-        failed = sorted(set(re.findall(
-            r"(?:FAIL|failed)[^\n]*?(\b[A-Za-z_]+\.saw\b[^\n]*)", out)))
-        res = {"status": status, "run_s": secs, "layers": env["SAW_LAYERS"],
-               "outcome": ("hang" if status is None else
-                           "proved" if status == 0 else "failed"),
-               "failed": failed[:20]}
+            res = saw_once(tree, os.path.join(logs, m.id), layers)
         save(tree, "saw", m.id, res)
-        print("saw %s: %s (%d s)" % (m.id, res["outcome"], secs))
+        print("saw %s: %s%s (%d s)" % (
+            m.id, res["outcome"],
+            (" at %s %s%s" % (res.get("script"), res.get("subprogram"),
+                              ", counterexample" if res.get("cex") else ""))
+            if res.get("script") else "", res["run_s"]))
         sys.stdout.flush()
     return 0
 
@@ -801,6 +879,16 @@ def cell_prove(r):
     return o
 
 
+def cell_saw(r):
+    if not r:
+        return ""
+    if r.get("script"):
+        return "%s at %s `%s`%s" % (
+            r["outcome"], r["script"], r.get("subprogram"),
+            " (counterexample)" if r.get("cex") else "")
+    return r["outcome"]
+
+
 def verdict(m, rf, rff, rp):
     """The mutant's category for the table."""
     if not rf or not rp:
@@ -839,7 +927,7 @@ def cmd_report(args):
         rows.append("| %s | `%s`:%d | %s | %s | %s | %s | %s |" % (
             m.id, os.path.basename(m.file), m.line, m.what,
             cell_ffi(rf, rff), cell_prove(rp),
-            rs["outcome"] if rs else "", v))
+            cell_saw(rs), v))
     print("| id | where | mutant | FFI | gnatprove | SAW | caught by |")
     print("|---|---|---|---|---|---|---|")
     for r in rows:
