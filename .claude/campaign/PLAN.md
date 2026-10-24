@@ -1,27 +1,36 @@
 # The campaign plan: SPARK AES, SHA-256 and HMAC against the Cryptol
 
-**Provenance.** Rewritten 2026-10-22/23 on **hex**, at `main` = `a4cf229`
-(the merge of PR #117). **The campaign now runs on hex**, Tony's arm64
-Mac; the `foundation` container is retired ("Machines"). This session
-merged PRs #108 (#100), #109 (#107), #111 (part of #75), #116 (#113, the
-FFI on macOS), #115 (#51's aarch64 half) and #117 (#106, done in the
-`foundation` container), and refiled the remaining work around **a
-technical blog post** (#102).
-**Board, counted on hex at `f7a2366`** (no proof input changed since):
-4264/4264 proved; SAW **STALE** (PR #111 changed five of its inputs; the
-next IOD session re-records).
-**Open PRs:** #118 (#106 follow-up: relabels the after-a-change layers;
-docs only), and this plan. **In flight:** the #104 tick (mutation testing,
-FFI and gnatprove columns, on hex).
-**Open issues:** #102 blog post and its prerequisites #103 #104 #51
-(x86_64 half); the IOD batch #99 #110 and #75 (item 3, the re-record,
-four AES statements); E5's epic #48. #105, #67, #106 and #113 closed.
-**E0–E4 are closed**; E5: #49 and #50 closed, #51 half done.
-**GitHub disabled this repository's workflows on 2026-10-23** (reason not
-recorded; Tony re-enabled them): push once per PR, not per commit.
+**Provenance.** Rewritten 2026-10-24 on **the x86_64 IOD** (the batch
+session; instance up 2026-10-23 17:50 UTC, gone 2026-10-24 17:50 UTC), at
+`main` = `ef8bdf7` (the merge of PR #121, #104's FFI and gnatprove
+columns, merged by Tony from hex). **The campaign runs on hex**; the IOD
+did the SAW batch only. This session opened, all verified and pushed once,
+none merged:
+* **#119** (Closes #51): x86_64 AES performance. Docs only, so SPARK CI
+  does not run on it (`'!**.md'`); `MERGEABLE`, `CLEAN`.
+* **#122** (Closes #99, #110; Part of #75): the SAW batch and the one
+  re-record. CI green on `f19fbf8` (FFI 14m45s); `MERGEABLE`, `CLEAN`.
+* **#123** (Closes #104): #104's SAW column, a sibling of #122 on
+  `main` (it uses only the implementation-layer SAW scripts, which #122
+  does not change).
+* **This plan**, stacked on #122 (base `issue-99-saw-batch`): retarget it to
+  `main` once #122 is merged.
+**Board on `main` = `ef8bdf7`**: 4264/4264 proved, holes 0; SAW
+**STALE** until #122 merges, then **current** (`board.py` on #122's head:
+both records current, none of 62 inputs changed since `82b10e6`).
+**Open issues:** #102 blog post and its prerequisite #103; #75 (the four
+AES statements, if wanted); #120 (parallel `check-saw.sh`, filed this
+session, **not** a #102 prerequisite); E5's epic #48. #51, #99, #104 and
+#110 close when their PRs merge.
+**E0–E4 are closed**; E5: #49 and #50 closed, #51 closes with #119.
+**Push once per PR, not per commit** (GitHub disabled the workflows on
+2026-10-23; Tony re-enabled them).
 **Measurements:** `.claude/campaign/measurements/2026-10-19-iod.md` (the E4
-day) and `2026-10-22-saw-cost.md` (#69). The AES spec crosswalks are in
-`.claude/campaign/walkthroughs/` (links in its README).
+day), `2026-10-22-saw-cost.md` (#69), `2026-10-22-aes-perf-hex.md` and
+`2026-10-23-aes-perf-x86_64.md` (#51), `2026-10-23-mutation.md` (#104);
+#99's single-proof timings in `spark/saw/experiments/issue-99/`. The AES
+spec crosswalks are in `.claude/campaign/walkthroughs/` (links in its
+README).
 
 **A fresh session starts at "Next".**
 
@@ -51,7 +60,9 @@ check proved, against a SPARK spec layer, with no assumptions.
 
 Counted on hex at `main` = `f7a2366` (`check-proof.sh` through the
 scheduler, `FOUNDATION_SPARK_PROOF_ALLOWANCE=ci`, 225 s warm; CI's arm64
-gate green on PR #111's head):
+gate green on PR #111's head). No proof input has changed since, up to
+`ef8bdf7` and the three open PRs (CI's arm64 gate green on #122's head);
+the SAW line is counted by `board.py` on #122's head `f19fbf8`:
 
 * **40 of 40 functions complete** in CI, 3 of them by design (`board.py`'s
   row kinds, #67/PR #81): `AES::SBox::affine` and `GF2::inverse (AES)` are
@@ -70,11 +81,19 @@ gate green on PR #111's head):
   export units, each justified in `spark/scripts/trust-surface.txt`).
 * **FFI:** 147 properties, all passing in CI on PR #111's head
   (`spark/cryptol/properties.txt`). CI FFI job about 11–16 min.
-* **Coverage (#49, PR #55):** under the FFI properties, 300/303 statements,
-  13/14 decisions, 14/17 MC/DC, every gap explained
-  (`spark/coverage/explained.txt`). Measured before the constant-time
-  S-box; the CI Coverage job is green on every PR since, so the gaps are
-  still all explained, but the numbers need re-running (#104).
+* **Coverage (#49, PR #55; re-run for #104 in PR #121):** under the FFI
+  properties, **496/499 statements, 10/11 decisions, 11/13 MC/DC**, 0
+  unexplained (`spark/coverage/explained.txt`: three contract-only
+  expression functions); AES.Impl 241/241.
+* **Mutation testing (#104; PRs #121, #123):** 84 one-line mutants. The
+  FFI kills 68; gnatprove fails the 6 real bugs the FFI misses (S20–S24,
+  S27), by timeout. SAW column (#123, 23 mutants, implementation layer):
+  21 of 23 as predicted. SAW proves all six real bugs (its `Hash` proofs
+  are at fixed lengths ≤ 200 bytes, and `Hash_Chunked` has none), so
+  gnatprove alone rejects them. S14 is a false kill: an equivalent mutant
+  that adds a null-range `nuw` poison inside a strict proof. F02 is
+  caught by the 10G memory cap (rme on the mutated `Maj`), not by a
+  counterexample; z3 refutes it in 0.03 s.
 * **Constant time (#50, closed):** AES's S-box is a bitsliced
   Boyar–Peralta circuit, proved equal to the tables. On aarch64 and x86_64
   the object-code check finds 0 violations; dudect max |t| ≤ 2.3; x86_64
@@ -98,12 +117,13 @@ gate green on PR #111's head):
 | **#13** E2 SHA-256 | #14 #15 #16 #17 | all closed |
 | **#18** E3 HMAC-SHA-256 | #19 #20 | all closed |
 | **#21** E4 SAW | #22 #23 #24 #59 | all closed |
-| **#48** E5 assurance beyond the proofs | #49 coverage · #50 constant time · #51 binaries and performance (AES only) | #49 #50 closed; #51 open |
-| review of 2026-10-20 | #67 … #80 | all closed but #75 (item 3, four AES statements) |
-| IOD session 2026-10-21/22 | #95 #99 #100 | #95 #100 closed; #99 open (IOD) |
-| **#102** blog post (2026-10-22) | #103 docs · #104 mutation testing · #105 fork history · #51 · #75 · #99 · #113 FFI on macOS | #105 closed (accepted); the rest open |
-| hex move (2026-10-22) | #107 scripts on macOS · #110 `check-saw.sh` on macOS | #107 closed; #110 open (IOD) |
-| other | #106 effort analysis | open |
+| **#48** E5 assurance beyond the proofs | #49 coverage · #50 constant time · #51 binaries and performance (AES only) | #49 #50 closed; #51 closes with #119 |
+| review of 2026-10-20 | #67 … #80 | all closed but #75 (four AES statements; item 3 lands with #122) |
+| IOD session 2026-10-21/22 | #95 #99 #100 | #95 #100 closed; #99 closes with #122 |
+| **#102** blog post (2026-10-22) | #103 docs · #104 mutation testing · #105 fork history · #51 · #75 · #99 · #113 FFI on macOS | #105 #113 closed; #51 #99 #104 close with #119 #122 #123; #103 open |
+| hex move (2026-10-22) | #107 scripts on macOS · #110 `check-saw.sh` on macOS | #107 closed; #110 closes with #122 |
+| IOD session 2026-10-23/24 | #120 parallel `check-saw.sh` | open; not for #102 (Tony) |
+| other | #106 effort analysis | closed |
 
 ## Next
 
@@ -114,37 +134,49 @@ and never drafts it. A `/campaign` run never takes #102 as a writing task.
 **The order** (A → B: A first):
 
 ```
-#104a mutants: FFI + gnatprove (hex, in flight) ───┐
-                          IOD session ◄────────────┘
-                            #99 unfold linear recursions
-                            #110 check-saw.sh portable
-                            #75 item 3, prelude SAW proofs
-                            check-saw: relative runtime path, generic comment (#105)
-                            SAW re-record, default + long, once
-                            #104 SAW column · #51b AES perf, x86_64
-                          ──► #103 docs ──► #102 data ──► tag, clean FSF repro ──► publish
+merge #119, #122, #123 (Tony) ──► this plan, retargeted to main
+  ──► #103 docs (hex) ──► #102 data ──► tag, clean FSF repro ──► publish
 ```
 
-**Done on hex:** #113 (PR #116: the FFI library as an encapsulated
-`.dylib`, Cryptol run through an ad hoc signed copy; 147/147 in about
-463 s); #51's aarch64 half (PR #115: `scripts/perf-aes.sh`; constant-time
-SPARK 1.5–1.7× Rust on blocks, the table S-box 0.8–1.1×); #106 (PR #117,
-from the `foundation` container). **In flight:** #104's FFI and gnatprove
-columns.
+**1. Merge** (Tony): #119, #122 and #123 are independent siblings on
+`main`; any order. Then retarget this plan's PR from `issue-99-saw-batch`
+to `main` and merge it. After #122, `board.py` on `main` reports SAW
+current.
 
-**The IOD session** (Tony builds one; it dies 24 h after start, so **upload
-the session to memcp before then**): everything under "IOD session" above,
-in one line of PRs, one re-record.
+**2. #103** (the README rewrite and in-repo walkthroughs), on hex. Its
+final numbers are now all in: board, coverage and mutation (#121, #123),
+SAW (#122), performance on both architectures (#115, #119). Then data for
+#102 as Tony asks.
 
-**Then #103** (the README rewrite and in-repo walkthroughs), which needs the
-final numbers, then data for #102 as Tony asks.
+**Done in the IOD batch (2026-10-23/24)**, all verified, none merged:
+#51's x86_64 half (#119: constant-time SPARK 1.1× Rust on encrypt,
+1.5× on decrypt, against 1.5–1.7× on aarch64; the table S-box at `-O3`
+encrypts in half Rust's time; `perf-aes.sh`'s Linux path ran
+unmodified); #99, #110, the relative runtime path and generic comment
+(#105's follow-up), #111's fallout and #75 item 3, with one re-record
+(#122: 1898 / 2145 proved, 2749 s / 6257 s); #104's SAW column (#123;
+`mutation.py saw` fixed: it needed a git in the scratch tree).
+
+**No IOD is needed for #103 or #102.** The next one is needed only when a
+change touches a SAW input, or for #120.
 
 Not in the post (Tony, 2026-10-22): constant time; offering the work to NSA
 (undecided; possibly after GNAT-LLVM is in the community release).
 
+Not yet, filed:
+* **#120** `check-saw.sh`: run the independent `.saw` files in parallel
+  and record each run's peak memory (SAW has no `-j`; a record keeps one
+  core busy). Needs an IOD. Tony: not part of #102's list.
+* **#75's four AES statements** (below), if wanted.
+
 Not yet, and not filed:
-* A T-table AES (only if speed matters: #51 on aarch64 has the table
-  S-box at 0.8–1.1× NSA's Rust, the constant-time circuit at 1.5–1.7×).
+* `check-saw.sh` under bash 3.2: #110's three fixes are in (#122), but
+  the script still uses `declare -n` (bash 4.3+) and empty arrays under
+  `set -u` in a `SAW_LAYERS` partial run, so it does not yet run on
+  macOS's `/bin/bash`. File it if SAW is ever run on a Mac.
+* A T-table AES (only if speed matters: #51 has the table S-box at
+  0.8–1.1× NSA's Rust on aarch64 and 0.5× on x86_64 encrypt; the
+  constant-time circuit at 1.5–1.7× and 1.1–1.5×).
 * `FinalBits` for SHA-256; SHA-224/384/512 instances; truncated HMAC.
 * The four AES statements still inline (`pmod`, GF2 `pmult` [9], `pdiv`,
   `Types.Split`/`Join`): each sits in `SBox_Entries`' closure (PR #111
@@ -172,15 +204,18 @@ Not yet, and not filed:
   niss where E0–E3 and the reviews ran. Its transcripts fed #106 (PR #117);
   Tony can still start it.
 * **The x86_64 IOD**: dies 24 hours after it starts. **8 CPUs, 15.7 GB RAM,
-  no swap.** Bootstrap with `spark/scripts/bootstrap-x86_64.sh`: since #100
-  it uses each tool already present at its pin and fetches the rest. The IOD
-  comes with GNAT Pro 27 (GNAT Pro, SPARK Pro and the LLVM back end); point
-  `GNAT_LLVM_DIR` and `LLVM_LINK_DIR` at it in the tools' `env.sh`. **The
-  concrete paths are not in this repository** (it is public): they are in
-  memcp (session of 2026-10-21/22). A default SAW record takes about 60 min,
-  the long one about 130 min, on one core. **Push after every commit, and
-  upload the session to memcp before the instance dies** (one was reaped
-  with its session on it).
+  no swap.** **A new instance starts bare** (2026-10-23): no `gh` login,
+  no tools directory, no Rust; only the repository checkout survived. Ask
+  Tony for `gh auth login` and to make GNAT Pro 27 reachable (how is in
+  memcp, sessions of 2026-10-21/22 and 2026-10-23/24; not here, the
+  repository is public). Then `spark/scripts/bootstrap-x86_64.sh
+  --no-checks` with `GNAT_LLVM_DIR` set to GNAT Pro's LLVM back end:
+  about 3 min, and it fetches llvm-link 21.1.8 itself (sha256-pinned) when
+  GNAT Pro has none. Rust for #51-style work: rustup, 1.95.0 (hex's).
+  A default SAW record takes about 46 min, the long one about 104 min, on
+  one core (#122). **Upload the session to memcp before the instance
+  dies** (one was reaped with its session on it). Push once per PR (see
+  the provenance), but commit in small increments.
 * **niss** (M5 Pro, 64 GB): the fallback if a SAW proof ever needs more
   memory than the IOD has. SAW ships for macOS arm64, so that would mean
   bitcode on the IOD and SAW on a Mac. Not needed so far.
@@ -381,11 +416,18 @@ Not yet, and not filed:
   review's changes versus following them in SAW, not upkeep of either
   tool. Comparable: 6.78 h of gnatprove against 6.80 h of SAW.
 * **Coverage is not the argument against FFI-only testing**: it is near
-  100%. Mutation testing (#104) is.
+  100%. Mutation testing (#104) is: 6 real bugs pass the FFI and SAW
+  (#121, #123), and only gnatprove rejects them.
 * **Plan location.** This file. There is one `PLAN.md`; its history is git's.
 
 ## Open for Tony
 
+* **Merge #119, #122 and #123**, then retarget this plan's PR to `main`.
+  Two deviations from the issues as filed, both stated in #122: #99's AES
+  cipher folds and GF2's `Pmod`/`Pdiv` folds stay per index (unfolding
+  measured dearer: 24.3 s against 14.2 s for Round at M = 13); and
+  "Closes #110" meets its done-when, but `check-saw.sh` still is not
+  bash-3.2 clean (`declare -n`). Keep #110 open, or file a follow-up?
 * **Report to AdaCore:** gprbuild 26's `gnat.xml` enables encapsulated
   libraries for x86_64, i686 and powerpc Darwin but not aarch64 Darwin
   (#113 worked around it in `foundation_spark_ffi.gpr`).
@@ -406,9 +448,9 @@ Not yet, and not filed:
   byte (about 20%); Z3 alone (a `--prover` level-policy change).
 * **The IOD's global `~/.claude/CLAUDE.md`** is a mempalace leftover; Tony
   said to ignore it (use memcp). Delete it on the next image if wanted.
-* **memcp's SessionStart hook** injected no surface on the IOD, and `hex`'s
-  SessionEnd uploads are failing (3 of 19 sessions): `doctor`, or redeploy
-  the hooks.
+* **memcp's SessionStart hook** injected no surface on the IOD (again on
+  2026-10-23), and `hex`'s SessionEnd uploads are failing (3 of 19
+  sessions): `doctor`, or redeploy the hooks.
 
 ## Live ambushes
 
@@ -442,7 +484,8 @@ Not yet, and not filed:
 * **A hand re-run replays cached proofs** (seconds); `prove.sh` refuses
   `-f` (its freshness guard forces per unit). CI's run is the cold one.
 * **hex is macOS**: scripts must run under BSD awk/sed and bash 3.2 (#107
-  fixed the proof and FFI scripts; `check-saw.sh` is #110). XProtect and
+  fixed the proof and FFI scripts; #110's fixes to `check-saw.sh` are in
+  #122, but it still needs bash 4.3 for `declare -n`). XProtect and
   Tony's own work load the machine: load averages near 20 are normal
   during a `-j8` proof.
 * **gnatdoc 26 crashes** on: `declare` expressions; a line break right after
@@ -519,3 +562,17 @@ Not yet, and not filed:
   of names need splitting.
 * **`gh pr create` on a fork** defaults to the upstream. Always
   `--repo manthonyaiello/Foundation`.
+* **A docs-only PR gets no CI at all**: SPARK CI's path filter ends in
+  `'!**.md'`, so `gh pr checks` says "no checks reported" for good (#119,
+  and this plan). A wait loop must treat that as final, not pending.
+* **rme can blow up on a wrong formula it proves at once when right**
+  (#123's F02: the mutated `Maj` hit the 10G cap in 21 s; z3 refutes it in
+  0.03 s). A negative result killed by the cap is a failure, but not a
+  counterexample; say which.
+* **SAW's `nuw` poison check also fires on equivalent code** (#123's S14:
+  a null-slice copy inside a strict, non-lax proof). A SAW failure there
+  is not a wrong result; read the log before calling a mutant killed.
+* **The IOD's GNAT Pro tools load only in an interactive zsh** (the
+  helper is a shell function), so the Bash tool cannot use it: give
+  scripts the install directory through `GNAT_LLVM_DIR`, as `env.sh`
+  does.
