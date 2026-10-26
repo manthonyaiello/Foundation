@@ -761,7 +761,9 @@ checkout itself, and records what catches it:
   the failure sorted into refuted (a counterexample), timeout (the provers
   reached their time limit, no counterexample: not a refutation),
   unproved, or flow;
-* **SAW**: `check-saw.sh --print` per mutant, on a machine with SAW.
+* **SAW**: `check-saw.sh --print` per mutant (`SAW_LAYERS=impl`), on a
+  machine with SAW and GNAT Pro's LLVM back end (`mutation.py saw TREE
+  ID ...`, and `saw TREE --baseline` for the unmutated tree).
 
 ```console
 $ scripts/mutation.py check                      # every mutant applies
@@ -789,6 +791,19 @@ counterexample. Conversely, the 7 mutants of `SHA2.Functions`, which the
 spec and the implementation share, are killed by the FFI and not by
 gnatprove, which proves the implementation against the same, mutated,
 spec.
+
+SAW (the x86_64 instance, 2026-10-24) was run on 23 of the mutants: the
+16 FFI survivors and the 7 of `SHA2.Functions`. It rejects all 7 of
+`SHA2.Functions` (it compares against NSA's Cryptol, as the FFI does): 6
+with a counterexample, and Maj's at the 10G memory cap under rme (z3
+refutes it at once). It passes all 6 real bugs: its Hash proofs are at
+fixed lengths of at most 200 bytes, and `Hash_Chunked` has none, so
+gnatprove is the only one of the three that rejects them. It proves 9 of
+the 10 equivalent mutants, and fails S14 for a reason of its own, not
+the hash's: the mutant copies two null slices, and SAW 1.6 fails at the
+poison value GNAT-LLVM's length computation makes there (see "Null
+slices" in `saw/sha256_impl.saw`). The unmutated implementation layer
+proves (90 proofs, 152 s).
 
 ## Constant time
 
