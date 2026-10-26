@@ -310,8 +310,8 @@ if-expression with the cases in the same order. `k` is `K'Length`, and
 `Hk` is the generic formal rather than an argument. The precondition asks
 that only a key that is hashed be short enough for the hash; that is what
 Cryptol's type `[k * 8]` for `Hk` asks of the caller. The one deviation:
-`HMAC_init` is `private` in `Main.cry` but public in SPARK, "because M3.2
-is proved against it"
+`HMAC_init` is `private` in `Main.cry` but public in SPARK, because the
+implementation is proved against it
 ([foundation_spark-hmac-main.ads:114-117](../../src/hmac/foundation_spark-hmac-main.ads#L114-L117)).
 The implementation's `Init_Key` has `HMAC_init` in its postcondition.
 

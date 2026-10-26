@@ -6,7 +6,7 @@ catch (one-line mutants). Back to the [README](../README.md).
 
 ## Coverage
 
-`scripts/check-coverage.sh` (#49) measures how much of the executable code
+`scripts/check-coverage.sh` measures how much of the executable code
 the FFI properties run: GNATcoverage's statement, decision and MC/DC
 obligations (`--level=stmt+mcdc`) of the units in `coverage/units.txt` (the
 executables `AES.Impl`, `AES.Impl.Main`, `SHA2.SHA256_Stream`,
@@ -55,15 +55,15 @@ tests is closed with a property instead (`prop_Impl_Dot` closed
 `AES.Impl.Dot`, which the ciphers never call).
 
 **CI** runs it in `.github/workflows/spark-coverage.yml`, its own workflow,
-so it never lengthens the FFI gate: on `ubuntu-24.04` (x86_64), on a PR or a
-push to `main` that touches the sources, the properties or the coverage
+so it never lengthens the FFI gate: on `ubuntu-24.04` (x86_64), on a pull request or
+a push to `main` that touches the sources, the properties or the coverage
 tooling, and by hand (`workflow_dispatch`). The report is the artifact
 `spark-coverage`, and the table goes in the job summary.
 
 ## Mutation testing
 
 Coverage says which code the FFI properties run, not which inputs they
-try. `scripts/mutation.py` (#104) measures the difference: it applies each
+try. `scripts/mutation.py` measures the difference: it applies each
 one-line mutant of `mutation/mutants.txt` (84 of them, in `AES.Impl`,
 `AES.Impl.Main`, `SHA2.SHA256_Stream`, `HMAC.SHA256_Impl` and
 `SHA2.Functions`) in a scratch copy of the checkout, never in the

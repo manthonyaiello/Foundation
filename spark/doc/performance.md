@@ -6,7 +6,7 @@ arm64 Mac and an x86_64 Linux instance. Back to the
 
 ## Performance
 
-`scripts/perf-aes.sh` (#51) compares the SPARK AES with the repository's
+`scripts/perf-aes.sh` compares the SPARK AES with the repository's
 reference, NSA's Rust `Cipher` and `KeyExpansion` crates
 (`../algorithms/AES/rust/`, used unmodified as path dependencies). AES
 only: there is no reference SHA-256 or HMAC to compare with.
@@ -26,7 +26,7 @@ b967ebb`), `nm`, `size` and `python3`. It builds:
 |---|---|
 | `spark-O2`, `spark-O3` | `-O2` / `-O3 -gnatn -gnatp -flto -ffunction-sections -fdata-sections`, `pragma Assertion_Policy (Ignore)` (`perf/perf.adc`: no contract, assertion or ghost code), link `-flto` and `-dead_strip` / `--gc-sections` |
 | `spark-O3-checks` | the same at `-O3` without `-gnatp`: the run-time checks stay |
-| `spark-table-O2`, `-O3` | as `spark-O2`/`-O3`, on `src/` at `b967ebb`: the table S-box before #50 |
+| `spark-table-O2`, `-O3` | as `spark-O2`/`-O3`, on `src/` at `b967ebb`: the table S-box |
 | `rust-O2`, `rust-O3` | cargo profiles `perf-o2`/`perf-o3` (`perf/rust/Cargo.toml`): release, `opt-level` 2 / 3, `lto = "fat"`, `codegen-units = 1`; otherwise release defaults (no overflow checks, `panic = "unwind"`). Slice bounds checks stay: Rust cannot turn them off |
 | `rust-release` | plain `--release`: `opt-level` 3, no LTO, 16 codegen units |
 
@@ -124,7 +124,7 @@ What it shows, at `-O3`:
 * **The constant-time SPARK costs 1.5–1.6× the Rust on encrypt and
   1.7× on decrypt, and is faster on key expansion** (0.67–0.93×). Its
   cost against the table SPARK is 1.9× encrypt, 1.5–1.6× decrypt and
-  2.5–2.7× key expansion here, against #84's 1.64× / 1.42× / 2.9× on
+  2.5–2.7× key expansion here, against 1.64× / 1.42× / 2.9× on
   an aarch64 Linux container ([constant-time.md](constant-time.md)): those were with checks on, best-of-7, on another chip.
 * **What the proof buys at run time is small here**: removing the checks
   (`-gnatp`) saves 7–12% of `Expand_Key`, and nothing measurable on the

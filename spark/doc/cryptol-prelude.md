@@ -6,7 +6,7 @@ Back to the [README](../README.md).
 
 ## The Cryptol prelude
 
-`src/cryptol/` (`Foundation_Spark.Cryptol`, #75) states, once and under
+`src/cryptol/` (`Foundation_Spark.Cryptol`) states, once and under
 their Cryptol names, the Cryptol built-ins the spec layers are written in.
 A spec unit instantiates a generic at its own types and calls the instance
 where the Cryptol calls the built-in, so a reviewer checks each
@@ -58,7 +58,7 @@ know:
 **Who uses it.** SHA-2 (`foldl` twice, `@`, `join`, `split`, `zero`, the
 literal of `pad`, `/^` and `%^`) and HMAC (`repeat`, `zero`, `@` and
 `join` on bytes), with nothing of either left inline. The last four
-statements moved in #75's remainder, once the cause of the lost proofs
+statements moved into the prelude once the cause of the lost proofs
 was measured from the provers' own goals (`--debug-save-vcs`):
 - `/^` and `%^` (`SHA2.Lengths`, `Numeric`). They had been tried as
   wrappers, `SHA2.Ceil_Div` with the body `Lengths.Ceil_Div (A, B)`. The
@@ -85,7 +85,7 @@ was measured from the provers' own goals (`--debug-save-vcs`):
 
 The FFI shim calls these instances (`SHA2.Lengths`, `HMAC.Byte_Words`).
 
-AES since #75's second half: `foldl` (`Spec.Cipher`'s three round folds,
+AES: `foldl` (`Spec.Cipher`'s three round folds,
 `Folds`; GF28MultiplicationCorrect's fold over a byte's bits,
 `Enumeration_Folds`), `@@` (SubBytes, ShiftRows and their inverses,
 `Bulk_Indexing`), `join` and `split` between bytes and bits (`Spec.Main`'s
@@ -94,13 +94,13 @@ AES since #75's second half: `foldl` (`Spec.Cipher`'s three round folds,
 `Product_Bit`, GF2's `Bit`, `Words`), `pmult` (GF28 at `[8] x [8]`,
 `Polynomial_Products`), and `reverse` (`Cipher.Reverse_Keys`,
 `Sequences` over round keys). `reverse` had stayed written out because
-#85 measured `AES.Impl.Decrypt_Block_Prime`'s assertion `RK (J) = W (Nr
-(K) - J)` timing out at level 2 through the instance. That does not
-reproduce: through the instance the assertion proves with Z3 in 396
-steps (0.15 s), on this tree and on #85's own before its rebase (its
-spec with `AES.Impl` as it was before #84), and the gate proves. Four
-stay written out, each for a measured reason (not re-measured in #75's
-remainder):
+an earlier run measured `AES.Impl.Decrypt_Block_Prime`'s assertion
+`RK (J) = W (Nr (K) - J)` timing out at level 2 through the instance.
+That does not reproduce: through the instance the assertion proves with
+Z3 in 396 steps (0.15 s), on this tree and on the tree first measured
+(its spec with an earlier `AES.Impl`), and the gate proves. Four
+stay written out, each for a measured reason (not re-measured when the
+others moved):
 - `pmod` (GF28's `Pmod_Fold`, `Pmod`): GF28 returns the remainder as a
   `Byte`, and its bound below `2 ** 8` is an induction no expression
   function can call; GF28's `Pmod` also takes any `Poly` dividend;
@@ -128,7 +128,7 @@ spec layers' own instances where there are some: 22 properties, `:exhaust`
 where the domain allows. A fold takes a function, which C cannot pass, so
 the shims fold fixed ones whose result depends on the order of the
 elements. The spec-layer SAW proofs go through its instances (their
-lemmas name the instances' recursions), and since #75's item 3 SAW also
+lemmas name the instances' recursions), and SAW also
 proves each instance the spec layers call on its own, at the sizes they
 call it at, against the Cryptol built-in it states (`saw/aes_spec_prelude.saw`,
 `saw/sha256_spec_prelude.saw`; [saw.md, "The spec layer"](saw.md#the-spec-layer)).

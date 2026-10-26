@@ -23,7 +23,7 @@ checker needs it), and python3 (macOS's bash 3.2 is enough). It sets
 `CRYPTOLPATH` to the repository root and `cryptol/`, so a property module
 imports `algorithms::AES::GF28` by its NSA name.
 
-**On macOS** (#113) the check runs as on Linux, with `.dylib` for `.so`,
+**On macOS** the check runs as on Linux, with `.dylib` for `.so`,
 and two differences, neither of which touches the Linux build:
 
 - gprbuild 26.0.1 does not enable encapsulated libraries for aarch64
@@ -122,8 +122,8 @@ Rust.
 for a constant `K <= 64` (as `uint8_t` .. `uint64_t`), and sequences of such
 words (`[n][8]` as `uint8_t *`, with each size variable passed first as
 `size_t`). An arbitrary-length `[l]` is rejected ("Type unsupported for
-FFI"), and so is a fixed `[100]`. So a function over `[l]` (SHA-2's `hash`,
-#15) is checked through a byte-packing wrapper on the Cryptol side, for
+FFI"), and so is a fixed `[100]`. So a function over `[l]` (SHA-2's `hash`)
+is checked through a byte-packing wrapper on the Cryptol side, for
 example `foreign spark_hash : {l} (fin l) => [l /^ 8][8] -> [32][8]`, which
 is the C `void spark_hash (size_t l, uint8_t *in, uint8_t *out)`. Cryptol's
 other convention, `foreign abstract`, does accept `{l} (fin l) => [l]`: the
@@ -173,7 +173,7 @@ share.
   key and conjoins `Tests.cry`'s own `Example<n>KeyExpansion`, so the long
   expected schedules are not copied. Each is a closed `Bit`, run with
   `:exhaust` (1 test).
-- **The executable AES** (`AES.Impl`, #11) is not ghost: its exports
+- **The executable AES** (`AES.Impl`) is not ghost: its exports
   (`FFI.AES_Impl`: `spark_Expand_Key`, `spark_Encrypt_Block`,
   `spark_Decrypt_Block`, `spark_Decrypt_Block_Prime`) call `Expand_Key`
   and the block ciphers directly, with no ghost shim, in the C shapes of

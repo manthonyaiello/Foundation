@@ -7,7 +7,7 @@ Back to the [README](../README.md).
 
 ## Constant time
 
-Issue #50 (M5.2), after SPARKNaCl: the executable code must take the same
+After SPARKNaCl, the executable code must take the same
 time, and touch the same memory, whatever the secrets are. Functional proof
 says nothing about timing: a table-driven AES is correct, and its table
 lookups leak the key through the cache.
@@ -146,7 +146,7 @@ runtime checks) and:
    and a `|t|` below 4.5 shows only that this many samples saw nothing.
 
 Results on an aarch64 Linux container (GNAT 16.1 at `-O3 -gnatn`), before
-(`b967ebb`) and after #50:
+(`b967ebb`) and after:
 
 * **Object code.** Before: 86 indexed loads in the straight-line
   functions (`ldrb w0, [x1, w0, uxtw]` in `Sub_Byte`, 16 in each of
@@ -185,7 +185,7 @@ Results on an aarch64 Linux container (GNAT 16.1 at `-O3 -gnatn`), before
 
 Results on an x86_64 Linux instance (Intel Xeon, Ubuntu 24.04, GNAT 16.1 at
 `-O3 -gnatn`, GNAT Pro 27's `objdump` 2.46, Valgrind 3.22.0), before
-(`b967ebb`, with `ct/` and the two scripts copied in) and after #50, on
+(`b967ebb`, with `ct/` and the two scripts copied in) and after, on
 2026-10-21. The machine was shared with a SAW job on one of its 8 cores
 (load average 0.3–1.9 during the runs):
 

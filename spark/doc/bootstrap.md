@@ -7,7 +7,7 @@ Back to the [README](../README.md).
 
 ## Cryptol
 
-The FFI checks (`spark/cryptol/`, M0.3 onward) need Cryptol 3.6.0 built
+The FFI checks (`spark/cryptol/`) need Cryptol 3.6.0 built
 with FFI support (`cryptol --version` prints `FFI enabled`). SAW is
 installed only on the x86_64 Linux instance, by its bootstrap
 ("Bootstrapping the x86_64 instance", below).
@@ -108,7 +108,7 @@ On Linux, Cryptol looks for a module's foreign implementations in
 
 ### CI
 
-CI (M0.3) uses the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers` release
+CI uses the `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers` release
 tarball on an x86_64 runner: the release without solvers refuses to start
 without z3. No arm64 Linux release exists.
 
@@ -117,7 +117,7 @@ without z3. No arm64 Linux release exists.
 `scripts/bootstrap-x86_64.sh` takes an x86_64 Linux machine from a bare
 Ubuntu 24.04 to a green `check-ffi.sh` in one command. The campaign used
 it on short-lived x86_64 Linux instances, which it brought up for SAW
-(E4) and the x86_64 measurements:
+and the x86_64 measurements:
 
 ```console
 $ curl -fsSL https://raw.githubusercontent.com/manthonyaiello/Foundation/main/spark/scripts/bootstrap-x86_64.sh | bash
@@ -129,10 +129,10 @@ directory (`FOUNDATION_TOOLS`; the script prints the path, and the
 defaults to `nproc`); set `PROVE_JOBS` lower on a shared machine. On a
 machine that will not live long, push each commit as it is made.
 
-`scripts/bootstrap-x86_64.sh` (M0.5, #6) is idempotent: each phase skips
+`scripts/bootstrap-x86_64.sh` is idempotent: each phase skips
 what is in place, so rerun it after anything goes wrong.
 
-**Present or fetched** (#100). Each tool is used where it is when it is
+**Present or fetched.** Each tool is used where it is when it is
 present and its version matches its pin, and fetched (the pinned
 release, sha256 checked) only when it is not. Present means, in this
 order: in the directory its environment variable names (`LLVM_LINK_DIR`,
@@ -180,9 +180,9 @@ asset's sha256. Given the key (`SAW_SIGNING_KEY_FILE=key.asc`), the script
 verifies the `.sig` too.
 
 The script is tested by `.github/workflows/spark-bootstrap-x86_64.yml`
-(on a PR that touches it, or dispatched): on a bare `ubuntu-24.04` runner
-with no setup action, and in a plain `ubuntu:24.04` container as root,
-which is what measures the packages it must install. Both jobs run it with
+(on a pull request that touches it, or dispatched): on a bare
+`ubuntu-24.04` runner with no setup action, and in a plain
+`ubuntu:24.04` container as root, which is what measures the packages it must install. Both jobs run it with
 `--no-proof`: every phase but `proof` runs, and the phase table reports
 `proof` as skipped. Both check that the first run reported every tool
 fetched, then run it again (`--no-checks`) and check that the second

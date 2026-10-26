@@ -65,7 +65,7 @@ in `obj/*/gnatprove/*.tmp`):
 
 So an explicit `--timeout` beats the level, the command line beats the GPR,
 and the `"Ada"` default's switches reach every file that has its own entry.
-#3's CI passed `--timeout=10` on the command line: harmless at level 2 (it
+CI once passed `--timeout=10` on the command line: harmless at level 2 (it
 lengthens 5 s to 10 s), but it would have proved a level-3 or level-4 unit
 with 10 s.
 
@@ -112,11 +112,11 @@ AES::GF28::xTimes | Foundation_Spark.AES.Spec.GF28.xTimes | Foundation_Spark.AES
 
 The function is the Cryptol declaration, qualified by module. The entities are
 named as gnatprove names them in the `.spark` files (for a generic, the
-proved instance's entity). The file is the board's denominator: a tick that
-adds a spec-layer function adds its row, and the tick that implements it fills
-in the impl entity.
+proved instance's entity). The file is the board's denominator: a change
+that adds a spec-layer function adds its row, and the change that implements
+it fills in the impl entity.
 
-**Row kinds** (#67). The fourth field says how the row is complete; a row
+**Row kinds.** The fourth field says how the row is complete; a row
 without one is `impl`:
 
 | kind | impl entity | complete when |
@@ -154,7 +154,7 @@ every row's SAW cell "(stale)": the results are not this tree's until
 `check-saw.sh` is run again. The board cannot re-run SAW (no GNAT Pro in
 CI); it reports the record honestly.
 
-**FFI log.** `scripts/check-ffi.sh` (M0.3) writes `obj/ffi/ffi-results.txt`,
+**FFI log.** `scripts/check-ffi.sh` writes `obj/ffi/ffi-results.txt`,
 one line per property, `|`-separated, `#` for comments:
 
 ```text
@@ -198,11 +198,11 @@ counterpart but that SAW does not prove on their own are in [saw.md, "What SAW p
 (`GF28MultiplicationCorrect`, `SBoxCorrect`, `SBoxInverts`, the `*Inverts`
 of `Cipher.cry`, `InvCipherEquivalence`, `EncryptInverts`, and the others
 its header lists). **They are optional, and they are kept for now** (a campaign
-decision of 2026-10-20; #67):
+decision of 2026-10-20):
 
 - **Optional.** SAW proves the spec layer equal to NSA's Cryptol at k =
   128, 192 and 256, which is all of AES, so the Cryptol's properties
-  already hold of the SPARK spec. (Since #80 the `{k}` functions are the
+  already hold of the SPARK spec. (The `{k}` functions are the
   instances `AES128`, `AES192`, `AES256` of the generic `AES_K`, one per
   key size, each proved by SAW.) `Properties` states the four properties that take a key size
   (`InvCipherEquivalence`, `CipherInverts`, `CipherInverts'`,
@@ -216,11 +216,11 @@ decision of 2026-10-20; #67):
 - **Kept for now, because SAW is not in CI.** The transfer rests on a local
   SAW run (GNAT Pro 27, recorded in `saw/results.txt`), and any change to
   the spec suspends it until SAW is run again (the board says so:
-  **STALE**). The properties are re-proved on every PR, so until SAW runs in
-  CI they are the continuously checked cross-check that the SPARK spec is
+  **STALE**). The properties are re-proved on every pull request, so until SAW
+  runs in CI they are the continuously checked cross-check that the SPARK spec is
   right.
 - **Two are not stated:** `SBoxPolynomialIsIrreducible` and
-  `inverseCorrect` (#73 item 3). For the reason above, that is acceptable.
+  `inverseCorrect`. For the reason above, that is acceptable.
 - **What the transfer assumes.** SAW proves the spec layer's bitcode equal
   to the Cryptol, while gnatprove reasons about the Ada source. Carrying a
   property from the Cryptol to the source assumes GNAT-LLVM compiled the
@@ -230,7 +230,7 @@ decision of 2026-10-20; #67):
 
 A unit whose proof is too slow for the default gate is **proved on demand,
 not by the gate, and the gate detects when anything it depends on changes**,
-so it is known when to prove it again. The first was #12's generated
+so it is known when to prove it again. The first was the generated
 `SBox_Entries` (SBox.cry's `SBoxCorrect` by case enumeration): about 26 min
 cold on an aarch64 Linux container and 1 h 40 min cold in CI.
 
@@ -269,8 +269,7 @@ unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
   closure errs towards staleness. Units outside `src/` (the runtime) are
   listed in the verbose output but not hashed;
 - `alire.toml`, the crate's manifest: it pins the crate's dependencies and
-  its build switches (`ada_version`), which gnatprove reads too (#67, a
-  follow-up of PR #44);
+  its build switches (`ada_version`), which gnatprove reads too;
 - the GPR's proof switches for those files: the `Prove` package's level
   definitions, `Proof_Switches ("Ada")`, and each input file's own
   `Proof_Switches`;
@@ -322,7 +321,7 @@ workflow (`spark-prove-slow.yml`, `workflow_dispatch`, up to 180 minutes) runs
 in its summary. It cannot push, so the entries are committed by hand.
 
 **When the fingerprint gains an input.** Adding an input to what
-`slow_proofs.py` hashes (as `alire.toml` was, #67) makes every entry stale
+`slow_proofs.py` hashes (as `alire.toml` was) makes every entry stale
 although nothing its proof read has changed. `scripts/slow_proofs.py refresh
 FILE` rewrites the entry's inputs and fingerprint and keeps its commit, date,
 level and checks, but only when every difference is a new input that is a
