@@ -1,7 +1,7 @@
 /*
  * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
  *
- * The spec layer's Parse at N = 1 block (#67 item 3) against
+ * The spec layer's Parse at N = 1 block against
  * Preprocessing.cry's parse`{32, 1} of the padded message's bits
  * reversed, with the override of sha256_spec.saw's proof at that length
  * (Word_Of's lemma at Count = 32 for 512 bits, proved here as it proves

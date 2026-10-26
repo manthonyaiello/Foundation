@@ -2,7 +2,7 @@
  * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
  *
  * One of aes_spec.saw's per-index lemmas of KeyExpansion's W with the
- * wrong Cryptol: AES128.W (#80) at I = 4 against w @ 4 of the key words
+ * wrong Cryptol: AES128.W at I = 4 against w @ 4 of the key words
  * reversed, with the overrides of the lemma at I = 4 (the lemmas at
  * I = 0 .. 3, proved here as aes_spec_keyexpansion.saw proves them, and
  * the leaves') and its tactic (z3 with SubWord uninterpreted). It runs

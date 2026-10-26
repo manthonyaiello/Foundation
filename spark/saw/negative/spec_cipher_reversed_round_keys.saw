@@ -1,7 +1,7 @@
 /*
  * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
  *
- * The spec layer's AES256.Cipher (#80) against Cipher.cry's Cipher`{256} of
+ * The spec layer's AES256.Cipher against Cipher.cry's Cipher`{256} of
  * the round keys in reverse order, with every override and the tactic of
  * aes_spec.saw's proof (z3 with Round, SubBytes, ShiftRows and
  * AddRoundKey uninterpreted), as negative/encrypt_block_reversed_round_

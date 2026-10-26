@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# run.sh -- #99's measurements: the spec layer's linear recursions proved
+# run.sh -- the unfold-vs-chain measurements: the spec layer's linear recursions proved
 # unfolded against the per-index lemma chains they replaced. Each
 # experiment is a SAW script here, e_<name>.saw, run against the bitcode
 # check-saw.sh builds (saw/obj/), in a scratch copy of saw/'s scripts.
-# saw/experiments/ is outside the record (README "SAW"; #69's run.sh,
-# which this follows, says how).
+# saw/experiments/ is outside the record (README "SAW"; the
+# spec-layer-cost experiments' run.sh, which this follows, says how).
 #
 #   run.sh EXPERIMENT [OUT_DIR]
 #

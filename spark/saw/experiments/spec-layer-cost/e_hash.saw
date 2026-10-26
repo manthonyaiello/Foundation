@@ -1,5 +1,5 @@
 /*
- * #69, experiment "hash": where the time of the spec layer's top-level
+ * Spec-layer cost, experiment "hash": where the time of the spec layer's top-level
  * SHA-256 proofs goes, symbolic execution or the solver. The module
  * loads are timed (the strict one and the one with lax arithmetic); then
  * at l = 440 bits (55 bytes, one padded block), as sha256_spec.saw proves

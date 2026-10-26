@@ -1,8 +1,8 @@
 /*
- * The Cryptol prelude in SPARK (spark/src/cryptol/, #75), as the AES spec
- * layer instantiates it, proved on its own against Cryptol's built-ins
- * (#75 item 3). Included by aes_spec.saw last, after the other
- * aes_spec_*.saw files, whose lemmas it uses as overrides.
+ * The Cryptol prelude in SPARK (spark/src/cryptol/), as the AES spec
+ * layer instantiates it, proved on its own against Cryptol's built-ins.
+ * Included by aes_spec.saw last, after the other aes_spec_*.saw files,
+ * whose lemmas it uses as overrides.
  *
  * The spec layer's own proofs execute these instances (or take their
  * lemmas as overrides), so each is already checked through its caller.

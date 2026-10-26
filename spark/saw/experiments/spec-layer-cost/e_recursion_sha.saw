@@ -1,5 +1,5 @@
 /*
- * #69, experiment "recursion_sha": what the per-index lemmas buy, for
+ * Spec-layer cost, experiment "recursion_sha": what the per-index lemmas buy, for
  * the SHA-256 spec layer's recursions, against letting SAW unfold the
  * recursion at the fixed size (no lemma of the function's own as an
  * override; the leaves' lemmas still are). Same module, same contracts,

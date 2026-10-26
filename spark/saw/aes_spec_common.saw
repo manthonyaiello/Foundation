@@ -11,13 +11,13 @@
  * obj/spec/aes_spec.bc. Not run by CI: see spark/README.md, "SAW".
  *
  * The {k} functions (KeyExpansion and its W, Cipher, InvCipher,
- * InvCipher', Split_Key, Encrypt, Decrypt) are the generic AES_K's (#80):
+ * InvCipher', Split_Key, Encrypt, Decrypt) are the generic AES_K's:
  * one symbol per instance, aes128__cipher and so on (instance_symbol),
  * with no K argument, and their arrays of the instance's constrained
  * subtypes (Key_Words (0 .. Nk - 1), Round_Keys (0 .. Nr), Key_Bits
- * (0 .. K - 1)) passed without bounds. #80 wrote these contracts on a
- * machine without GNAT-LLVM; the IOD session of 2026-10-21 read the ABI
- * from GNAT-LLVM 27's IR and ran them. A constrained array argument of
+ * (0 .. K - 1)) passed without bounds. These contracts were written on a
+ * machine without GNAT-LLVM; a session on the x86_64 instance on
+ * 2026-10-21 read the ABI from GNAT-LLVM 27's IR and ran them. A constrained array argument of
  * at most 16 bytes goes by value, a larger one by reference: the key
  * words by value at k = 128 (16 bytes), by reference at 192 and 256 (24
  * and 32 bytes). KeyExpansion's Round_Keys (176 to 240 bytes) and
@@ -214,7 +214,7 @@ let block_block_contract (f : Term) = do {
 /*
  * function F (K : Key_Size) return Positive (Key_Size: 128 | 192 | 256):
  * AES.Spec.Types' Nk and Nr, as aes_impl_common.saw states them. They
- * are Static (#80); the instances read them as constants, and nothing in
+ * are Static; the instances read them as constants, and nothing in
  * the spec module calls them, so their symbols may not be emitted.
  */
 let key_size_contract (f : Term) = do {
@@ -227,10 +227,10 @@ let key_size_contract (f : Term) = do {
 /*
  * function Foldl_Take (Z : Block; Xs : Round_Keys; N : Integer) return
  * Block of Spec.Cipher's instances of the prelude's Folds (Round_Folds,
- * InvRound_Folds, InvRound_Prime_Folds; #75), Xs of length M: Cryptol's
+ * InvRound_Folds, InvRound_Prime_Folds), Xs of length M: Cryptol's
  * foldl f z (take`{N} xs) over [M]Block.
  *
- * Since #75, Foldl_Round (Z, Xs) calls Round_Folds.Foldl (Z, Xs), which
+ * Foldl_Round (Z, Xs) calls Round_Folds.Foldl (Z, Xs), which
  * calls Foldl_Take (Z, Xs, Xs'Length), which recurses on N with the same
  * Xs (the prelude's fold recurses from the last element). So the
  * recursion, and these lemmas, are Foldl_Take's, at the lengths M that
@@ -348,7 +348,7 @@ let reverse_keys_contract (m : Int) = do {
  * instance at key size k: Key as in w_contract; the result, of the
  * constrained Round_Keys (0 .. Nr), nr + 1 round keys, is written
  * through the pointer the caller passes first (sret), not on the
- * secondary stack as the K-explicit KeyExpansion's was before #80.
+ * secondary stack, as a K-explicit KeyExpansion's would be.
  */
 let keyexpansion_contract (k : Int) (nk : Int) (nr : Int) = do {
   (key, keyarg) <- key_words_arg nk;

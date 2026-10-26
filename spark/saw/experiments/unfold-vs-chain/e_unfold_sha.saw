@@ -1,7 +1,7 @@
 /*
- * #99, experiment "unfold_sha": the SHA-256 spec layer's linear
+ * Unfold vs chain, experiment "unfold_sha": the SHA-256 spec layer's linear
  * recursions, each proved unfolded (as the recorded scripts now prove
- * them) and as the per-index lemma chain the scripts proved before #99,
+ * them) and as the per-index lemma chain the scripts proved before,
  * same contracts, overrides and tactics, one after the other in one saw
  * run, so that the two are timed on the same machine and state.
  *

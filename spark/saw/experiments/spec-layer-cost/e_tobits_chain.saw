@@ -1,5 +1,5 @@
 /*
- * #69, experiment "tobits_chain": one To_Bits chain (the prelude's
+ * Spec-layer cost, experiment "tobits_chain": one To_Bits chain (the prelude's
  * Sequences_Of_Bits.Literal, W = 0 .. 64), exactly as sha256_spec.saw
  * proves it for the pad group k = 7 (l = 8, 520 bits): the secondary
  * stack at 48 bytes (Zero's result), the first 39 kept. Each lemma is

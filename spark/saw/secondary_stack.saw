@@ -1,5 +1,5 @@
 /*
- * The secondary stack in the spec layer's contracts (M4.4, #59; README
+ * The secondary stack in the spec layer's contracts (README
  * "SAW", "The secondary stack"), included by aes_spec_common.saw and
  * sha256_spec_common.saw.
  *

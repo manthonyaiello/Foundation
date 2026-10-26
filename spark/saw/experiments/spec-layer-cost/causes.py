@@ -1,4 +1,4 @@
-"""#69: the spec layer's SAW results grouped by what makes them, from a
+"""Spec-layer cost: the spec layer's SAW results grouped by what makes them, from a
 check-saw.sh record (saw/results.txt).
 
 Usage: python3 -I causes.py saw/results.txt

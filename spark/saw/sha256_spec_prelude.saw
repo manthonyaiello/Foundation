@@ -1,7 +1,7 @@
 /*
- * The Cryptol prelude in SPARK (spark/src/cryptol/, #75), as the SHA-256
+ * The Cryptol prelude in SPARK (spark/src/cryptol/), as the SHA-256
  * and HMAC-SHA-256 spec layers instantiate it, proved on its own against
- * Cryptol's built-ins (#75 item 3). Included by sha256_spec.saw last,
+ * Cryptol's built-ins. Included by sha256_spec.saw last,
  * after the other sha256_spec_*.saw files, whose lemmas it uses as
  * overrides.
  *
@@ -93,7 +93,7 @@ for [7, 159, 383, 439, 447, 455, 511, 256, 512] (\k ->
  * Sequences_Of_Bits.Literal (V, 64) = the [64] literal of v (RefMan
  * BasicSyntax.rst:349; Pad's (`l : [64])), which is v modulo 2 ^^ 64:
  * drop`{64} (v : [128]), for V <= 2 ** 126, on the empty secondary
- * stack, its recursion unfolded (#99): it leaves its result and every
+ * stack, its recursion unfolded: it leaves its result and every
  * shorter one on the stack (to_bits_used, sha256_spec_pad.saw), and
  * returns the last. In the load with lax arithmetic (its width 1
  * concatenates a null range). Stated as fromInteger (toInteger v) : [64]

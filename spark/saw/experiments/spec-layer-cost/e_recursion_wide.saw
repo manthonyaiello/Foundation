@@ -1,5 +1,5 @@
 /*
- * #69, experiment "recursion_wide": the two recursions with more than one
+ * Spec-layer cost, experiment "recursion_wide": the two recursions with more than one
  * recursive call, unfolded further than e_recursion_aes.saw and
  * e_recursion_sha.saw take them, to fit their growth: KeyExpansion's W
  * at k = 128 at I = 24, 28, 32 (calls: 2503, 9201, 33673), and SHA-2's W

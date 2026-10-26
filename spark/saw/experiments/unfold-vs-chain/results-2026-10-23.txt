@@ -1,6 +1,6 @@
-# #99's measurements, 2026-10-23, on the x86_64 instance (8 CPUs, 15.7 GB,
+# Unfold-vs-chain measurements, 2026-10-23, on the x86_64 instance (8 CPUs, 15.7 GB,
 # no swap), at the bitcode check-saw.sh builds from main = 6023e8a (spark/src
-# unchanged by #99), SAW 1.6, z3 4.8.14, each saw run alone, capped at 10G.
+# unchanged by these measurements), SAW 1.6, z3 4.8.14, each saw run alone, capped at 10G.
 # run.sh's summary.txt of each experiment: "== <label>" then the "Time:"
 # lines SAW printed under it (a chain's whole time is the one line under
 # "chain"), the RESULT lines of the scripts it includes, wall-clock and

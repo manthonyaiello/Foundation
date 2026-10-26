@@ -1,5 +1,5 @@
 /*
- * #75 item 3, a trial run of saw/aes_spec_prelude.saw: the AES spec
+ * A trial run of saw/aes_spec_prelude.saw: the AES spec
  * scripts it rests on, without aes_spec.saw's exhaustive proofs, then the
  * prelude's proofs.
  */

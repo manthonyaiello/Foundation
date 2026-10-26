@@ -1,7 +1,7 @@
 /*
  * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
  *
- * The spec layer's Join_Block (obj/spec/aes_spec.bc; since #75 the
+ * The spec layer's Join_Block (obj/spec/aes_spec.bc; the
  * prelude's Byte_Bits.Join of the block, on the secondary stack, copied
  * out) against Main.cry's join of the block's bytes reversed, with the
  * secondary stack, overrides (none) and tactic of aes_spec_main.saw's

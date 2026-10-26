@@ -98,13 +98,13 @@ i_step3 <- round_lemmas 0 [] [];
 /* --- Foldl_Step3, unfolded at N = 64 --------------------------------------- */
 
 /*
- * Foldl_Step3 (M, H, N) = foldl (step3 m) h [0 ..< N]. Since #75 the
+ * Foldl_Step3 (M, H, N) = foldl (step3 m) h [0 ..< N]. The
  * recursion is the prelude's: Foldl_Step3 calls its instance
  * Rounds.Foldl (M, H, 0, N) of Cryptol.Enumeration_Folds, which recurses
- * on its bound, one call per level. Since #99 SAW unfolds it: Rounds.Foldl
+ * on its bound, one call per level. SAW unfolds it: Rounds.Foldl
  * is proved once, at N = 64, with Step3's lemmas as the overrides (SAW
  * applies the one at each round), and Foldl_Step3 once, at 64, over that
- * lemma. (#69 measured 2.4 s for the unfolded proof against 23.2 s for a
+ * lemma. (saw/experiments/spec-layer-cost measured 2.4 s for the unfolded proof against 23.2 s for a
  * lemma per N in 0 .. 64.)
  */
 let rounds_foldl_contract (n : Int) = do {

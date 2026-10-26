@@ -1,4 +1,4 @@
---  Configuration pragmas of the spec layer's bitcode for SAW (M4.4, #59),
+--  Configuration pragmas of the spec layer's bitcode for SAW,
 --  given to llvm-gcc with -gnatec by scripts/check-saw.sh: ghost code is
 --  compiled, and every other assertion kind (Assert, Pre, Post,
 --  Loop_Invariant, Subprogram_Variant, ...) is ignored, so that the

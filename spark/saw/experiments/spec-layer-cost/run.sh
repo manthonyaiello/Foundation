@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run.sh -- the controlled experiments of #69 (why SAW costs so much more
+# run.sh -- the controlled spec-layer cost experiments (why SAW costs so much more
 # on the spec layer than on the implementation). Write-up:
 # .claude/campaign/measurements/2026-10-22-saw-cost.md.
 #

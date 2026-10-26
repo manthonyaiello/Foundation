@@ -6,7 +6,7 @@
  * To_Bits. Included by sha256_spec.saw after the module's load with lax
  * arithmetic (below), whose verify_spec it uses.
  *
- * At the message lengths of M4.3's Hash proofs (README "SAW"): 0, 1, 55,
+ * At sha256_impl.saw's Hash proofs' message lengths (README "SAW"): 0, 1, 55,
  * 56, 63, 64, 65, 100, 119, 120, 128 and 200 bytes, l = 8 times that in
  * bits.
  *
@@ -21,7 +21,7 @@
  * null range {0, -1}, and GNAT-LLVM computes a range's length as
  * select (Lo > Hi, 0, (Hi - Lo) +nuw 1): the add wraps to a poison value
  * that the select discards, which crucible refuses at its creation (the
- * case M4.3 met in Final; README "The bitcode ABI"). Pad on an empty
+ * case sha256_impl.saw meets in Final; README "The bitcode ABI"). Pad on an empty
  * message does the same. So To_Bits' lemma, whose unfolding reaches
  * width 1, and Pad's, which rests on it, are proved in a load of the
  * module with lax arithmetic, under which overflow is not an obligation:
@@ -170,19 +170,19 @@ let verify_zero (k : Int) = verify_zero_at 0 0 0 k;
  * every shorter one on the stack (to_bits_used), and then allocates its
  * result.
  *
- * Since #75 the recursion is the prelude's: To_Bits calls SHA2's
+ * The recursion is the prelude's: To_Bits calls SHA2's
  * Sequences_Of_Bits.Literal (Cryptol.Bit_Sequences) with the same
  * arguments, so this lemma is Literal's, and Pad reaches it through
- * To_Bits, which SAW executes; likewise Zero now calls
+ * To_Bits, which SAW executes; likewise Zero calls
  * Sequences_Of_Bits.Zero. The wrappers pass their callee's fat pointer
  * through, with no copy on the secondary stack (GNAT-LLVM 27's IR,
- * 2026-10-21), so the byte counts here and in Pad's contract are as
- * before #75.
+ * 2026-10-21), so the byte counts here and in Pad's contract are
+ * the callees', with nothing added by the wrappers.
  *
- * Literal recurses once per level, and since #99 SAW unfolds it: one
- * proof at W = 64 for each stack state, with no override (#69 measured
- * 1.4 s for it against 43.8 s for a lemma per width in 0 .. 64, a chain
- * that each stack state needed again).
+ * Literal recurses once per level, and SAW unfolds it: one proof at W =
+ * 64 per stack state, no override (saw/experiments/spec-layer-cost
+ * measured 1.4 s for it against 43.8 s for a lemma per width in 0 .. 64,
+ * a chain that each stack state needed again).
  */
 let to_bits_used (w : Int) = eval_int {{ sum [ ((32 + j + 15) / 16) * 16 | j <- [0 .. w] ] : [64] }};
 /*

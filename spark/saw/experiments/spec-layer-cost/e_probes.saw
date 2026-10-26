@@ -1,5 +1,5 @@
 /*
- * #69, experiment "probes" (run.sh -p probes): the probe units
+ * Spec-layer cost, experiment "probes" (run.sh -p probes): the probe units
  * (probes/probe_bits.ads, instantiated at a 128-bit and a 64-bit index),
  * one function written several ways, each one change from the spec
  * layer's. Every proof uses the recorded proofs' contract shapes
