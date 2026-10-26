@@ -1,5 +1,5 @@
---  The entry points the benchmark times and the size table measures (issue
---  #51): one non-inlined wrapper per AES operation, as perf/rust/src/lib.rs
+--  The entry points the benchmark times and the size table measures:
+--  one non-inlined wrapper per AES operation, as perf/rust/src/lib.rs
 --  has for the Rust. Whatever the optimizer inlines into a wrapper (at -O3
 --  with LTO, usually the whole operation) is counted in its size, and every
 --  timed call is one real call on both sides.

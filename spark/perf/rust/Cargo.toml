@@ -1,4 +1,4 @@
-# The Rust side of the AES size and performance comparison (issue #51):
+# The Rust side of the AES size and performance comparison:
 # NSA's Rust Cipher and KeyExpansion crates (algorithms/AES/rust/), used
 # as they are, behind one non-inlined wrapper per operation (src/lib.rs),
 # and timed by src/main.rs. scripts/perf-aes.sh builds and runs it with the

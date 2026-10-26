@@ -1,4 +1,4 @@
-//! The Rust side of the AES benchmark (issue #51); `perf/src/perf_bench.adb`
+//! The Rust side of the AES benchmark; `perf/src/perf_bench.adb`
 //! is the SPARK side, and does the same thing in the same order.
 //!
 //! First the FIPS-197 Appendix C known answers go through the build under

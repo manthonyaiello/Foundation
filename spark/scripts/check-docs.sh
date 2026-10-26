@@ -54,8 +54,8 @@ EOF
   exit 2
 fi
 
-# Entities we do not author. The crate has no dependency (#72 removed the
-# unused SPARKlib), so the one unit in gnatdoc's closure that is not ours is
+# Entities we do not author. The crate has no dependency (not even
+# SPARKlib), so the one unit in gnatdoc's closure that is not ours is
 # the crate config, foundation_spark_config.ads: Alire-generated and
 # gitignored. Warning lines carry only a base name, so the filter is by unit.
 # Warnings on .gpr files are NOT filtered: a project problem should fail the
@@ -96,8 +96,8 @@ findings="$(printf '%s\n' "$ours" | grep -vE ': internal error:' | sed '/^$/d' |
 # cannot hide behind patterns written for the old one. 26.0.0 prints a bare AST
 # node for a package renaming, e.g.
 #   <PackageRenamingDecl ["EHT"] some_unit.ads:1059:4-1059:45>
-# (the crate has no package renaming; SPARKlib, a dependency until #72, had
-# four). Such a line names its file mid-line; the not-ours filter matches
+# (the crate has no package renaming; SPARKlib, when it was a dependency,
+# had four). Such a line names its file mid-line; the not-ours filter matches
 # there too.
 unaccounted="$(grep -vE '^(==|[A-Za-z0-9_.-]+:[0-9]+:[0-9]+:|Note:|Success:|error:|warning:)' "$LOG" \
                | grep -vE "$NOT_OURS" | sed '/^$/d' | sort -u || true)"

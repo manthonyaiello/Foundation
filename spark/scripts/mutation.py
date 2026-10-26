@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mutation.py -- mutation testing of the executable SPARK (#104).
+"""mutation.py -- mutation testing of the executable SPARK.
 
 Each mutant of mutation/mutants.txt is a one-line change to an
 implementation unit. For each one, this script records what catches it:
@@ -47,7 +47,7 @@ Env:
                            SPARK_SCHEDULER_TOKENS is used instead.
   MUTATION_PROVE_WRAP      a command prefix for each proof, word-split, in
                            which {tokens} is passed through, for example
-                           "spark-scheduler run --up-to 8 --key hex|mutation
+                           "spark-scheduler run --up-to 8 --key mutation
                            --strategy prove --variant spark --level 2 --".
                            The child is then `env PROVE_JOBS={tokens}
                            scripts/prove.sh -u ...`.

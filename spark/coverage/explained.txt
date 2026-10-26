@@ -1,4 +1,4 @@
-# explained.txt -- the coverage violations that are explained, not gaps (#49).
+# explained.txt -- the coverage violations that are explained, not gaps.
 #
 # scripts/check-coverage.sh matches each violation of gnatcov's report
 # against these entries and lists the ones that match none as UNEXPLAINED.

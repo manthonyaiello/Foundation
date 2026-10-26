@@ -1,6 +1,6 @@
 name: SPARK CI
 
-# CI for the SPARK crate in spark/ (issue #3), on the memcp model. NSA's
+# CI for the SPARK crate in spark/. NSA's
 # workflows are disabled on this fork (`gh workflow disable`, files untouched);
 # only the spark-* workflows run.
 #
@@ -19,16 +19,16 @@ name: SPARK CI
 #        of spark/scripts/proof-slow.txt are skipped, and their recorded
 #        proofs checked current (spark-prove-slow.yml proves them on demand).
 #        Bounded at 30 minutes.
-# ffi    The FFI check (#4): spark/scripts/check-ffi.sh builds the crate as a
+# ffi    The FFI check: spark/scripts/check-ffi.sh builds the crate as a
 #        shared library with ghost code enabled and runs every property in
 #        spark/cryptol/properties.txt against the NSA Cryptol.
 #
-# The SAW job is added by E4.
+# SAW is local only and has no job here (README "SAW").
 #
-# Runners are ubuntu-24.04-arm: the same architecture as the campaign's own
-# machine, so CI runs the same gnatprove and prover builds as local runs. The
+# Runners are ubuntu-24.04-arm: the same architecture as the aarch64
+# container, so CI runs the same gnatprove and prover builds as local runs. The
 # exception is ffi, on ubuntu-24.04 (x86_64): Cryptol has no arm64 Linux
-# release, and the campaign machine's Cryptol is a source build.
+# release, and the aarch64 container's Cryptol is a source build.
 on:
   push:
     branches: [main]

@@ -1,4 +1,4 @@
---  The FFI library (#4): the crate's sources, ghost code and assertions
+--  The FFI library: the crate's sources, ghost code and assertions
 --  enabled, as one shared, encapsulated, auto-initializing standalone
 --  library that Cryptol loads by foreign. Built and used by
 --  scripts/check-ffi.sh; see spark/README.md, "The FFI harness".
@@ -13,7 +13,7 @@
 --    prefixed link names (Foundation_Spark.FFI). A name that does not
 --    resolve fails the link here, not the first call from Cryptol.
 --
---  On macOS (#113) the library is the same: encapsulated, as
+--  On macOS the library is the same: encapsulated, as
 --  libfoundation_spark_ffi.dylib, depending on libSystem only. Two things
 --  differ, both below, both under Host = "macos" so that Linux is
 --  untouched:
@@ -35,7 +35,7 @@ project Foundation_Spark_FFI is
 
    --  "ffi" (the default) is the library check-ffi.sh builds. "coverage" is
    --  the same library instrumented by gnatcov, which check-coverage.sh
-   --  (#49) builds: its own object and library directories, so the two
+   --  builds: its own object and library directories, so the two
    --  never share an object file, and one more unit, the trace dump
    --  (coverage/foundation_spark_coverage.ads). gnatprove never reads this
    --  project.

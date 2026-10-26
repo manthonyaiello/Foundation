@@ -12,8 +12,8 @@
 #
 # This crate is meant to be platinum: every check proved against the spec layer,
 # with no assumptions. So the manifest should only ever hold the FFI export
-# shims (M0.3). Anything else is a hole, and a hole is reported as one in the
-# PR that adds it, even when the manifest line makes this gate pass.
+# shims. Anything else is a hole, and a hole is reported as one in the
+# change that adds it, even when the manifest line makes this gate pass.
 #
 # Scope: git-tracked Ada sources under spark/src/, recursively (src/common,
 # src/aes, src/sha2, ...). Paths are relative to spark/.

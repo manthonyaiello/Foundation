@@ -1,4 +1,4 @@
---  The benchmark clock (issue #51): the same monotonic clock that Rust's
+--  The benchmark clock: the same monotonic clock that Rust's
 --  std::time::Instant reads on each system, so the two harnesses time with
 --  one source: clock_gettime_nsec_np (CLOCK_UPTIME_RAW) on macOS
 --  (os-darwin/), clock_gettime (CLOCK_MONOTONIC) on Linux (os-linux/).

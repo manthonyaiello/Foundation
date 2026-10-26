@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # check-ffi.sh -- run every FFI property: the SPARK spec layer against the
-# NSA Cryptol, through Cryptol's foreign function interface (issue #4).
+# NSA Cryptol, through Cryptol's foreign function interface.
 #
 # 1. Builds the FFI library (foundation_spark_ffi.gpr: the crate with ghost
 #    code and assertions enabled, as a shared, encapsulated, auto-initializing
@@ -92,7 +92,7 @@ command -v "$CRYPTOL" >/dev/null 2>&1 || die "cryptol not found (set CRYPTOL)"
 # Why re-sign: Galois's macOS Cryptol has the hardened runtime without
 # disable-library-validation, so dlopen refuses our (differently signed)
 # library. We run an ad hoc signed copy under $OUT/cryptol-adhoc instead;
-# the installed binary is never modified (#113).
+# the installed binary is never modified.
 if [ "$(uname -s)" = Darwin ]; then
   # Captured, not piped into grep -q: under pipefail, codesign killed by
   # SIGPIPE would fail the test.
@@ -136,7 +136,7 @@ fi
 #
 # OURS is a newline-separated list, not an associative array, and the link's
 # relative path comes from python3, not `realpath --relative-to`: macOS ships
-# bash 3.2 and a BSD realpath, and the script runs there too (#107).
+# bash 3.2 and a BSD realpath, and the script runs there too.
 OURS=""
 while IFS= read -r cry; do
   mod="$(sed -nE 's/^[[:space:]]*module[[:space:]]+([A-Za-z0-9_:]+)[[:space:]]+where.*/\1/p' "$cry" | head -n 1)"

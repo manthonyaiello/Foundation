@@ -1,6 +1,6 @@
 name: SPARK bootstrap x86_64
 
-# Tests spark/scripts/bootstrap-x86_64.sh (issue #6, M0.5), the one command
+# Tests spark/scripts/bootstrap-x86_64.sh, the one command
 # that takes the ephemeral x86_64 instance from a bare Ubuntu 24.04 to a green
 # check-ffi.sh. The instance dies 24 hours after it starts, so the script has
 # to work the first time there; this is where it is shown to.
@@ -11,7 +11,7 @@ name: SPARK bootstrap x86_64
 #            checks that it reported every tool fetched. Then it runs again
 #            (--no-checks), with every tool now present, and the job checks
 #            that it reported every tool "present and matching the pin" and
-#            downloaded and apt-installed nothing (#100). Then a SAW smoke
+#            downloaded and apt-installed nothing. Then a SAW smoke
 #            test runs two of NSA's small AES SAW scripts.
 # container  the same script in a plain ubuntu:24.04 container (root, nothing
 #            installed): the strictest bare image, and the one that measures
@@ -123,7 +123,7 @@ jobs:
       - name: SAW smoke test
         if: ${{ !cancelled() }}
         run: |
-          . "$HOME/foundation-tools/env.sh"
+          . "$HOME/spark-tools/env.sh"
           saw --version
           export CRYPTOLPATH="$HOME/Foundation"
           cd "$HOME/Foundation/algorithms/AES/theorems"
@@ -152,7 +152,7 @@ jobs:
         with:
           name: bootstrap-bare
           path: |
-            ~/foundation-tools/bootstrap-times.txt
+            ~/spark-tools/bootstrap-times.txt
             ~/bootstrap-run-*.log
             ~/Foundation/spark/obj/prove.log
             ~/Foundation/spark/obj/ffi/ffi-results.txt
@@ -219,7 +219,7 @@ jobs:
         with:
           name: bootstrap-container
           path: |
-            ~/foundation-tools/bootstrap-times.txt
+            ~/spark-tools/bootstrap-times.txt
             ~/bootstrap-run-*.log
             ~/Foundation/spark/obj/prove.log
             ~/Foundation/spark/obj/ffi/ffi-results.txt

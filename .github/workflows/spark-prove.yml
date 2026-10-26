@@ -36,7 +36,7 @@ on:
         type: number
         default: 30
 
-# No `permissions:` block on purpose (memcp issue #13): a reusable workflow's
+# No `permissions:` block on purpose: a reusable workflow's
 # scopes are validated against the caller's grant, not capped by it, so asking
 # for actions:write here would break spark-ci.yml, which grants contents:read
 # only. Each caller grants what it needs; only the refresh grants actions:write,
@@ -111,7 +111,7 @@ jobs:
       # GNATPROVE_EXTRA to the call.
       #
       # FOUNDATION_SPARK_PROOF_ALLOWANCE=ci is the wall-clock allowance for
-      # this 4-vCPU runner, slower than the campaign's machine: the GPR gives
+      # this 4-vCPU runner, slower than the aarch64 container: the GPR gives
       # each level an explicit timeout of max (its own, 10 s), that is 10 s at
       # level 2, 20 s at level 3 and 60 s at level 4. It is not a command-line
       # --timeout, because that overrides every unit's level timeout, so it
