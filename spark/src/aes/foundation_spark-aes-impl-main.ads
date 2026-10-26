@@ -19,9 +19,9 @@
 --  AES`{k}.Encrypt and Decrypt through the dispatchers Spec.Dispatch.Encrypt
 --  and Decrypt, which select the instance of the generic Spec.AES_K.
 --
---  Nothing executable here calls ghost code: Join_Key and the spec appear
---  only in contracts, and the proof's lemmas (AES.Main_Lemmas) only in
---  ghost statements.
+--  Nothing executable here calls ghost code: Is_Key_Bytes, Join_Key and
+--  the spec appear only in contracts, and the proof's lemmas
+--  (AES.Main_Lemmas) only in ghost statements.
 
 with Foundation_Spark.AES.Spec.Dispatch;
 with Foundation_Spark.AES.Spec.Main;
@@ -43,7 +43,8 @@ is
    --  Is_Key_Bytes.
 
    function Is_Key_Bytes (K : Key_Size; Key : Key_Bytes) return Boolean
-   is (Key'First = 0 and then Key'Length = K / 8);
+   is (Key'First = 0 and then Key'Length = K / 8)
+   with Ghost;
    --  The typing key : [k / 8][8], with Cryptol's zero-based indexing. The
    --  constraint Key k is K's subtype.
    --  @param K The key size in bits.

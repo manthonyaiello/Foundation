@@ -104,7 +104,8 @@ is
    --  An HMAC-SHA-256 computation in progress: the inner SHA-256 context,
    --  fed K0 xor ipad and the text so far, and K0 xor opad for Final.
 
-   function Count (C : Context) return SHA2.SHA256_Bytes.Byte_Index;
+   function Count (C : Context) return SHA2.SHA256_Bytes.Byte_Index with
+     Ghost;
    --  The number of bytes the inner hash has absorbed: the 64 of K0 xor
    --  ipad, and then the text's.
    --  @param C The context.

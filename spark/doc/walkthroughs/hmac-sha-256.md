@@ -597,7 +597,7 @@ hold the key or the text, so its meaning is stated by ghost predicates:
 `Inner_Prefix (Key, M)` is `K0 xor ipad` followed by `M`, the message the
 inner hash absorbs. `Init`, `Update` and `Final` are specified on
 contexts,
-[`foundation_spark-hmac-sha256_impl.ads:136-151`](../../src/hmac/foundation_spark-hmac-sha256_impl.ads#L136-L151):
+[`foundation_spark-hmac-sha256_impl.ads:137-152`](../../src/hmac/foundation_spark-hmac-sha256_impl.ads#L137-L152):
 
 ```ada
    procedure Init (C : out Context; Key : Byte_Array) with
@@ -621,7 +621,7 @@ contexts,
 and the two ghost lemmas carry the key and text to the spec. A caller
 calls `Lemma_Update` after each `Update`, and `Lemma_Final` before
 `Final`.
-[`foundation_spark-hmac-sha256_impl.ads:173-196`](../../src/hmac/foundation_spark-hmac-sha256_impl.ads#L173-L196):
+[`foundation_spark-hmac-sha256_impl.ads:174-197`](../../src/hmac/foundation_spark-hmac-sha256_impl.ads#L174-L197):
 
 ```ada
    procedure Lemma_Update
@@ -650,7 +650,7 @@ calls `Lemma_Update` after each `Update`, and `Lemma_Final` before
      Post => Models (C1, Key, M2);
 ```
 
-[`foundation_spark-hmac-sha256_impl.ads:206-216`](../../src/hmac/foundation_spark-hmac-sha256_impl.ads#L206-L216):
+[`foundation_spark-hmac-sha256_impl.ads:207-217`](../../src/hmac/foundation_spark-hmac-sha256_impl.ads#L207-L217):
 
 ```ada
    procedure Lemma_Final (C : Context; Key : Byte_Array; M : Byte_Array) with
@@ -675,7 +675,7 @@ models `M` is, on the bits, the spec's `HMAC` of the key and `M`.
 
 Two results from SHA-256's own proof do most of the work (see
 [sha-256.md](sha-256.md) for how they are proved). The streaming theorem,
-[`foundation_spark-sha2-sha256_stream.ads:201-205`](../../src/sha2/foundation_spark-sha2-sha256_stream.ads#L201-L205):
+[`foundation_spark-sha2-sha256_stream.ads:202-206`](../../src/sha2/foundation_spark-sha2-sha256_stream.ads#L202-L206):
 
 ```ada
    procedure Lemma_Final (C : Context; M : Byte_Array) with
@@ -686,7 +686,7 @@ Two results from SHA-256's own proof do most of the work (see
 ```
 
 with its companion `SHA256_Stream.Lemma_Update`
-([lines 172-189](../../src/sha2/foundation_spark-sha2-sha256_stream.ads#L172-L189)),
+([lines 173-190](../../src/sha2/foundation_spark-sha2-sha256_stream.ads#L173-L190)),
 which has the same shape as HMAC's `Lemma_Update`. And the byte-to-bit
 refinement,
 [`foundation_spark-sha2-sha256_bytes.ads:425-428`](../../src/sha2/foundation_spark-sha2-sha256_bytes.ads#L425-L428):

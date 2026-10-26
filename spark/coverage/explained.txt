@@ -9,15 +9,10 @@
 #
 # A gap in the targeted tests is closed with a property, never listed here.
 #
-# Contract-only functions. Each is an ordinary (not ghost) expression
-# function, so the compiler emits code for it, but its only callers are
-# contracts (Pre, Post) and loop invariants. The FFI library builds the
-# executables as a client would, without -gnata, so those contracts are not
-# executed, and no executable statement calls these functions: they are
-# unreachable in the code that ships, by construction. gnatprove proves
-# every precondition they appear in at each call site, which is the
-# assurance they carry.
-
-foundation_spark-aes-impl-main.ads | is (Key'First = 0 and then Key'Length = K / 8); | contract-only: AES.Impl.Main.Is_Key_Bytes is called only by the preconditions of Key_Words_Of, Encrypt and Decrypt (proved at each call, FFI.AES_Impl's included)
-foundation_spark-hmac-sha256_impl.ads | (SHA2.SHA256_Stream.Count (C.Inner)); | contract-only: HMAC.SHA256_Impl.Count is called only by the contracts of Init, Update and Final and by FFI.HMAC_SHA256_Impl.HMAC_Chunked's loop invariant
-foundation_spark-sha2-sha256_stream.ads | function Count (C : Context) return SHA256_Bytes.Byte_Index is (C.Count); | contract-only: SHA2.SHA256_Stream.Count is called only by the contracts of Init, Update, Final and Lemma_Final, and by HMAC.SHA256_Impl.Count (itself contract-only)
+# A function called only from contracts (Pre, Post) and loop invariants is
+# Ghost, not an entry here: the FFI library builds the executables as a
+# client would, without -gnata, so the compiler emits no code for it and
+# gnatcov counts no obligation in it.
+#
+# No entries: every statement, decision and MC/DC obligation of the units
+# in coverage/units.txt is covered by the FFI properties.

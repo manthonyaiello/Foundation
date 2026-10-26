@@ -49,10 +49,13 @@ The library elaborates itself when Cryptol loads it, so every `cryptol -b`
 **Explained, or closed.** Every violation must match an entry of
 `coverage/explained.txt` (the file, the trimmed text of the line, the
 reason), or the script fails. An entry is for code the properties cannot
-reach by construction, such as an expression function called only from
-contracts, which the FFI build does not execute. A gap in the targeted
+reach by construction. A function called only from contracts is not such
+code: it is Ghost, and the coverage build compiles the executables
+without `-gnata`, so no code is emitted for it. A gap in the targeted
 tests is closed with a property instead (`prop_Impl_Dot` closed
-`AES.Impl.Dot`, which the ciphers never call).
+`AES.Impl.Dot`, which the ciphers never call). Measured in CI: 496/496
+statements, 10/10 decisions and 11/11 MC/DC, and the file has no
+entries.
 
 **CI** runs it in `.github/workflows/spark-coverage.yml`, its own workflow,
 so it never lengthens the FFI gate: on `ubuntu-24.04` (x86_64), on a pull request or
