@@ -102,9 +102,9 @@ What is **not** proved:
   or `:check` (random inputs), plus the known-answer vectors of FIPS 197,
   FIPS 180-4 and RFC 4231. [doc/ffi.md](doc/ffi.md).
 * **Coverage** of the executable code under those properties, statement,
-  decision and MC/DC, with every gap explained in
+  decision and MC/DC; a gap is closed with a property or explained in
   [`coverage/explained.txt`](coverage/explained.txt). Measured in CI:
-  496/499 statements, 10/11 decisions and 11/13 MC/DC.
+  496/496 statements, 10/10 decisions and 11/11 MC/DC, with no gap.
   [doc/coverage.md](doc/coverage.md).
 * **Mutation testing**: 84 one-line faults in the executable code. The FFI
   properties catch 68. Of the other 16, 10 do not change behaviour, and 6
