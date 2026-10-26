@@ -11,7 +11,7 @@
 --  constants. Lemma_SBox_Row_X then checks the affine transformation of
 --  those inverses against the table. The inverse lemmas name nothing of
 --  SBox but SBoxPolynomial, so that the goals of the steps, nearly all of
---  the unit's, do not carry the table and affine (#70).
+--  the unit's, do not carry the table and affine.
 --
 --  The unit is a child of SBox, so that what its proof depends on is SBox
 --  and what SBox depends on (Types, GF2, GF28), and nothing else of the

@@ -1,7 +1,7 @@
 --  The types AES is stated in, mirroring algorithms/AES/Types.cry
 --  [FIPS-PUB-197 Sections 2.1, 2.3 and 5].
 --
---  Key-size polymorphism (issue #80, decided on spike #74). The Cryptol is
+--  Key-size polymorphism. The Cryptol is
 --  polymorphic in the key size k under the constraint Key k
 --  ({k} (Key k) => ...). The SPARK states it as the Cryptol does:
 --  * The constraint Key k is the subtype Key_Size. Its predicate lists
@@ -34,7 +34,7 @@
 --  (Ada 2022) for the same reason; a static function has no Pre, so the
 --  constraint is their parameter's subtype. The generic was weighed and
 --  declined earlier on 2026-10-20 on the belief that proof time would
---  triple; spike #74 measured no change in wall-clock (PR #78).
+--  triple; a measurement found no change in wall-clock.
 --
 --  This unit is not ghost: the implementation layer uses the same types.
 
@@ -90,8 +90,7 @@ is
    --  k / 64 >= 2, k / 64 <= 4), as a subtype: the standard key sizes 128,
    --  192 and 256 [FIPS-PUB-197 Sections 1, 5 and 6.1]. Fin k holds of any
    --  Natural. It is the type of the formal K of the generic AES_K, and of
-   --  every K that stands for the Cryptol's k (issue #73 item 1, as #80
-   --  settled it). The predicate lists the values that Key k allows, and
+   --  every K that stands for the Cryptol's k. The predicate lists the values that Key k allows, and
    --  Dispatch.Lemma_Key_Size proves the list equal to Key k's clauses,
    --  clause for clause; why it is a list is in the header.
 

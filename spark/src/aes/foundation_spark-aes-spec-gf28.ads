@@ -7,7 +7,7 @@
 --  a recursive fold over the bits of its argument, most significant first,
 --  as Cryptol orders bits. Ada has no operator named •, so (•) is Dot.
 --
---  From the Cryptol prelude in SPARK (Foundation_Spark.Cryptol, #75): @
+--  From the Cryptol prelude in SPARK (Foundation_Spark.Cryptol): @
 --  and head on a [8] and @ on a [15] (Words), and pmult at [8] x [8]
 --  (Polynomial_Products). pmod stays inline: Pmod returns the [8] as a
 --  Byte, where the prelude's Pmod returns a Poly whose bound below 2 ** 8
