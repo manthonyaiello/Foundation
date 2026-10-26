@@ -53,16 +53,3 @@ property prop_Dot b c = spark_Dot b c == b • c
  */
 prop_Impl_Dot : [8] -> [8] -> Bit
 property prop_Impl_Dot b c = spark_Impl_Dot b c == b • c
-
-/**
- * Foundation_Spark.FFI.AES_Impl.X_Times: the executable AES.Impl.X_Times,
- * its reduction masked rather than branched (issue #50), proved equal to
- * the spec's xTimes.
- */
-foreign spark_Impl_xTimes : [8] -> [8]
-
-/**
- * The executable X_Times is GF28.cry's xTimes on every byte (256 tests).
- */
-prop_Impl_xTimes : [8] -> Bit
-property prop_Impl_xTimes b = spark_Impl_xTimes b == xTimes b

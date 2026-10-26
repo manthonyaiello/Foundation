@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
 #
 # perf-aes.sh -- binary size and performance of the SPARK AES against NSA's
-# Rust AES (issue #51, README "Performance"), on whatever machine it runs on:
-# Linux or macOS, x86_64 or arm64.
+# Rust AES (doc/performance.md), on whatever machine it runs on: Linux or
+# macOS, x86_64 or arm64.
 #
 # 1. Builds the SPARK harness perf/perf.gpr (perf_bench, timing through
-#    Perf_AES's non-inlined wrappers) in five variants, all with
+#    Perf_AES's non-inlined wrappers) from src/ in three variants, all with
 #    Assertion_Policy (Ignore) (perf/perf.adc: no contract, assertion or
 #    ghost code), -gnatn, -ffunction-sections -fdata-sections, -flto at
 #    compile and link time, and dead-section removal at link time:
-#      spark-O2          -O2 -gnatp   the constant-time S-box (src/)
-#      spark-O3          -O3 -gnatp   the same
-#      spark-O3-checks   -O3          the same, run-time checks kept
-#      spark-table-O2    -O2 -gnatp   the table S-box: src/ at PERF_TABLE_REV
-#      spark-table-O3    -O3 -gnatp   the same
+#      spark-O2          -O2 -gnatp
+#      spark-O3          -O3 -gnatp
+#      spark-O3-checks   -O3          run-time checks kept
 # 2. Builds the Rust harness perf/rust (NSA's Cipher and KeyExpansion
 #    crates behind non-inlined wrappers) with cargo, three ways:
 #      rust-O2           profile perf-o2: opt-level 2, lto "fat", 1 codegen unit
@@ -31,8 +29,6 @@
 # Env:
 #   GPRBUILD         gprbuild (default: gprbuild)
 #   CARGO            cargo (default: cargo)
-#   PERF_TABLE_REV   the commit whose src/ has the table S-box (default
-#                    b967ebb, the last before #84); "none" skips those builds
 #   PERF_QUICK       1 for a smoke test (few, small batches): not a measurement
 #   PERF_SKIP_BENCH  1 to build and measure sizes only
 #
@@ -46,7 +42,6 @@ cd "$ROOT"
 
 GPRBUILD="${GPRBUILD:-gprbuild}"
 CARGO="${CARGO:-cargo}"
-TABLE_REV="${PERF_TABLE_REV:-b967ebb}"
 OUT="obj/perf"
 REPORT="$OUT/perf-report.md"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)"
@@ -82,17 +77,6 @@ cpu() {
   fi
 }
 
-# The table S-box: src/ as it was at TABLE_REV, extracted outside the tree.
-TABLE_SRC=""
-if [ "$TABLE_REV" != none ]; then
-  rm -rf "$OUT/src-table"
-  mkdir -p "$OUT/src-table"
-  # The pathspec is relative to the current directory: run from the top.
-  git -C "$(git rev-parse --show-toplevel)" archive "$TABLE_REV:spark" src \
-    | tar -x -C "$OUT/src-table"
-  TABLE_SRC="$ROOT/$OUT/src-table/src"
-fi
-
 spark_build() { # name opt checks src
   echo ">> building $1" >&2
   "$GPRBUILD" -P perf/perf.gpr -q -j"$JOBS" \
@@ -118,10 +102,6 @@ rust_build() { # name profile
 spark_build spark-O2 O2 off "$ROOT/src"
 spark_build spark-O3 O3 off "$ROOT/src"
 spark_build spark-O3-checks O3 on "$ROOT/src"
-if [ -n "$TABLE_SRC" ]; then
-  spark_build spark-table-O2 O2 off "$TABLE_SRC"
-  spark_build spark-table-O3 O3 off "$TABLE_SRC"
-fi
 rust_build rust-O2 perf-o2
 rust_build rust-O3 perf-o3
 rust_build rust-release release
@@ -132,7 +112,6 @@ rust_build rust-release release
   echo "* CPU: $(cpu), $JOBS logical CPUs"
   echo "* GNAT: $(gcc --version | head -1); gprbuild: $("$GPRBUILD" --version | head -1)"
   echo "* Rust: $(rustc --version), host $(rustc -vV | sed -n 's/^host: //p')"
-  echo "* table S-box sources: ${TABLE_REV}"
   if [ -n "$RUN_ARG" ]; then
     echo "* **PERF_QUICK=1: a smoke test, not a measurement**"
   fi
