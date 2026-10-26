@@ -55,27 +55,37 @@ How each link is checked:
 
 ## Reading the notation
 
-**Cryptol.** `[8]` is an 8-bit word; `[16][8]` is 16 bytes. Bit 0 of a
-word is its most significant bit. `xs @ i` reads element `i`; `xs @@ is`
-reads the elements at each index in `is`. `a # b` concatenates; as a
-pattern, `[w0] # ws # [wr]` splits a sequence into first, middle and
-last. `foldl f z xs` applies `f` to an accumulator and each element in
-turn, from the first. `{k} (Key k) => ...` is polymorphic in a type-level
-number `k` under a constraint, and ``AES`{128}`` applies it at
-`k = 128`. `split` and `join` regroup a sequence (`[128]` to `[16][8]`
-and back). `<| x^^8 + x^^4 + x^^3 + x + 1 |>` is a polynomial over GF(2)
-written as a bit vector; `pmult` and `pmod` multiply and reduce such
-polynomials and are Cryptol primitives, with no Cryptol body.
+Cryptol:
 
-**SPARK.** `Ghost` marks code that exists only for proof. An *expression
-function*, `function F (X : T) return R is (...)`, has a one-expression
-body that the prover sees. `[for I in R => ...]` and `[A, B, C]` are
-array aggregates. `Pre` and `Post` are the precondition and
-postcondition; `F'Result` is the result and `X'Old` the value of `X` on
-entry. `Subprogram_Variant => (Decreases => N)` is a recursive
-function's termination argument: `N` decreases at every recursive call.
-A *generic* package is parameterized, and `package P is new G (K => 128)`
-is an instance of it.
+- `[8]` is an 8-bit word; `[16][8]` is 16 bytes. Bit 0 of a word is its
+  most significant bit.
+- `xs @ i` reads element `i`, counting from 0; `xs @@ is` reads the
+  elements at each index in `is`.
+- `a # b` concatenates; as a pattern, `[w0] # ws # [wr]` splits a
+  sequence into first, middle and last. `^` is exclusive or.
+- `split` and `join` regroup a sequence (`[128]` to `[16][8]` and back).
+  `reverse` reverses a sequence.
+- `foldl f z xs` applies `f` to an accumulator and each element in turn,
+  from the first.
+- `{k} (Key k) => ...` is polymorphic in a type-level number `k` under a
+  constraint; ``AES`{128}`` applies it at `k = 128`.
+- `where` introduces local definitions.
+- `<| x^^8 + x^^4 + x^^3 + x + 1 |>` is a polynomial over GF(2) written
+  as a bit vector. `pmult` and `pmod` multiply and reduce such
+  polynomials; they are Cryptol primitives, with no Cryptol body.
+
+SPARK (Ada):
+
+- `with Ghost` marks code that exists only for proof.
+- An expression function `function F (X : T) return R is (expr)` is a
+  function whose body is one expression, visible to the prover.
+- `[for I in R => ...]` and `[A, B, C]` are array aggregates.
+- `Pre` and `Post` are the precondition and postcondition; `F'Result` is
+  the function's result in `Post`, and `X'Old` the value of `X` on entry.
+- `Subprogram_Variant => (Decreases => N)` is a recursive function's
+  termination argument: `N` decreases at every recursive call.
+- A generic package is a template instantiated with `is new`, as in
+  `package P is new G (K => 128)`.
 
 ## The spec layer, declaration by declaration
 
