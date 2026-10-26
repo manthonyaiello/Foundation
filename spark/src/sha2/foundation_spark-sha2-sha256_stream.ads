@@ -91,7 +91,8 @@ is
    --  the whole blocks consumed, the bytes consumed since, and the number
    --  of bytes consumed. Models states its meaning.
 
-   function Count (C : Context) return SHA256_Bytes.Byte_Index;
+   function Count (C : Context) return SHA256_Bytes.Byte_Index with
+     Ghost;
    --  The number of bytes C has consumed.
    --  @param C The context.
    --  @return The number of bytes consumed since Init.

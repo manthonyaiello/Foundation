@@ -282,9 +282,9 @@ GHOST_RE_SHA+='|foundation_spark__sha2__sha256__(rounds|word_sequences|blocks)__
 GHOST_RE_SHA+='|foundation_spark__hmac__(byte_words|byte_sequences)__'
 GHOST_RE_SHA+='|foundation_spark__sha2__sha256__(w|t1|t2|step3|foldl_step3|step|small_k|n|zero|pad|word_of|parse_block|parse|foldl_step|bit|join|hash)$'
 GHOST_RE_SHA+='|foundation_spark__sha2__sha256_bytes__(byte_bit|bits_of|blocks|length_byte|padded_byte|pad_bytes|word_at|block_at|parse_bytes|word_byte|digest_bytes|hash_bytes)$'
-GHOST_RE_SHA+='|foundation_spark__sha2__sha256_stream__(models|absorbed|finished|joined|tail_blocks|tail_pad|empty)$'
+GHOST_RE_SHA+='|foundation_spark__sha2__sha256_stream__(count|models|absorbed|finished|joined|tail_blocks|tail_pad|empty)$'
 GHOST_RE_SHA+='|foundation_spark__hmac__(byte_bit|join|repeat|zero)$'
-GHOST_RE_SHA+='|foundation_spark__hmac__sha256_impl__(to_bytes|models|absorbed|finished|inner_prefix|inner_message|outer_message)$'
+GHOST_RE_SHA+='|foundation_spark__hmac__sha256_impl__(count|to_bytes|models|absorbed|finished|inner_prefix|inner_message|outer_message)$'
 GHOST_RE_SHA+='|__lemma_'
 GHOST_RE="$GHOST_RE_AES|$GHOST_RE_SHA"
 

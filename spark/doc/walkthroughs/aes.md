@@ -860,7 +860,7 @@ than `[k]` bits, and the postcondition goes through Cryptol's `join`
 (the ghost `Join_Key` and `Spec.Main.Join_Block`) to compare with the
 spec's bit-level `Encrypt`:
 
-<a href="../../src/aes/foundation_spark-aes-impl-main.ads#L80-L87"><code>spark/src/aes/foundation_spark-aes-impl-main.ads:80-87</code></a>
+<a href="../../src/aes/foundation_spark-aes-impl-main.ads#L81-L88"><code>spark/src/aes/foundation_spark-aes-impl-main.ads:81-88</code></a>
 
 ```ada
    function Encrypt (K : Key_Size; Key : Key_Bytes; Input : Block)
