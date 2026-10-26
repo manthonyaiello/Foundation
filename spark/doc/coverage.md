@@ -99,7 +99,9 @@ $ scripts/mutation.py report /tmp/mut            # the table, as Markdown
 properties never try, and `diagnose` re-proves a mutant with more prover
 time; both are diagnostics, outside the two columns.
 
-The results (2026-10-23):
+The results (2026-10-23; the FFI column of the 34 `AES.Impl` mutants
+again on 2026-10-26, after they were moved onto the table S-box code:
+31 killed, and the same three equivalent mutants survive):
 the FFI kills 68 of the 84. Of the 16 survivors, 10 are equivalent
 mutants, and 6 are real bugs in `SHA256_Stream` that only show on
 messages longer than the properties try (from 4 KiB for one, up to 2^53
