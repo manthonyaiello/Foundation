@@ -14,7 +14,7 @@ parts:
   is compiled only when ghost code is enabled, as in the FFI build
   ([`foundation_spark-aes-spec.ads:5-7`](../../src/aes/foundation_spark-aes-spec.ads#L5-L7)).
 - **The implementation layer** (`AES.Impl`, `AES.Impl.Main`) is ordinary
-  executable SPARK: loops, in-place updates, a constant-time S-box. Each
+  executable SPARK: loops, in-place updates, a table S-box. Each
   subprogram's postcondition says that its result equals the spec-layer
   function it implements.
 - **Between them** are ghost units that are not in the Cryptol: the lemma
@@ -806,10 +806,10 @@ level, and Ada has no type-level numbers
 
 Every subprogram of `AES.Impl` has a postcondition that names the spec.
 `Expand_Key`'s is `W = Spec.Dispatch.KeyExpansion (K, Key)`
-([`foundation_spark-aes-impl.ads:112-116`](../../src/aes/foundation_spark-aes-impl.ads#L112-L116)),
+([`foundation_spark-aes-impl.ads:179-183`](../../src/aes/foundation_spark-aes-impl.ads#L179-L183)),
 and `Encrypt_Block`'s:
 
-<a href="../../src/aes/foundation_spark-aes-impl.ads#L195-L198"><code>spark/src/aes/foundation_spark-aes-impl.ads:195-198</code></a>
+<a href="../../src/aes/foundation_spark-aes-impl.ads#L260-L263"><code>spark/src/aes/foundation_spark-aes-impl.ads:260-263</code></a>
 
 ```ada
    procedure Encrypt_Block (K : Key_Size; W : Round_Keys; State : in out Block)
@@ -820,40 +820,23 @@ and `Encrypt_Block`'s:
 
 `Decrypt_Block` and `Decrypt_Block_Prime` have the same shape, with
 `Spec.Dispatch.InvCipher` and `InvCipher_Prime`
-([`foundation_spark-aes-impl.ads:206-222`](../../src/aes/foundation_spark-aes-impl.ads#L206-L222)).
+([`foundation_spark-aes-impl.ads:271-287`](../../src/aes/foundation_spark-aes-impl.ads#L271-L287)).
 The pieces they call each equal one spec function. For example,
-`X_Times` uses a mask instead of the spec's `if`, so that no branch
-depends on the data:
+`X_Times` is the spec's `xTimes` on a byte: a shift, and a conditional
+reduction:
 
-<a href="../../src/aes/foundation_spark-aes-impl.ads#L38-L41"><code>spark/src/aes/foundation_spark-aes-impl.ads:38-41</code></a>
+<a href="../../src/aes/foundation_spark-aes-impl.ads#L38-L40"><code>spark/src/aes/foundation_spark-aes-impl.ads:38-40</code></a>
 
 ```ada
    function X_Times (B : Byte) return Byte
-   is (Interfaces.Shift_Left (B, 1)
-       xor (16#1b# and (0 - Interfaces.Shift_Right (B, 7))))
+   is (Interfaces.Shift_Left (B, 1) xor (if B >= 16#80# then 16#1b# else 0))
    with Post => X_Times'Result = Spec.GF28.xTimes (B);
 ```
 
-The S-box is constant-time too. `Sub_Byte`'s postcondition is the spec's
-table
-([`foundation_spark-aes-impl.ads:58-59`](../../src/aes/foundation_spark-aes-impl.ads#L58-L59)),
-but its body reads no table: it evaluates Boyar and Peralta's circuit on
-eight bytes at once, one per 8-bit lane of a 64-bit word. The body-local
-function that does this states, lane by lane, equality with the table:
-
-<a href="../../src/aes/foundation_spark-aes-impl.adb#L264-L268"><code>spark/src/aes/foundation_spark-aes-impl.adb:264-268</code></a>
-
-```ada
-   function SBox_Lanes (X : Lanes) return Lanes
-   with
-     Post =>
-       (for all J in Lane_Index =>
-          Lane (SBox_Lanes'Result, J) = Spec.SBox.SBox (Lane (X, J)));
-```
-
-gnatprove proves it: the provers bit-blast the circuit against the table
-([`spark/doc/constant-time.md`](../constant-time.md#constant-time)).
-`Inv_SBox_Lanes` does the same for `InvSBox`.
+`Sub_Byte` is a lookup in `S_Box`, the implementation's own copy of the
+spec's table, and its postcondition is the spec's table
+([`foundation_spark-aes-impl.ads:128-129`](../../src/aes/foundation_spark-aes-impl.ads#L128-L129)).
+`Inv_Sub_Byte` does the same with `Inv_S_Box` for `InvSBox`.
 
 `AES.Impl.Main` is the byte-level top. A key is `K / 8` bytes rather
 than `[k]` bits, and the postcondition goes through Cryptol's `join`
@@ -898,7 +881,7 @@ loop whose invariant is: the state after `R - 1` rounds is the spec's
 fold over the first `R - 1` middle round keys. One more round extends the
 fold by one key at the end:
 
-<a href="../../src/aes/foundation_spark-aes-impl.adb#L680-L693"><code>spark/src/aes/foundation_spark-aes-impl.adb:680-693</code></a>
+<a href="../../src/aes/foundation_spark-aes-impl.adb#L340-L353"><code>spark/src/aes/foundation_spark-aes-impl.adb:340-353</code></a>
 
 ```ada
       Add_Round_Key (State, W (0));
@@ -933,7 +916,7 @@ nearly its definition. After the loop, the last three calls are the outer
 layer of `Dispatch.Cipher`'s postcondition. The key schedule is proved
 the same way, word by word, against `Dispatch.W` through
 `Dispatch.Lemma_W`
-([`foundation_spark-aes-impl.adb:385-421`](../../src/aes/foundation_spark-aes-impl.adb#L385-L421)).
+([`foundation_spark-aes-impl.adb:69-105`](../../src/aes/foundation_spark-aes-impl.adb#L69-L105)).
 
 **Equal arguments, equal results.** Ada's `=` on arrays compares
 components; it is not the provers' built-in equality. So the provers do
@@ -973,9 +956,8 @@ prop_SBox : [8] -> Bit
 property prop_SBox b = spark_SBox b == SBox @ b
 ```
 
-`spark_SBox` is the spec layer's table; `prop_Impl_SBox` checks the
-executable bitsliced S-box the same way
-([`SBox.cry:54-55`](../../cryptol/SPARK/AES/SBox.cry#L54-L55)). For the
+`spark_SBox` is the spec layer's table; the executable `Sub_Byte` is
+tested through the key schedule and ciphers that call it. For the
 executable cipher at each key size:
 
 <a href="../../cryptol/SPARK/AES/Cipher.cry#L221-L222"><code>spark/cryptol/SPARK/AES/Cipher.cry:221-222</code></a>
@@ -990,13 +972,13 @@ Known-answer vectors are checked too, for example `prop_CipherExample`
 copied from NSA's `CipherExample`
 ([`algorithms/AES/Tests.cry:236`](../../../algorithms/AES/Tests.cry#L236)).
 
-[`spark/cryptol/properties.txt`](../../cryptol/properties.txt) lists 88
+[`spark/cryptol/properties.txt`](../../cryptol/properties.txt) lists 82
 AES properties
-([lines 20-107](../../cryptol/properties.txt#L20-L107)): 23 in `exhaust`
-mode and 65 in `check` mode.
+([lines 20-101](../../cryptol/properties.txt#L20-L101)): 20 in `exhaust`
+mode and 62 in `check` mode.
 
 - `exhaust` runs every input: `xTimes` (256), `(•)` (65536), both
-  S-boxes (256 each) for the spec and for the executable, `Rcon` (256),
+  S-boxes (256 each), `Rcon` (256),
   and the known-answer vectors (1 test each). For these functions the
   check covers every input.
 - `check` runs random inputs: 10000 for the round transformations; 1000
@@ -1020,7 +1002,7 @@ same hashes.
 
 - **Implementation** ([`aes_impl.saw`](../../saw/aes_impl.saw)): 31
   results ([lines 132-162](../../saw/results.txt#L132-L162)). The leaves
-  (`X_Times`, `SBox_Lanes`, `Sub_Bytes`, `Mix_Column`, `Round`, and the
+  (`X_Times`, the S-box, `Sub_Bytes`, `Mix_Column`, `Round`, and the
   others) are proved for all inputs. `Expand_Key`, `Encrypt_Block` and
   `Decrypt_Block` are proved against ``KeyExpansion`{k}``,
   ``Cipher`{k}`` and ``InvCipher`{k}`` at each of `k = 128, 192, 256`,

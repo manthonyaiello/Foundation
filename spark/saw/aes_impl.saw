@@ -15,9 +15,9 @@
  * are proofs, not assumptions (check-saw.sh refuses any assumed spec in
  * saw/).
  *
- * Fixed key sizes, as NSA's own proofs (#67 item 9; README "SAW", "What
- * SAW proves on its own, in place, or not at all"). NSA's only
- * implementation proofs in this repository are of Rust:
+ * Fixed key sizes, as NSA's own proofs (README "SAW", "What SAW proves
+ * on its own, in place, or not at all"). NSA's only implementation proofs
+ * in this repository are of Rust:
  * algorithms/AES/rust/Cipher/theorems/saw.py proves cipher against
  * Cipher`{k} and inv_cipher against InvCipher'`{k}, and
  * KeyExpansion/theorems/saw.py the key expansion against KeyExpansion`{k},
@@ -67,51 +67,25 @@ x_times <- verify_impl "x_times" [] (byte_to_byte_contract {{ xTimes }})
                        "GF28::xTimes";
 
 /*
- * SBox_Lanes and Inv_SBox_Lanes (issue #50; body-local functions of
- * AES.Impl, with symbols of their own at -O0) = SBox.cry's SBox @ b and
- * InvSBox @ b [FIPS-PUB-197 Tables 4 and 6] on each byte of a 64-bit
- * word: the bitsliced S-box circuit on eight byte lanes, with no table.
- * Lane J is bits 8J .. 8J+7; a bytewise map keeps every byte where it is,
- * so the order of Cryptol's split does not matter. rme: each output bit is
- * a polynomial in the 8 bits of its own lane.
- *
- * Written on foundation for #50; it proves (IOD, 2026-10-21, #68).
+ * Sub_Byte and Inv_Sub_Byte = SBox.cry's SBox @ b and InvSBox @ b
+ * [FIPS-PUB-197 Tables 4 and 6]: lookups in the implementation's own
+ * constant tables, S_Box and Inv_S_Box.
  */
-sbox_lanes <- verify_impl "sbox_lanes" []
-                (lanes_contract {{ \(x : [64]) -> join [ SBox @ b | b <- (split x : [8][8]) ] }})
-                "\\x -> join [SBox::SBox @ b | b <- split x]";
-inv_sbox_lanes <- verify_impl "inv_sbox_lanes" []
-                    (lanes_contract {{ \(x : [64]) -> join [ InvSBox @ b | b <- (split x : [8][8]) ] }})
-                    "\\x -> join [SBox::InvSBox @ b | b <- split x]";
-
-/*
- * Sub_Byte and Inv_Sub_Byte = SBox.cry's SBox @ b and InvSBox @ b: the
- * byte in lane 0 of one call of SBox_Lanes (Inv_SBox_Lanes), whose proof
- * is the override.
- */
-sub_byte <- verify_impl "sub_byte" [sbox_lanes] (byte_to_byte_contract {{ \b -> SBox @ b }})
+sub_byte <- verify_impl "sub_byte" [] (byte_to_byte_contract {{ \b -> SBox @ b }})
                         "\\b -> SBox::SBox @ b";
-inv_sub_byte <- verify_impl "inv_sub_byte" [inv_sbox_lanes] (byte_to_byte_contract {{ \b -> InvSBox @ b }})
+inv_sub_byte <- verify_impl "inv_sub_byte" [] (byte_to_byte_contract {{ \b -> InvSBox @ b }})
                             "\\b -> SBox::InvSBox @ b";
 
 /*
  * Sub_Bytes and Inv_Sub_Bytes = Cipher.cry's SubBytes and InvSubBytes
  * [FIPS-PUB-197 Sections 5.1.1 and 5.3.2]: SBox @@ bs and InvSBox @@ bs,
- * as two calls of SBox_Lanes (Inv_SBox_Lanes) on bytes 0 .. 7 and 8 ..
- * 15, whose proof is the override.
+ * with Sub_Byte's (Inv_Sub_Byte's) proof as the override for the 16
+ * calls.
  */
-sub_bytes <- verify_impl "sub_bytes" [sbox_lanes] (block_in_out_contract {{ SubBytes }})
+sub_bytes <- verify_impl "sub_bytes" [sub_byte] (block_in_out_contract {{ SubBytes }})
                          "Cipher::SubBytes";
-inv_sub_bytes <- verify_impl "inv_sub_bytes" [inv_sbox_lanes] (block_in_out_contract {{ InvSubBytes }})
+inv_sub_bytes <- verify_impl "inv_sub_bytes" [inv_sub_byte] (block_in_out_contract {{ InvSubBytes }})
                              "Cipher::InvSubBytes";
-
-/*
- * Sub_Word = KeyExpansion.cry's SubWord: since #50 a function of its own
- * (no longer an inlined expression function), one call of SBox_Lanes on
- * the word's four bytes, whose proof is the override.
- */
-sub_word <- verify_impl "sub_word" [sbox_lanes] (word_to_word_contract {{ SubWord }})
-                        "KeyExpansion::SubWord";
 
 /*
  * Shift_Rows and Inv_Shift_Rows = Cipher.cry's ShiftRows and
@@ -193,16 +167,15 @@ inv_round <- verify_impl "inv_round" [inv_shift_rows, inv_sub_bytes, add_round_k
  * Expand_Key = KeyExpansion.cry's KeyExpansion`{k} [FIPS-PUB-197 Section
  * 5.2], for each key size: W, a fat pointer to Nr k + 1 blocks, holds
  * KeyExpansion`{k} key after the call. The 4 * (Nr k + 1) words are
- * computed with Sub_Word's proof as the override for its calls (Rot_Word,
- * Xor_Word and Rcon, expression functions, are inlined into Expand_Key's
- * body even at -O0; Sub_Word is a function of its own since #50), and
- * with Nk's and Nr's. z3, with SubWord and SBox left uninterpreted: both
- * sides apply the same SubWord.
+ * computed with Sub_Byte's proof as the override for its calls (Sub_Word,
+ * Rot_Word, Xor_Word and Rcon, expression functions, are inlined into
+ * Expand_Key's body even at -O0), and with Nk's and Nr's. z3, with
+ * SBox left uninterpreted: both sides index the same table.
  */
 let verify_expand_key (k : Term) (nk : Term) (nr : Term) (f : Term) (size : String) =
   verify_symbol (impl_symbol "expand_key") (str_concat "expand_key at K = " size)
-    [types_nk, types_nr, sub_word]
-    (expand_key_contract k nk nr f) (w4_unint_z3 ["SubWord", "SBox"]) "w4_unint_z3 SubWord SBox"
+    [types_nk, types_nr, sub_byte]
+    (expand_key_contract k nk nr f) (w4_unint_z3 ["SBox"]) "w4_unint_z3 SBox"
     (str_concat (str_concat "KeyExpansion::KeyExpansion`{" size) "}");
 
 expand_key_128 <- verify_expand_key {{ 128 : [32] }} {{ 4 : [32] }} {{ 10 : [32] }} {{ KeyExpansion`{128} }} "128";

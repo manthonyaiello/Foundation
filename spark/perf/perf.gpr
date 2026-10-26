@@ -13,7 +13,7 @@
 --    PERF_LTO     on | off         -flto at compile and link time
 --    PERF_OS      darwin | linux   which Perf_Clock body (the clock source)
 --    PERF_SRC     the crate sources to build: ../src (default), or another
---                 tree, such as the table S-box's src/ at b967ebb
+--                 tree, such as src/ at an earlier commit
 --    PERF_NAME    the object and exec subdirectory of ../obj/perf/
 --
 --  Every variant compiles with perf.adc, Assertion_Policy (Ignore): no

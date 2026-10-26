@@ -60,28 +60,4 @@ is
 
    function Dot (B, C : Byte) return Byte is (AES.Impl.Dot (B, C));
 
-   function X_Times (B : Byte) return Byte is (AES.Impl.X_Times (B));
-
-   function Sub_Byte (B : Byte) return Byte is (AES.Impl.Sub_Byte (B));
-
-   function Inv_Sub_Byte (B : Byte) return Byte
-   is (AES.Impl.Inv_Sub_Byte (B));
-
-   procedure Sub_Bytes (Bs : Block; Output : out Block) is
-   begin
-      Output := Bs;
-      AES.Impl.Sub_Bytes (Output);
-   end Sub_Bytes;
-
-   procedure Inv_Sub_Bytes (Bs : Block; Output : out Block) is
-   begin
-      Output := Bs;
-      AES.Impl.Inv_Sub_Bytes (Output);
-   end Inv_Sub_Bytes;
-
-   procedure Sub_Word (A : AESWord; Output : out AESWord) is
-   begin
-      Output := AES.Impl.Sub_Word (A);
-   end Sub_Word;
-
 end Foundation_Spark.FFI.AES_Impl;

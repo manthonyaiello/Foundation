@@ -811,7 +811,7 @@ only SHA-3
 ([SHA256.cry:16-18](../../cryptol/SPARK/HMAC/SHA256.cry#L16-L18)).
 
 The modes and test counts, from
-[`spark/cryptol/properties.txt:132-144`](../../cryptol/properties.txt#L132-L144)
+[`spark/cryptol/properties.txt:126-138`](../../cryptol/properties.txt#L126-L138)
 (`check` is random testing with that many tests; `exhaust` with 1 test is
 a property with no inputs, such as the known answers):
 

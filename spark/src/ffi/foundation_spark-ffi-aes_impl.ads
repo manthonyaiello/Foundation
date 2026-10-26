@@ -1,16 +1,12 @@
 --  The exports Cryptol calls for the executable AES, AES.Impl: the key
 --  schedule Expand_Key, and Encrypt_Block, Decrypt_Block and
 --  Decrypt_Block_Prime of one block, AES.Impl.Main's Encrypt and
---  Decrypt of a key and a block, the multiplication Dot, and the
---  constant-time leaves of issue #50 (X_Times, Sub_Byte, Inv_Sub_Byte,
---  Sub_Bytes, Inv_Sub_Bytes, Sub_Word). They are checked against
---  KeyExpansion.cry's KeyExpansion and SubWord and Cipher.cry's Cipher,
---  InvCipher, InvCipher', SubBytes and InvSubBytes by spark/cryptol/SPARK/
---  AES/KeyExpansion.cry and spark/cryptol/SPARK/AES/Cipher.cry, against
---  Main.cry's Encrypt and Decrypt by spark/cryptol/SPARK/AES/Main.cry,
---  against GF28.cry's (•) and xTimes by spark/cryptol/SPARK/AES/GF28.cry,
---  and against SBox.cry's SBox and InvSBox by spark/cryptol/SPARK/AES/
---  SBox.cry.
+--  Decrypt of a key and a block, and the multiplication Dot. They are
+--  checked against KeyExpansion.cry's KeyExpansion and Cipher.cry's
+--  Cipher, InvCipher and InvCipher' by spark/cryptol/SPARK/AES/
+--  KeyExpansion.cry and spark/cryptol/SPARK/AES/Cipher.cry, against
+--  Main.cry's Encrypt and Decrypt by spark/cryptol/SPARK/AES/Main.cry, and
+--  against GF28.cry's (•) by spark/cryptol/SPARK/AES/GF28.cry.
 --
 --  The implementation is not ghost, so these need no ghost shim: they call
 --  it directly, and their names are the ones Cryptol looks up. They take
@@ -145,72 +141,5 @@ is
    --  @param B The first factor.
    --  @param C The second factor.
    --  @return AES.Impl.Dot (B, C).
-
-   function X_Times (B : Byte) return Byte
-   with
-     Export,
-     Convention    => C,
-     External_Name => "spark_Impl_xTimes";
-   --  Cryptol's foreign spark_Impl_xTimes : [8] -> [8]. The executable
-   --  AES.Impl.X_Times (masked, issue #50), proved equal to the spec's
-   --  xTimes.
-   --  @param B The byte.
-   --  @return AES.Impl.X_Times (B).
-
-   function Sub_Byte (B : Byte) return Byte
-   with
-     Export,
-     Convention    => C,
-     External_Name => "spark_Impl_SBox";
-   --  Cryptol's foreign spark_Impl_SBox : [8] -> [8]. The executable
-   --  AES.Impl.Sub_Byte (the bitsliced circuit, issue #50), proved equal
-   --  to the spec's SBox table.
-   --  @param B The byte.
-   --  @return AES.Impl.Sub_Byte (B).
-
-   function Inv_Sub_Byte (B : Byte) return Byte
-   with
-     Export,
-     Convention    => C,
-     External_Name => "spark_Impl_InvSBox";
-   --  Cryptol's foreign spark_Impl_InvSBox : [8] -> [8]. The executable
-   --  AES.Impl.Inv_Sub_Byte (issue #50), proved equal to the spec's
-   --  InvSBox table.
-   --  @param B The byte.
-   --  @return AES.Impl.Inv_Sub_Byte (B).
-
-   procedure Sub_Bytes (Bs : Block; Output : out Block)
-   with
-     Export,
-     Convention    => C,
-     External_Name => "spark_Impl_SubBytes";
-   --  Cryptol's foreign spark_Impl_SubBytes : Block -> Block. The
-   --  executable AES.Impl.Sub_Bytes (the circuit on two words of eight
-   --  lanes, issue #50), proved equal to the spec's SubBytes, applied to a
-   --  copy of Bs.
-   --  @param Bs The state.
-   --  @param Output The result, written through Cryptol's output pointer.
-
-   procedure Inv_Sub_Bytes (Bs : Block; Output : out Block)
-   with
-     Export,
-     Convention    => C,
-     External_Name => "spark_Impl_InvSubBytes";
-   --  Cryptol's foreign spark_Impl_InvSubBytes : Block -> Block. The
-   --  executable AES.Impl.Inv_Sub_Bytes (issue #50), proved equal to the
-   --  spec's InvSubBytes, applied to a copy of Bs.
-   --  @param Bs The state.
-   --  @param Output The result, written through Cryptol's output pointer.
-
-   procedure Sub_Word (A : AESWord; Output : out AESWord)
-   with
-     Export,
-     Convention    => C,
-     External_Name => "spark_Impl_SubWord";
-   --  Cryptol's foreign spark_Impl_SubWord : AESWord -> AESWord. The
-   --  executable AES.Impl.Sub_Word (four lanes of the circuit, issue
-   --  #50), proved equal to the spec's SubWord.
-   --  @param A The word.
-   --  @param Output The result, written through Cryptol's output pointer.
 
 end Foundation_Spark.FFI.AES_Impl;

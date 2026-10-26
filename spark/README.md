@@ -90,12 +90,13 @@ What is **not** proved:
   all of AES, but SHA-256 and HMAC only at the lengths SAW was run at);
 * that the compiler is correct. gnatprove reasons about the Ada source;
   SAW about the bitcode one compiler (GNAT Pro's LLVM back end) emits;
-* timing. Constant time is checked on the object code and measured, not
-  proved ([doc/constant-time.md](doc/constant-time.md)).
+* timing. The AES here is not constant time: its S-box is a table lookup
+  indexed by key and state bytes. A constant-time AES (a bitsliced S-box,
+  proved equal to the same spec) is on the `constant-time` branch.
 
 ## What is tested
 
-* **The FFI check**: 147 properties
+* **The FFI check**: 141 properties
   ([`cryptol/properties.txt`](cryptol/properties.txt)), run in CI on
   every change. They compare the SPARK functions with NSA's Cryptol, with
   Cryptol's `:exhaust` (every input, for bytes and other small domains)
@@ -104,7 +105,7 @@ What is **not** proved:
 * **Coverage** of the executable code under those properties, statement,
   decision and MC/DC; a gap is closed with a property or explained in
   [`coverage/explained.txt`](coverage/explained.txt). Measured in CI:
-  496/496 statements, 10/10 decisions and 11/11 MC/DC, with no gap.
+  334/334 statements, 13/13 decisions and 14/14 MC/DC, with no gap.
   [doc/coverage.md](doc/coverage.md).
 * **Mutation testing**: 84 one-line faults in the executable code. The FFI
   properties catch 68. Of the other 16, 10 do not change behaviour, and 6
@@ -112,10 +113,6 @@ What is **not** proved:
   than the properties try, or on an array that does not start at index 0.
   gnatprove fails to prove all six (by timeout, not by counterexample).
   [doc/coverage.md](doc/coverage.md), "Mutation testing".
-* **Constant time**: no secret-dependent branch or indexed memory access
-  in the AES object code, no secret-dependent branch or address under
-  Valgrind, and statistical timing tests.
-  [doc/constant-time.md](doc/constant-time.md).
 * **Performance** against NSA's Rust reference AES.
   [doc/performance.md](doc/performance.md).
 
@@ -129,7 +126,7 @@ What is **not** proved:
 | [`cryptol/`](cryptol) | our Cryptol: the property modules that call the SPARK exports, and `properties.txt` |
 | [`saw/`](saw) | the SAW scripts, and `results.txt`, the record of the last run |
 | [`coverage/`](coverage), [`mutation/`](mutation) | coverage and mutation-testing inputs |
-| [`ct/`](ct), [`perf/`](perf) | the constant-time and performance harnesses |
+| [`perf/`](perf) | the performance harness |
 | [`scripts/`](scripts) | proof, FFI, coverage, SAW, gates, bootstrap; `toolchain-pins.env` pins every tool |
 | [`doc/`](doc) | the detailed documents below |
 
@@ -160,7 +157,6 @@ Pro 27's LLVM back end. Both paths, step by step:
 | [doc/cryptol-prelude.md](doc/cryptol-prelude.md) | Cryptol's built-ins in SPARK, and the choices made in stating them |
 | [doc/ffi.md](doc/ffi.md) | the FFI check: how SPARK is called from Cryptol, what a pass requires, what each algorithm's properties cover |
 | [doc/coverage.md](doc/coverage.md) | coverage under the FFI properties, and mutation testing |
-| [doc/constant-time.md](doc/constant-time.md) | the constant-time rule, the audit, the bitsliced S-box, and the checks |
 | [doc/performance.md](doc/performance.md) | size and speed against NSA's Rust AES |
 | [doc/saw.md](doc/saw.md) | the SAW proofs: what is proved at which sizes, what is not, how to run them, the bitcode details |
 | [doc/bootstrap.md](doc/bootstrap.md) | installing Cryptol (and building it from source), and bootstrapping an x86_64 Linux machine |

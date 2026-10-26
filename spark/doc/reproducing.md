@@ -2,7 +2,7 @@
 
 There are two paths. The **FSF path** needs only free tools, and
 reproduces everything CI checks: the proofs, the FFI check against the
-Cryptol, coverage, and the constant-time and performance harnesses. The
+Cryptol, coverage, and the performance harness. The
 **SAW path** also needs GNAT Pro 27's LLVM back end, which is not freely
 available; it reproduces the SAW proofs recorded in `saw/results.txt`.
 
@@ -89,16 +89,13 @@ $ scripts/check-coverage.sh
 
 Details: [coverage.md](coverage.md).
 
-**Constant time and performance** (optional):
+**Performance** (optional):
 
 ```console
-$ scripts/check-ct.sh                          # object code, ct_grind, dudect
 $ alr -n exec -- scripts/perf-aes.sh           # needs cargo, for NSA's Rust AES
 ```
 
-`check-ct.sh` runs its Valgrind test only when `valgrind` is on `PATH`.
-Details: [constant-time.md](constant-time.md),
-[performance.md](performance.md).
+Details: [performance.md](performance.md).
 
 **The documentation gates:**
 

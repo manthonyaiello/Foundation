@@ -33,13 +33,12 @@
 # ---------------------------------------------------------------- FFI groups
 
 # AES.Impl, through each export that reaches it (FFI.AES_Impl).
-group aes_gf = prop_Impl_Dot prop_Impl_xTimes
-group aes_sbox = prop_Impl_SBox prop_Impl_InvSBox prop_Impl_SubBytes prop_Impl_InvSubBytes prop_Impl_SubWord
+group aes_gf = prop_Impl_Dot
 group aes_key = prop_Expand_Key128 prop_Expand_Key192 prop_Expand_Key256 prop_Expand_Key_FIPS
 group aes_block = prop_Encrypt_Block128 prop_Encrypt_Block192 prop_Encrypt_Block256 prop_Decrypt_Block128 prop_Decrypt_Block192 prop_Decrypt_Block256 prop_Decrypt_Block_Prime128 prop_Decrypt_Block_Prime192 prop_Decrypt_Block_Prime256 prop_Block_CipherExample
 # AES.Impl.Main (and through it all of AES.Impl's cipher).
 group aes_main = prop_Impl_Encrypt128 prop_Impl_Encrypt192 prop_Impl_Encrypt256 prop_Impl_Decrypt128 prop_Impl_Decrypt192 prop_Impl_Decrypt256 prop_Impl_AESExamples prop_Impl_FIPS197_C prop_Exec_Encrypt128 prop_Exec_Encrypt192 prop_Exec_Encrypt256 prop_Exec_Decrypt128 prop_Exec_Decrypt192 prop_Exec_Decrypt256 prop_Exec_AESExamples prop_Exec_FIPS197_C
-group aes_impl = aes_gf aes_sbox aes_key aes_block aes_main
+group aes_impl = aes_gf aes_key aes_block aes_main
 
 # HMAC.SHA256_Impl (FFI.HMAC_SHA256_Impl).
 group hmac_impl = prop_HMAC_SHA256_texts prop_HMAC_SHA256_keys prop_HMAC_SHA256_long prop_HMAC_SHA256_RFC4231 prop_HMAC_Chunked prop_HMAC_Chunked_long prop_HMAC_Chunked_RFC4231 prop_Init_Key
@@ -56,40 +55,40 @@ group sha_units = foundation_spark-sha2-functions.ads foundation_spark-sha2-sha2
 
 # ---------------------------------------------------------------- AES.Impl
 
-A01 | src/aes/foundation_spark-aes-impl.ads | 40 | 16#1b# | 16#1d# | aes_gf aes_main | foundation_spark-aes-impl.ads | X_Times: the reduction constant 0x1b changed to 0x1d
-A02 | src/aes/foundation_spark-aes-impl.ads | 40 | Shift_Right (B, 7) | Shift_Right (B, 6) | aes_gf aes_main | foundation_spark-aes-impl.ads | X_Times: the top-bit mask taken from bit 6
-A03 | src/aes/foundation_spark-aes-impl.ads | 81 | [A (1), A (2), A (3), A (0)] | [A (1), A (2), A (0), A (3)] | aes_key aes_main | foundation_spark-aes-impl.ads | Rot_Word: two bytes swapped
-A04 | src/aes/foundation_spark-aes-impl.ads | 103 | when 9 => 16#1b# | when 9 => 16#1d# | aes_key aes_main | foundation_spark-aes-impl.ads | Rcon: Rcon(9), read by AES-128 only, changed
-A05 | src/aes/foundation_spark-aes-impl.ads | 104 | when 10 => 16#36# | when 10 => 16#37# | aes_key aes_main | foundation_spark-aes-impl.ads | Rcon: Rcon(10), read by AES-128's last word only, changed
+A01 | src/aes/foundation_spark-aes-impl.ads | 39 | 16#1b# | 16#1d# | aes_gf aes_main | foundation_spark-aes-impl.ads | X_Times: the reduction constant 0x1b changed to 0x1d
+A02 | src/aes/foundation_spark-aes-impl.ads | 39 | B >= 16#80# | B >= 16#40# | aes_gf aes_main | foundation_spark-aes-impl.ads | X_Times: the reduction taken on bit 6
+A03 | src/aes/foundation_spark-aes-impl.ads | 148 | [A (1), A (2), A (3), A (0)] | [A (1), A (2), A (0), A (3)] | aes_key aes_main | foundation_spark-aes-impl.ads | Rot_Word: two bytes swapped
+A04 | src/aes/foundation_spark-aes-impl.ads | 170 | when 9 => 16#1b# | when 9 => 16#1d# | aes_key aes_main | foundation_spark-aes-impl.ads | Rcon: Rcon(9), read by AES-128 only, changed
+A05 | src/aes/foundation_spark-aes-impl.ads | 171 | when 10 => 16#36# | when 10 => 16#37# | aes_key aes_main | foundation_spark-aes-impl.ads | Rcon: Rcon(10), read by AES-128's last word only, changed
 A06 | src/aes/foundation_spark-aes-impl.adb | 18 | for N in 1 .. 8 loop | for N in 1 .. 7 loop | aes_gf | foundation_spark-aes-impl.adb | Dot: the product loop one bit short
-A07 | src/aes/foundation_spark-aes-impl.adb | 28 | 16#11B# | 16#11D# | aes_gf | foundation_spark-aes-impl.adb | Dot: the modulus 0x11b changed to 0x11d
-A08 | src/aes/foundation_spark-aes-impl.adb | 25 | for N in 1 .. 15 loop | for N in 1 .. 14 loop | aes_gf | foundation_spark-aes-impl.adb | Dot: the reduction loop one bit short
-A09 | src/aes/foundation_spark-aes-impl.adb | 95 | Shift_Left (P (7), 7) | Shift_Left (P (7), 6) | aes_sbox aes_main | foundation_spark-aes-impl.adb | From_Planes: plane 7 shifted to bit 6
-A10 | src/aes/foundation_spark-aes-impl.adb | 102 | P (7) xor P (5) xor P (2) xor Ones | P (7) xor P (5) xor P (2) | aes_sbox aes_main | foundation_spark-aes-impl.adb | Inv_Affine: the constant dropped from bit 0
-A11 | src/aes/foundation_spark-aes-impl.adb | 126 | U0 xor U3 | U0 xor U4 | aes_sbox aes_main | foundation_spark-aes-impl.adb | S-box circuit: gate T1 reads the wrong input
-A12 | src/aes/foundation_spark-aes-impl.adb | 153 | T13 and T6 | T13 or T6 | aes_sbox aes_main | foundation_spark-aes-impl.adb | S-box circuit: AND gate M1 made an OR
-A13 | src/aes/foundation_spark-aes-impl.adb | 247 | L16 xor L26 xor Ones | L16 xor L26 | aes_sbox aes_main | foundation_spark-aes-impl.adb | S-box circuit: XNOR output S1 made an XOR
-A14 | src/aes/foundation_spark-aes-impl.adb | 319 | Lanes (S (F + 7)), 56 | Lanes (S (F + 7)), 48 | aes_sbox aes_main | foundation_spark-aes-impl.adb | Pack: byte 7 packed into lane 6
-A15 | src/aes/foundation_spark-aes-impl.adb | 348 | Lanes (A (3)), 24 | Lanes (A (3)), 16 | aes_sbox aes_key aes_main | foundation_spark-aes-impl.adb | Sub_Word: byte 3 packed into lane 2
-A16 | src/aes/foundation_spark-aes-impl.adb | 442 | Lane (Hi, 6), Lane (Hi, 7)] | Lane (Hi, 6), Lane (Hi, 6)] | aes_sbox aes_main | foundation_spark-aes-impl.adb | Sub_Bytes: the last byte taken from the wrong lane
-A17 | src/aes/foundation_spark-aes-impl.adb | 473 | State (0), State (5), | State (0), State (1), | aes_block aes_main | foundation_spark-aes-impl.adb | Shift_Rows: an index changed
-A18 | src/aes/foundation_spark-aes-impl.adb | 489 | State (12), State (9), State (6), State (3)] | State (12), State (9), State (6), State (7)] | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Shift_Rows: an index changed
-A19 | src/aes/foundation_spark-aes-impl.adb | 512 | S (2) xor X (3)] | S (2) xor S (3)] | aes_block aes_main | foundation_spark-aes-impl.adb | Mix_Column: 0x02 * s3 read as s3
-A20 | src/aes/foundation_spark-aes-impl.adb | 509 | [X (0) xor (X (1) xor S (1)) | [(X (1) xor S (1)) xor X (0) | aes_block aes_main | foundation_spark-aes-impl.adb | Mix_Column: operands of a xor swapped (equivalent)
-A21 | src/aes/foundation_spark-aes-impl.adb | 550 | xor (X_Times (D4) xor D) | xor (X_Times (D4) xor D2) | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Mix_Byte: 0x09 * d computed as 0x0a * d
-A22 | src/aes/foundation_spark-aes-impl.adb | 559 | Inv_Mix_Byte (S (3), S (0), S (1), S (2)) | Inv_Mix_Byte (S (3), S (1), S (0), S (2)) | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Mix_Column: the last row's rotation wrong
-A23 | src/aes/foundation_spark-aes-impl.adb | 612 | State (I) xor Key (I) | State (I) xor Key (15 - I) | aes_block aes_main | foundation_spark-aes-impl.adb | Add_Round_Key: the key's bytes reversed
-A24 | src/aes/foundation_spark-aes-impl.adb | 624 | Shift_Rows (State); | null; | aes_block aes_main | foundation_spark-aes-impl.adb | Round: ShiftRows dropped
-A25 | src/aes/foundation_spark-aes-impl.adb | 681 | for R in 1 .. Nr (K) - 1 loop | for R in 1 .. Nr (K) - 2 loop | aes_block aes_main | foundation_spark-aes-impl.adb | Encrypt_Block: one round short
-A26 | src/aes/foundation_spark-aes-impl.adb | 693 | Add_Round_Key (State, W (Nr (K))); | Add_Round_Key (State, W (Nr (K) - 1)); | aes_block aes_main | foundation_spark-aes-impl.adb | Encrypt_Block: the last round key off by one
-A27 | src/aes/foundation_spark-aes-impl.adb | 717 | Inv_Round (State, W (Nr (K) - J)); | Inv_Round (State, W (Nr (K) - J - 1)); | aes_block aes_main | foundation_spark-aes-impl.adb | Decrypt_Block: the round keys off by one
-A28 | src/aes/foundation_spark-aes-impl.adb | 755 | Add_Round_Key (State, W (0)); | Add_Round_Key (State, W (1)); | aes_block | foundation_spark-aes-impl.adb | Decrypt_Block_Prime: the last round key W (1) for W (0)
-A29 | src/aes/foundation_spark-aes-impl.adb | 381 | Ws   : Word_Schedule := [others => [others => 0]]; | Ws   : Word_Schedule; | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the schedule's initialization dropped (every word is written before it is read)
-A30 | src/aes/foundation_spark-aes-impl.adb | 385 | for I in 0 .. 4 * (Nr (K) + 1) - 1 loop | for I in 0 .. 4 * Nr (K) - 1 loop | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the last round key's words never computed
-A31 | src/aes/foundation_spark-aes-impl.adb | 394 | if I mod Nk_K = 0 then | if I mod Nk_K = 1 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the RotWord step on the wrong word
-A32 | src/aes/foundation_spark-aes-impl.adb | 401 | and then Nk_K > 6 then | and then Nk_K > 4 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the extra SubWord step also for AES-192
-A33 | src/aes/foundation_spark-aes-impl.adb | 401 | and then Nk_K > 6 then | and then Nk_K > 7 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: Nk > 6 as Nk > 7 (equivalent: Nk is 4, 6 or 8)
-A34 | src/aes/foundation_spark-aes-impl.adb | 417 | Ws (4 * R + I / 4) (I mod 4) | Ws (4 * R + I mod 4) (I / 4) | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the round key's bytes transposed
+A07 | src/aes/foundation_spark-aes-impl.adb | 27 | 16#11B# | 16#11D# | aes_gf | foundation_spark-aes-impl.adb | Dot: the modulus 0x11b changed to 0x11d
+A08 | src/aes/foundation_spark-aes-impl.adb | 24 | for N in 1 .. 15 loop | for N in 1 .. 14 loop | aes_gf | foundation_spark-aes-impl.adb | Dot: the reduction loop one bit short
+A09 | src/aes/foundation_spark-aes-impl.ads | 55 | [16#63#, 16#7c# | [16#62#, 16#7c# | aes_key aes_block aes_main | foundation_spark-aes-impl.ads | S_Box: entry 0x00 changed
+A10 | src/aes/foundation_spark-aes-impl.ads | 86 | 16#bb#, 16#16#] | 16#bb#, 16#17#] | aes_key aes_block aes_main | foundation_spark-aes-impl.ads | S_Box: entry 0xff changed
+A11 | src/aes/foundation_spark-aes-impl.ads | 92 | [16#52#, 16#09# | [16#53#, 16#09# | aes_block aes_main | foundation_spark-aes-impl.ads | Inv_S_Box: entry 0x00 changed
+A12 | src/aes/foundation_spark-aes-impl.ads | 123 | 16#0c#, 16#7d#] | 16#0c#, 16#7c#] | aes_block aes_main | foundation_spark-aes-impl.ads | Inv_S_Box: entry 0xff changed
+A13 | src/aes/foundation_spark-aes-impl.adb | 40 | S_Box (B) | S_Box (B xor 1) | aes_key aes_block aes_main | foundation_spark-aes-impl.adb | Sub_Byte: the table indexed by B xor 1
+A14 | src/aes/foundation_spark-aes-impl.adb | 49 | Inv_S_Box (B) | Inv_S_Box (B + 1) | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Sub_Byte: the table indexed by B + 1
+A15 | src/aes/foundation_spark-aes-impl.ads | 141 | Sub_Byte (A (3))] | Sub_Byte (A (2))] | aes_key aes_main | foundation_spark-aes-impl.ads | Sub_Word: byte 3 taken from byte 2
+A16 | src/aes/foundation_spark-aes-impl.adb | 114 | Sub_Byte (State (I)) | Inv_Sub_Byte (State (I)) | aes_block aes_main | foundation_spark-aes-impl.adb | Sub_Bytes: the inverse S-box called
+A17 | src/aes/foundation_spark-aes-impl.adb | 133 | State (0), State (5), | State (0), State (1), | aes_block aes_main | foundation_spark-aes-impl.adb | Shift_Rows: an index changed
+A18 | src/aes/foundation_spark-aes-impl.adb | 149 | State (12), State (9), State (6), State (3)] | State (12), State (9), State (6), State (7)] | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Shift_Rows: an index changed
+A19 | src/aes/foundation_spark-aes-impl.adb | 172 | S (2) xor X (3)] | S (2) xor S (3)] | aes_block aes_main | foundation_spark-aes-impl.adb | Mix_Column: 0x02 * s3 read as s3
+A20 | src/aes/foundation_spark-aes-impl.adb | 169 | [X (0) xor (X (1) xor S (1)) | [(X (1) xor S (1)) xor X (0) | aes_block aes_main | foundation_spark-aes-impl.adb | Mix_Column: operands of a xor swapped (equivalent)
+A21 | src/aes/foundation_spark-aes-impl.adb | 210 | xor (X_Times (D4) xor D) | xor (X_Times (D4) xor D2) | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Mix_Byte: 0x09 * d computed as 0x0a * d
+A22 | src/aes/foundation_spark-aes-impl.adb | 219 | Inv_Mix_Byte (S (3), S (0), S (1), S (2)) | Inv_Mix_Byte (S (3), S (1), S (0), S (2)) | aes_block aes_main | foundation_spark-aes-impl.adb | Inv_Mix_Column: the last row's rotation wrong
+A23 | src/aes/foundation_spark-aes-impl.adb | 272 | State (I) xor Key (I) | State (I) xor Key (15 - I) | aes_block aes_main | foundation_spark-aes-impl.adb | Add_Round_Key: the key's bytes reversed
+A24 | src/aes/foundation_spark-aes-impl.adb | 284 | Shift_Rows (State); | null; | aes_block aes_main | foundation_spark-aes-impl.adb | Round: ShiftRows dropped
+A25 | src/aes/foundation_spark-aes-impl.adb | 341 | for R in 1 .. Nr (K) - 1 loop | for R in 1 .. Nr (K) - 2 loop | aes_block aes_main | foundation_spark-aes-impl.adb | Encrypt_Block: one round short
+A26 | src/aes/foundation_spark-aes-impl.adb | 353 | Add_Round_Key (State, W (Nr (K))); | Add_Round_Key (State, W (Nr (K) - 1)); | aes_block aes_main | foundation_spark-aes-impl.adb | Encrypt_Block: the last round key off by one
+A27 | src/aes/foundation_spark-aes-impl.adb | 377 | Inv_Round (State, W (Nr (K) - J)); | Inv_Round (State, W (Nr (K) - J - 1)); | aes_block aes_main | foundation_spark-aes-impl.adb | Decrypt_Block: the round keys off by one
+A28 | src/aes/foundation_spark-aes-impl.adb | 415 | Add_Round_Key (State, W (0)); | Add_Round_Key (State, W (1)); | aes_block | foundation_spark-aes-impl.adb | Decrypt_Block_Prime: the last round key W (1) for W (0)
+A29 | src/aes/foundation_spark-aes-impl.adb | 65 | Ws   : Word_Schedule := [others => [others => 0]]; | Ws   : Word_Schedule; | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the schedule's initialization dropped (every word is written before it is read)
+A30 | src/aes/foundation_spark-aes-impl.adb | 69 | for I in 0 .. 4 * (Nr (K) + 1) - 1 loop | for I in 0 .. 4 * Nr (K) - 1 loop | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the last round key's words never computed
+A31 | src/aes/foundation_spark-aes-impl.adb | 78 | if I mod Nk_K = 0 then | if I mod Nk_K = 1 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the RotWord step on the wrong word
+A32 | src/aes/foundation_spark-aes-impl.adb | 85 | and then Nk_K > 6 then | and then Nk_K > 4 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the extra SubWord step also for AES-192
+A33 | src/aes/foundation_spark-aes-impl.adb | 85 | and then Nk_K > 6 then | and then Nk_K > 7 then | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: Nk > 6 as Nk > 7 (equivalent: Nk is 4, 6 or 8)
+A34 | src/aes/foundation_spark-aes-impl.adb | 101 | Ws (4 * R + I / 4) (I mod 4) | Ws (4 * R + I mod 4) (I / 4) | aes_key aes_main | foundation_spark-aes-impl.adb | Expand_Key: the round key's bytes transposed
 
 # ---------------------------------------------------------------- AES.Impl.Main
 
