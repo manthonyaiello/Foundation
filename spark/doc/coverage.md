@@ -53,8 +53,8 @@ reach by construction. A function called only from contracts is not such
 code: it is Ghost, and the coverage build compiles the executables
 without `-gnata`, so no code is emitted for it. A gap in the targeted
 tests is closed with a property instead (`prop_Impl_Dot` closed
-`AES.Impl.Dot`, which the ciphers never call). Measured in CI: 496/496
-statements, 10/10 decisions and 11/11 MC/DC, and the file has no
+`AES.Impl.Dot`, which the ciphers never call). Measured in CI: 334/334
+statements, 13/13 decisions and 14/14 MC/DC, and the file has no
 entries.
 
 **CI** runs it in `.github/workflows/spark-coverage.yml`, its own workflow,

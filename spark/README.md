@@ -105,7 +105,7 @@ What is **not** proved:
 * **Coverage** of the executable code under those properties, statement,
   decision and MC/DC; a gap is closed with a property or explained in
   [`coverage/explained.txt`](coverage/explained.txt). Measured in CI:
-  496/496 statements, 10/10 decisions and 11/11 MC/DC, with no gap.
+  334/334 statements, 13/13 decisions and 14/14 MC/DC, with no gap.
   [doc/coverage.md](doc/coverage.md).
 * **Mutation testing**: 84 one-line faults in the executable code. The FFI
   properties catch 68. Of the other 16, 10 do not change behaviour, and 6
