@@ -1,17 +1,17 @@
 # SPARK implementations of AES, SHA-256 and HMAC-SHA-256
 
 This directory is an Alire crate, `foundation_spark`. It holds SPARK
-implementations of three algorithms from NSA's Cryptol specifications in
-[`../algorithms`](../algorithms):
+implementations of three algorithms from the NSA's Cryptol specifications 
+in [`../algorithms`](../algorithms):
 
 * **AES** (FIPS 197): key expansion, encryption and decryption, at 128,
   192 and 256-bit keys;
 * **SHA-256** (FIPS 180-4): one-shot and streaming;
 * **HMAC-SHA-256** (FIPS 198-1): one-shot and incremental.
 
-Each is proved, with SPARK's prover gnatprove, equal to a SPARK
-transcription of NSA's Cryptol. That transcription is checked against the
-Cryptol itself, by testing through Cryptol's foreign function interface
+Each is proved, with SPARK's prover `gnatprove`, equal to a SPARK
+transcription of the NSA's Cryptol. That transcription is checked against 
+the Cryptol itself by testing through Cryptol's foreign function interface
 and by proof with SAW.
 
 ## How the pieces fit
@@ -167,96 +167,3 @@ Pro 27's LLVM back end. Both paths, step by step:
 | [doc/saw.md](doc/saw.md) | the SAW proofs: what is proved at which sizes, what is not, how to run them, the bitcode details |
 | [doc/bootstrap.md](doc/bootstrap.md) | installing Cryptol (and building it from source), and bootstrapping an x86_64 Linux machine |
 | [doc/walkthroughs/](doc/walkthroughs) | AES, SHA-256 and HMAC-SHA-256: Cryptol and SPARK side by side |
-
-## Where earlier sections went
-
-Sources, scripts and records cite this README's sections by name. Those
-sections now live in the documents above.
-
-### Toolchain
-
-[doc/reproducing.md](doc/reproducing.md), "Tools".
-
-### Proving
-
-[doc/proving.md](doc/proving.md), "Running gnatprove".
-
-### Levels
-
-[doc/proving.md](doc/proving.md#levels), "Levels".
-
-### The board
-
-[doc/proving.md](doc/proving.md#the-board), "The board".
-
-### Where spec and implementation are not one-to-one
-
-[doc/proving.md](doc/proving.md#where-spec-and-implementation-are-not-one-to-one).
-
-### The Cryptol's own properties, re-proved
-
-[doc/proving.md](doc/proving.md#the-cryptols-own-properties-re-proved).
-
-### The FFI harness
-
-[doc/ffi.md](doc/ffi.md), including its paragraphs "Passing bit
-sequences" and "Targeted, not volume".
-
-### The Cryptol prelude
-
-[doc/cryptol-prelude.md](doc/cryptol-prelude.md).
-
-### Coverage
-
-[doc/coverage.md](doc/coverage.md#coverage).
-
-### Mutation testing
-
-[doc/coverage.md](doc/coverage.md#mutation-testing).
-
-### Constant time
-
-[doc/constant-time.md](doc/constant-time.md).
-
-### Performance
-
-[doc/performance.md](doc/performance.md).
-
-### Gates
-
-[doc/proving.md](doc/proving.md#gates).
-
-### Cryptol
-
-[doc/bootstrap.md](doc/bootstrap.md#cryptol).
-
-### Bootstrapping the x86_64 instance
-
-[doc/bootstrap.md](doc/bootstrap.md#bootstrapping-the-x86_64-instance).
-
-### Slow proofs
-
-[doc/proving.md](doc/proving.md#slow-proofs).
-
-### SAW
-
-[doc/saw.md](doc/saw.md), with its sections "AES", "SHA-256 and
-HMAC-SHA-256", "The spec layer" (and in it "The secondary stack" and "The
-FFI properties now backed by a proof"), "What SAW proves on its own, in
-place, or not at all", "Running it" and "The bitcode ABI".
-
-### The spec layer
-
-[doc/saw.md](doc/saw.md#the-spec-layer).
-
-### The secondary stack
-
-[doc/saw.md](doc/saw.md#the-secondary-stack).
-
-### What SAW proves on its own, in place, or not at all
-
-[doc/saw.md](doc/saw.md#what-saw-proves-on-its-own-in-place-or-not-at-all).
-
-### The bitcode ABI
-
-[doc/saw.md](doc/saw.md#the-bitcode-abi).
