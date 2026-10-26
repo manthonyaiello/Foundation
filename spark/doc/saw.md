@@ -168,7 +168,7 @@ SAW proves the ghost spec layer equal to the NSA Cryptol, with
   it calls as overrides. For the linear ones unfolding measured 10 to 30
   times cheaper (`Rounds.Foldl` 2.4 s unfolded against 23.2 s for its 65
   lemmas, `To_Bits` 1.4 s against 43.8 s), and each linear recursion was
-  then measured both ways (`saw/experiments/issue-99/`,
+  then measured both ways (`saw/experiments/unfold-vs-chain/`,
   `results-2026-10-23.txt` there). **Unfolded:** SHA-2's `Rounds.Foldl`
   (`Foldl_Step3`, 2.4 s against 25.9 s), `Literal` (`To_Bits`, 1.5 s
   against 48.0 s, at each of its stack states), `Blocks.Foldl_Take`
@@ -361,7 +361,7 @@ lax), `sha256_spec.saw` 4899 s, the whole 6257 s; before the unfolding
 7784 s, peak 7.2 GB; below, "Running it").
 
 **Why the spec layer costs about 76 times the implementation** (experiments
-in `saw/experiments/issue-69/`): 31 times as many results, each 2.6 times
+in `saw/experiments/spec-layer-cost/`): 31 times as many results, each 2.6 times
 as long. Of the spec layer's time, 44% is lemmas proved again at another
 secondary-stack base (an override matches only the stack state its
 contract names, and SAW cannot name a symbolic one), 33% lemmas per

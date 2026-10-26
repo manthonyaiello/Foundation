@@ -78,7 +78,7 @@ gf28_product_bit <- verify_spec "gf28__product_bit" []
  * Pmult (B, C) calls Products.Pmult, which calls Products at N = 8. The
  * recursion has one call per level, and since #99 SAW unfolds it: one
  * proof at N = 8 (0.06 s, against 0.88 s for a lemma per N in
- * 0 .. 8; saw/experiments/issue-99).
+ * 0 .. 8; saw/experiments/unfold-vs-chain).
  */
 let products_contract (n : Int) (rhs : Term) = do {
   x <- llvm_fresh_var "x" poly_t;
@@ -118,7 +118,7 @@ gf28_reduce <- verify_spec "gf28__reduce" []
  *   Pmod_Fold (X, Y, N) = pmod (take`{N} x) y
  * under the precondition 256 <= Y < 512. One call per level: since #99
  * SAW unfolds it, one proof at N = 15 (0.19 s, against 1.65 s for a
- * lemma per N in 0 .. 15; saw/experiments/issue-99).
+ * lemma per N in 0 .. 15; saw/experiments/unfold-vs-chain).
  */
 let pmod_fold_contract (n : Int) (rhs : Term) = do {
   x <- llvm_fresh_var "x" poly_t;

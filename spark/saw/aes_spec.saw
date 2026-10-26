@@ -11,7 +11,7 @@
  * as overrides, as algorithms/AES/rust/Cipher/theorems/saw.py composes
  * its leaf lemmas, where unfolding it costs more: KeyExpansion's W (two
  * recursive calls), the cipher folds' Foldl_Take and GF2's Pmod_Fold and
- * Pdiv_Fold (measured dearer unfolded, saw/experiments/issue-99). GF28's
+ * Pdiv_Fold (measured dearer unfolded, saw/experiments/unfold-vs-chain). GF28's
  * Products and Pmod_Fold, cheaper unfolded, are proved once, at the size
  * their callers use, SAW unfolding the recursion. GF2's Inner, whose variant is a value (the
  * degree of r'), has no such index: Pgcd and Inverse, which call it, are

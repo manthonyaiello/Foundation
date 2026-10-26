@@ -10,7 +10,7 @@
 #   run.sh EXPERIMENT [OUT_DIR]
 #
 #   EXPERIMENT  e_<EXPERIMENT>.saw;
-#   OUT_DIR     default /tmp/saw-issue-99/<EXPERIMENT>.
+#   OUT_DIR     default /tmp/saw-unfold-vs-chain/<EXPERIMENT>.
 #
 # Needs saw/obj built by `scripts/check-saw.sh --print`, and the env
 # check-saw.sh needs (saw and z3 on PATH). The saw run is capped at
@@ -27,7 +27,7 @@ SPARK_DIR="$(cd "$SAW_DIR/.." && pwd)"
 ROOT_DIR="$(cd "$SPARK_DIR/.." && pwd)"
 
 EXP="${1:?usage: run.sh EXPERIMENT [OUT_DIR]}"
-OUT="${2:-/tmp/saw-issue-99/$EXP}"
+OUT="${2:-/tmp/saw-unfold-vs-chain/$EXP}"
 
 [ -f "$HERE/e_$EXP.saw" ] || { echo "no $HERE/e_$EXP.saw" >&2; exit 2; }
 [ -f "$SAW_DIR/obj/spec/sha256_spec.bc" ] || { echo "no saw/obj/spec: run scripts/check-saw.sh --print first" >&2; exit 2; }
