@@ -57,7 +57,7 @@
 #
 # Env:
 #   GNAT_LLVM_DIR  REQUIRED: the GNAT Pro LLVM install, with bin/llvm-gcc and
-#                  bin/llvm-nm (e.g. .../gnatpro-llvm-ada/install).
+#                  bin/llvm-nm (e.g. /opt/gnat-llvm).
 #   LLVM_LINK_DIR  REQUIRED: a directory with bin/llvm-link of the LLVM
 #                  release pinned in toolchain-pins.env (LLVM_LINK_VERSION),
 #                  which must also be the LLVM of GNAT_LLVM_DIR's llvm-gcc.
@@ -224,8 +224,8 @@ UNITS_aes_spec=(
 )
 
 # sha256_spec: the SHA-256 instance of the generic SHA2.Main (its ghost
-# functions are the spec layer), with the SHA2 root (To_Bits, Ceil_Div,
-# Ceil_Mod), SHA2.Functions and SHA2.Preprocessing (H0_256), which it
+# functions are the spec layer), with the SHA2 root (To_Bits, and the
+# prelude's instances Lengths and Sequences_Of_Bits), SHA2.Functions and SHA2.Preprocessing (H0_256), which it
 # calls or reads; and the HMAC-SHA-256 spec layer, the instance
 # HMAC.SHA256 of the generic HMAC.Main, with the HMAC root (Join, Repeat,
 # Zero), whose hashes are SHA2.SHA256.Hash.
@@ -268,11 +268,18 @@ HARNESS_UNITS=(saw_soft_links.ads)
 #  - SHA-256 and HMAC: the ghost units SHA2.SHA256_Blocks, HMAC.Main and
 #    its instance HMAC.SHA256; the ghost functions of the units that also
 #    hold executable code (the SHA2 root, the SHA-256 instance of Main,
-#    SHA256_Bytes, SHA256_Stream, the HMAC root, HMAC.SHA256_Impl); and
-#    every lemma (`__lemma_`), wherever it is declared.
+#    SHA256_Bytes, SHA256_Stream, the HMAC root, HMAC.SHA256_Impl); the
+#    instances of the Cryptol prelude (a ghost generic, #75) in the SHA2
+#    and HMAC roots and in the SHA-256 instance of Main (since #111,
+#    SHA2.Lengths holds Ceil_Div and Ceil_Mod, and HMAC.Join calls
+#    HMAC.Byte_Words.Join); and every lemma (`__lemma_`), wherever it is
+#    declared.
 GHOST_RE_AES='foundation_spark__aes__(spec__(aes128|aes192|aes256|aes_k|cipher|dispatch|gf2|gf28|keyexpansion|main|properties|sbox)|lemmas|main_lemmas)(__|_E$|$)'
 GHOST_RE_SHA='foundation_spark__(sha2__sha256_blocks|hmac__main|hmac__sha256)(__|_E$|$)'
-GHOST_RE_SHA+='|foundation_spark__sha2__(ceil_div|ceil_mod|to_bits)$'
+GHOST_RE_SHA+='|foundation_spark__sha2__to_bits$'
+GHOST_RE_SHA+='|foundation_spark__sha2__(lengths|sequences_of_bits)__'
+GHOST_RE_SHA+='|foundation_spark__sha2__sha256__(rounds|word_sequences|blocks)__'
+GHOST_RE_SHA+='|foundation_spark__hmac__(byte_words|byte_sequences)__'
 GHOST_RE_SHA+='|foundation_spark__sha2__sha256__(w|t1|t2|step3|foldl_step3|step|small_k|n|zero|pad|word_of|parse_block|parse|foldl_step|bit|join|hash)$'
 GHOST_RE_SHA+='|foundation_spark__sha2__sha256_bytes__(byte_bit|bits_of|blocks|length_byte|padded_byte|pad_bytes|word_at|block_at|parse_bytes|word_byte|digest_bytes|hash_bytes)$'
 GHOST_RE_SHA+='|foundation_spark__sha2__sha256_stream__(models|absorbed|finished|joined|tail_blocks|tail_pad|empty)$'
@@ -441,7 +448,9 @@ KILLED_BY_CAP=137  # 128 + SIGKILL: what a scope killed by its MemoryMax returns
 
 run_saw() {  # run_saw FILE LOG: saw FILE from saw/, capped, its output in LOG; returns saw's status
   local status=0
-  (cd "$SAW_DIR" && "${CAP[@]}" saw "$1") > "$2" 2>&1 || status=$?
+  # "${CAP[@]+...}": CAP is empty without systemd-run (macOS), and bash 3.2
+  # calls an empty array unbound under set -u (#110).
+  (cd "$SAW_DIR" && "${CAP[@]+"${CAP[@]}"}" saw "$1") > "$2" 2>&1 || status=$?
   if [ "$status" -eq "$KILLED_BY_CAP" ] && [ "${#CAP[@]}" -gt 0 ]; then
     echo "!! KILLED (SIGKILL): saw $1 reached the memory cap ($SAW_MEMORY_MAX)" >> "$2"
   fi
@@ -530,7 +539,8 @@ T_TOTAL=$(( $(date +%s) - T0 ))
 
 # --- 5. the record --------------------------------------------------------------------------
 
-sha() { sha256sum "$1" | cut -d' ' -f1; }
+# sha256sum is GNU coreutils; older macOS has only shasum -a 256 (#110).
+sha() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
 
 record() {
   echo "# saw/${RESULTS##*/} -- written by scripts/check-saw.sh; do not edit."
@@ -543,7 +553,7 @@ record() {
   echo
   echo "commit      $COMMIT$DIRTY"
   echo "date        $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "host        $(uname -m), $(nproc) CPUs"
+  echo "host        $(uname -m), $(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN) CPUs"
   echo "llvm-gcc    $V_LLVM_GCC"
   echo "llvm        $V_LLVM"
   echo "llvm-link   $V_LLVM_LINK ($LLVM_LINK_TARBALL, sha256 $LLVM_LINK_SHA256)"
@@ -561,11 +571,17 @@ record() {
   done
   # The sources the front end read for the units (their ALIs' D lines),
   # each once: ours by sha256; the GNAT Pro runtime's by name and the ALI's
-  # checksum.
+  # checksum. A D line names a configuration file (-gnatec, saw/spec.adc)
+  # by its absolute path: it is recorded relative to spark/ (or, outside
+  # it, by its name alone), so that no record holds a machine's paths.
   for ali in "${ALL_ALIS[@]}"; do
     grep '^D ' "$ali"
   done | awk '!seen[$2]++' | while read -r _ file _ cksum _; do
-    src="$(find "$SPARK_DIR/src" "$SAW_DIR" -maxdepth 3 -name "$file" -print -quit)"
+    case "$file" in
+      "$SPARK_DIR"/*) src="$file" ;;
+      /*) src=""; file="${file##*/}" ;;
+      *) src="$(find "$SPARK_DIR/src" "$SAW_DIR" -maxdepth 3 -name "$file" -print -quit)" ;;
+    esac
     if [ -n "$src" ]; then
       echo "source      $(sha "$src") ${src#"$SPARK_DIR"/}"
     else

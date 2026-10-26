@@ -72,12 +72,13 @@ gf28_product_bit <- verify_spec "gf28__product_bit" []
  * Pmult_Fold and Pmult are the prelude's Polynomial_Products (instance
  * Products at {u, v} = {7, 7}), so the recursion is Products.Products (X,
  * Y, N) on Polys: the product of X with the leading N bits of the [8] Y,
- * one lemma per N in 0 .. 8, each with the lemma at N - 1 as the override
- * for its recursive call, for X and Y below 2 ** 8 (Pmult_Fold and Pmult
- * pass bytes, zero-extended):
- *   Products (X, Y, 0) = 0
+ * for X and Y below 2 ** 8 (Pmult_Fold and Pmult pass bytes,
+ * zero-extended):
  *   Products (X, Y, N) = zext (pmult x (take`{N} y))
- * Pmult (B, C) calls Products.Pmult, which calls Products at N = 8.
+ * Pmult (B, C) calls Products.Pmult, which calls Products at N = 8. The
+ * recursion has one call per level, and since #99 SAW unfolds it: one
+ * proof at N = 8 (0.06 s, against 0.88 s for a lemma per N in
+ * 0 .. 8; saw/experiments/issue-99).
  */
 let products_contract (n : Int) (rhs : Term) = do {
   x <- llvm_fresh_var "x" poly_t;
@@ -86,16 +87,9 @@ let products_contract (n : Int) (rhs : Term) = do {
   llvm_execute_func [llvm_term x, llvm_term y, llvm_term {{ `n : [32] }}];
   llvm_return (llvm_term {{ rhs (drop`{8} x : [8]) (drop`{8} y : [8]) }});
 };
-products_0 <- verify_spec "gf28__products__products" [] (products_contract 0 {{ \(b : [8]) (c : [8]) -> 0 : [16] }})
-                rme "rme" "N = 0: \\x y -> 0";
-rec products_lemmas (n : Int) (prev : LLVMSpec) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "gf28__products__products" [prev]
-             (products_contract n {{ \(b : [8]) (c : [8]) -> zext (pmult b (take`{n} c)) : [16] }})
-             rme "rme" (str_concat (str_concat "N = " (show n)) ": \\x y -> zext (pmult x (take`{N} y))");
-  if eval_bool {{ `n == (8 : Integer) }} then return lemma
-  else products_lemmas (eval_int {{ `n + 1 : [32] }}) lemma;
-};
-products_8 <- products_lemmas 1 products_0;
+products_8 <- verify_spec "gf28__products__products" []
+                (products_contract 8 {{ \(b : [8]) (c : [8]) -> zext (pmult b (take`{8} c)) : [16] }})
+                rme "rme" "N = 8, unfolded: \\x y -> zext (pmult x (take`{N} y))";
 
 /*
  * Pmult = Cryptol's pmult at [8] -> [8] -> [15], held in a Poly.
@@ -119,10 +113,12 @@ gf28_reduce <- verify_spec "gf28__reduce" []
 
 /*
  * Pmod_Fold (X, Y, N): the first N steps of pmod x y, the remainder
- * modulo the [9] Y of the leading N bits of the [15] X, one lemma per N
- * in 0 .. 15, each with the lemma at N - 1 and Reduce's as overrides:
+ * modulo the [9] Y of the leading N bits of the [15] X, with Reduce's and
+ * Product_Bit's lemmas as overrides:
  *   Pmod_Fold (X, Y, N) = pmod (take`{N} x) y
- * under the precondition 256 <= Y < 512.
+ * under the precondition 256 <= Y < 512. One call per level: since #99
+ * SAW unfolds it, one proof at N = 15 (0.19 s, against 1.65 s for a
+ * lemma per N in 0 .. 15; saw/experiments/issue-99).
  */
 let pmod_fold_contract (n : Int) (rhs : Term) = do {
   x <- llvm_fresh_var "x" poly_t;
@@ -131,14 +127,9 @@ let pmod_fold_contract (n : Int) (rhs : Term) = do {
   llvm_execute_func [llvm_term x, llvm_term y, llvm_term {{ `n : [32] }}];
   llvm_return (llvm_term {{ rhs x y }});
 };
-rec pmod_folds (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "gf28__pmod_fold" (concat prev [gf28_reduce, gf28_product_bit])
-             (pmod_fold_contract n {{ \(x : [16]) (y : [16]) -> pmod (take`{n} (drop`{1} x : [15])) (drop`{7} y : [9]) }})
-             rme "rme" (str_concat (str_concat "N = " (show n)) ": \\x y -> pmod (take`{N} (drop`{1} x : [15])) (drop`{7} y : [9]), 256 <= y < 512");
-  if eval_bool {{ `n == (15 : Integer) }} then return lemma
-  else pmod_folds (eval_int {{ `n + 1 : [32] }}) [lemma];
-};
-pmod_fold_15 <- pmod_folds 0 [];
+pmod_fold_15 <- verify_spec "gf28__pmod_fold" [gf28_reduce, gf28_product_bit]
+                  (pmod_fold_contract 15 {{ \(x : [16]) (y : [16]) -> pmod (take`{15} (drop`{1} x : [15])) (drop`{7} y : [9]) }})
+                  rme "rme" "N = 15, unfolded: \\x y -> pmod (take`{N} (drop`{1} x : [15])) (drop`{7} y : [9]), 256 <= y < 512";
 
 /*
  * Pmod = Cryptol's pmod at [15] -> [9] -> [8].

@@ -89,16 +89,17 @@ let verify_parse (nb : Int) (word_of : LLVMSpec) =
 
 /*
  * Foldl_Step (H, Ms, N) = foldl step h (take`{N} ms) for Ms of nt blocks
- * and each N in 0 .. nt, with the lemma at N - 1 and Step's as the
- * overrides, and z3 with step uninterpreted. H is read-only (Hash passes
- * the constant H0); Ms and its bounds are writable and stated unchanged
- * (Parse leaves them on the secondary stack).
+ * at N = nt, with Step's lemma as the override, and z3 with step
+ * uninterpreted. H is read-only (Hash passes the constant H0); Ms and its
+ * bounds are writable and stated unchanged (Parse leaves them on the
+ * secondary stack).
  *
  * Since #75 the recursion is the prelude's: Foldl_Step (H, Ms, N) calls
  * the SHA-256 Blocks.Foldl_Take (H, Ms, N) (Cryptol.Folds), with the same
- * arguments, which recurses on N. So these lemmas are Foldl_Take's, with
- * Foldl_Step's contract, and Hash reaches them through Foldl_Step, which
- * SAW executes.
+ * arguments, which recurses on N, one call per level. So this lemma is
+ * Foldl_Take's, with Foldl_Step's contract, and Hash reaches it through
+ * Foldl_Step, which SAW executes. Since #99 SAW unfolds the recursion: one
+ * proof at N = nt, where there was a lemma per N in 0 .. nt.
  */
 let block_vector_bounds_t = bits_bounds_t;
 let foldl_step_contract (nt : Int) (n : Int) = do {
@@ -115,14 +116,11 @@ let foldl_step_contract (nt : Int) (n : Int) = do {
   llvm_points_to msb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `nt - 1 : [128] }}]);
   llvm_return (llvm_term {{ foldl step h (take`{n} ms) }});
 };
-rec foldl_step_lemmas (nt : Int) (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
-  lemma <- verify_spec "sha256__blocks__foldl_take" (concat prev [i_step]) (foldl_step_contract nt n)
-             (w4_unint_z3 ["step"]) "w4_unint_z3 step"
-             (str_concat (str_concat (str_concat (str_concat "Ms of " (show nt)) " blocks, N = ") (show n))
-                ": foldl SHA256Main::step h (take`{N} ms) (Main.cry's hash's foldl)");
-  if eval_bool {{ `n == `nt }} then return lemma
-  else foldl_step_lemmas nt (eval_int {{ `n + 1 : [32] }}) [lemma];
-};
+let verify_foldl_step (nt : Int) =
+  verify_spec "sha256__blocks__foldl_take" [i_step] (foldl_step_contract nt nt)
+    (w4_unint_z3 ["step"]) "w4_unint_z3 step"
+    (str_concat (str_concat (str_concat (str_concat "Ms of " (show nt)) " blocks, N = ") (show nt))
+       ", unfolded: foldl SHA256Main::step h (take`{N} ms) (Main.cry's hash's foldl)");
 
 /*
  * Hash (M) = SHA256Main's hash`{l} M (Main.cry:55, [FIPS-PUB-180-4

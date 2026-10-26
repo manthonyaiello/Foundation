@@ -683,9 +683,11 @@ against Cryptol's built-in through the FFI (`FFI.Prelude`), through the
 spec layers' own instances where there are some: 22 properties, `:exhaust`
 where the domain allows. A fold takes a function, which C cannot pass, so
 the shims fold fixed ones whose result depends on the order of the
-elements. SAW does not prove the prelude on its own; the spec-layer SAW
-proofs of SHA-2 and HMAC go through its instances (their lemmas now name
-the instances' recursions).
+elements. The spec-layer SAW proofs go through its instances (their
+lemmas name the instances' recursions), and since #75's item 3 SAW also
+proves each instance the spec layers call on its own, at the sizes they
+call it at, against the Cryptol built-in it states (`saw/aes_spec_prelude.saw`,
+`saw/sha256_spec_prelude.saw`; "SAW", "The spec layer", below).
 
 ## Coverage
 
@@ -1746,14 +1748,34 @@ M4.4 (#59) proves the ghost spec layer equal to the NSA Cryptol, with
   call (`noinline`) and changes nothing else. The implementation's builds
   keep the check that no ghost symbol appears; the spec modules must
   define them instead.
-- **Recursions are never unfolded.** A recursive ghost function whose
-  variant is a size is proved one index at a time, each lemma with the
-  lemmas at the smaller indices it calls as overrides: the GF(2^8) and
-  GF(2) folds per bit count, the cipher folds per number of round keys,
-  `KeyExpansion`'s `W` per index (44, 52 and 60 lemmas at k = 128, 192,
-  256), SHA-2's `W` per index (64) and `Foldl_Step3` per round count (65),
-  `To_Bits` per width, `Word_Of` per bit count, `Foldl_Step` per block
-  count. GF2's `Inner` (pgcd's `inner`) recurses on a value, the degree of
+- **Recursions: unfolded where that is cheaper, a lemma per index where
+  not** (#99). A recursive ghost function whose variant is a size is
+  either proved once, at the size its caller uses, with SAW unfolding the
+  recursion (the overrides are those of the calls each level makes), or
+  one index at a time, each lemma with the lemmas at the smaller indices
+  it calls as overrides. Until #99 every recursion was proved per index;
+  #69 measured that for the linear ones unfolding is 10 to 30 times
+  cheaper (`Rounds.Foldl` 2.4 s unfolded against 23.2 s for its 65
+  lemmas, `To_Bits` 1.4 s against 43.8 s), and #99 measured each linear
+  recursion both ways (`saw/experiments/issue-99/`,
+  `results-2026-10-23.txt` there). **Unfolded:** SHA-2's `Rounds.Foldl`
+  (`Foldl_Step3`, 2.4 s against 25.9 s), `Literal` (`To_Bits`, 1.5 s
+  against 48.0 s, at each of its stack states), `Blocks.Foldl_Take`
+  (`Foldl_Step`, 0.13 s against 0.46 s at 2 blocks), and GF(2^8)'s
+  `Products` (0.06 s against 0.88 s) and `Pmod_Fold` (0.19 s against
+  1.65 s). **Per index**, because unfolded the goal is dearer: the
+  recursions with more than one call, `KeyExpansion`'s `W` (I - 1 and
+  I - Nk: unfolded it grows 1.38 times per index, some 35 minutes for
+  `KeyExpansion` against 16 s for its 44 lemmas at k = 128; 44, 52 and 60
+  lemmas at k = 128, 192, 256) and SHA-2's `W` (four calls; 64 lemmas,
+  about what one unfolded `W` at 63 costs); and three linear ones where
+  the solver's goal grows faster than the lemmas: `Word_Of` (a symbolic
+  index at every level: 230 s unfolded at Count = 8 against 179.5 s for
+  all 33 lemmas), the cipher folds (z3 with the round uninterpreted:
+  `Round`'s 24.3 s unfolded at M = 13 against 14.2 s for its 14 lemmas,
+  and 8.2 s against 7.2 s even at M = 9), and GF(2)'s `Pmod_Fold` and
+  `Pdiv_Fold` (rme: 34.1 s each unfolded against 12.5 s for both
+  chains). GF2's `Inner` (pgcd's `inner`) recurses on a value, the degree of
   `r'`, not on a size, and with a symbolic byte SAW's evaluation of the
   Cryptol's `inner` does not terminate: `Pgcd`, `Inverse` and `Affine` are
   proved on each of the 256 bytes, one `llvm_verify` per byte, which
@@ -1784,7 +1806,7 @@ AES (`aes_spec.saw`, with `aes_spec_gf.saw`, `aes_spec_cipher.saw`,
 | `Types.Nk`, `.Nr`, `.Split`, `.Join` | as for the implementation | | | z3, rme |
 | `Cipher.SubBytes` to `.InvMixColumns`, `.AddRoundKey` | `Cipher.cry`, each | | `Dot`; the column step, `Split`, `Join` | rme |
 | `Cipher.Round`, `.InvRound`, `.InvRound_Prime` | `Round`, `InvRound`, `InvRound'` | | their four steps | rme; z3 for `InvRound'` |
-| `Cipher.Round_Folds.Foldl_Take`, `.InvRound_Folds.`, `.InvRound_Prime_Folds.` (#75: the recursion of `Foldl_Round` and the others) | ``foldl Round z (take`{N} xs)`` and the others | N = 0 .. M at M = 9, 11, 13 round keys; `Round`'s with the slice's bounds a read-only constant (`Cipher` passes `W (1 .. Nr - 1)`), the inverse rounds' writable (the reversed keys, on the secondary stack) | N - 1, the round | z3, the round uninterpreted |
+| `Cipher.Round_Folds.Foldl_Take`, `.InvRound_Folds.`, `.InvRound_Prime_Folds.` (#75: the recursion of `Foldl_Round` and the others) | ``foldl Round z (take`{N} xs)`` and the others | N = 0 .. M at M = 9, 11, 13 round keys (not unfolded: #99 measured it dearer); `Round`'s with the slice's bounds a read-only constant (`Cipher` passes `W (1 .. Nr - 1)`), the inverse rounds' writable (the reversed keys, on the secondary stack) | N - 1, the round | z3, the round uninterpreted |
 | `AES128.Cipher`, `AES192.`, `AES256.` | ``Cipher`{k}`` | 128, 192, 256 (one instance each) | the fold, `SubBytes`, `ShiftRows`, `AddRoundKey` | z3, the four uninterpreted |
 | `Cipher.Reverse_Keys` | `reverse` | 9, 11, 13 round keys | | z3 |
 | `AES<k>.InvCipher`, `.InvCipher_Prime` | ``InvCipher`{k}``, ``InvCipher'`{k}`` | 128, 192, 256 | the fold, the steps (`Reverse_Keys` executed) | z3, the round and steps uninterpreted |
@@ -1829,17 +1851,17 @@ moved.
 | `SHA2.Functions.SIGMA_256_0/1`, `Small_Sigma_256_0/1`; `Logical.Ch`, `.Maj` | `Functions.cry` | | | rme |
 | `W` | `Ws m @ t` (`SHA256Step.cry`: `step`'s `W@t`) | T = 0 .. 63 | the lemmas below T (SAW applies those at T - 2, T - 7, T - 15, T - 16), the sigmas | z3, the four sigmas uninterpreted |
 | `T1`, `T2`, `Step3` | `SHA256Step.cry`: `step3`'s `T1`, `T2`, and `step3` | each T: 64, 1, 64 | `W` at T, the sigmas, `Ch`, `Maj`; `T1` at T, `T2` | z3, sigmas uninterpreted |
-| `Rounds.Foldl` (#75: `Foldl_Step3`'s recursion), then `Foldl_Step3` at 64 | `foldl (step3 m) h [0 ..< N]` | N = 0 .. 64 | N - 1, `Step3` at N - 1; `Rounds.Foldl` at 64 | z3, sigmas uninterpreted |
+| `Rounds.Foldl` (#75: `Foldl_Step3`'s recursion), then `Foldl_Step3` at 64 | `foldl (step3 m) h [0 ..< N]` | N = 64, unfolded (#99) | `Step3` at each round; `Rounds.Foldl` at 64 | z3, sigmas uninterpreted |
 | `"+"`, `Step` | `+` on `[8][32]`; **`Main.cry`: `step`** | | `Foldl_Step3` at 64, `"+"` | z3, sigmas uninterpreted |
 | `Small_K` | `hash`'s `type k = (l + 1 + 2 * w) %^ m` | each length | | z3 |
 | `Zero` | `zero : [k]` | each k (7 values) | | z3 |
-| `SHA2.Sequences_Of_Bits.Literal` (#75: `SHA2.To_Bits`'s recursion) | ``drop`{128 - W} v``, `pad`'s ``(`l : [64])`` | W = 0 .. 64, for each k | W - 1 | z3 |
+| `SHA2.Sequences_Of_Bits.Literal` (#75: `SHA2.To_Bits`'s recursion) | ``drop`{128 - W} v``, `pad`'s ``(`l : [64])`` | W = 64, unfolded (#99), for each k | | z3 |
 | **`Pad`** | `Preprocessing.cry`: ``pad`{512, 32, l, k}`` | all twelve lengths | `Small_K`, `Zero`, `To_Bits` at 64 | z3 |
 | `Word_Sequences.Value` (#75: `Word_Of`'s recursion) | ``zext (take`{Count} (p << first))`` (a word of `parse`) | Count = 0 .. 32, P of 512 and 1024 bits | Count - 1 | yices |
 | **`Parse`** (#67 item 3) | `Preprocessing.cry`: ``parse`{32, N}`` | N = 1, 2 blocks; with `SAW_LONG=1` also 3, 4 | `Word_Of` at 32 for 512 N bits (`Parse_Block`, `Split_At` executed) | z3 |
-| `Blocks.Foldl_Take` (#75: `Foldl_Step`'s recursion) | ``foldl step h (take`{N} ms)`` | N = 0 .. 1 of 1 block, 0 .. 2 of 2 | N - 1, `Step` | z3, `step` uninterpreted |
+| `Blocks.Foldl_Take` (#75: `Foldl_Step`'s recursion) | ``foldl step h (take`{N} ms)`` | N = 1 of 1 block, 2 of 2 (with `SAW_LONG=1` also 3 of 3, 4 of 4), unfolded (#99) | `Step` | z3, `step` uninterpreted |
 | **`Hash`** | `Main.cry`: ``hash`{l}`` | 0, 1, 55, 56, 63, 64, 65, 100, 119 bytes; with `SAW_LONG=1` also 120, 128, 200 | `Pad`, `Word_Of` at 32, `Foldl_Step` (`Parse`, `Parse_Block`, `Join`, `Bit` executed) | z3, `step` uninterpreted |
-| `Hash` (for HMAC), with its `Pad`, `Zero`, `To_Bits` chain | as above | at each base of the secondary stack where HMAC calls it (below) | as above | as above |
+| `Hash` (for HMAC), with its `Pad`, `Zero`, `To_Bits` | as above | at each base of the secondary stack where HMAC calls it (below) | as above | as above |
 | `HMAC.SHA256.HMAC_init` | `saw/HMACInit.cry` (ours: a copy of `HMAC/Main.cry`'s private `HMAC_init`): ``HMAC_init`{64, k, 32} hash`` | each key length HMAC is proved at, at the two stack bases HMAC calls it at | for k > 64, `Hash` at 8k bits, its message on the secondary stack | z3 (k > 64: `step` uninterpreted) |
 | **`HMAC.SHA256.HMAC`** | **`HMAC/Main.cry`: ``HMAC`{256, 64, k, n, 32} hash hash hash``** (Hash.cry's `HMAC` at SHA-256) | (key, text) = (32, 3), (64, 32), (65, 3) bytes (one per case of `HMAC_init`); with `SAW_LONG=1` also (0, 0), (32, 32), (64, 3), (100, 32); λ = 256 | `HMAC_init` twice, `Hash` (Hn at 512 + n bits, HL at 768) | z3, `step` uninterpreted (at (0, 0): none; with `step` uninterpreted z3 reports a spurious counterexample there, as for `Hash` at 0) |
 
@@ -1859,7 +1881,7 @@ and `HL`, each leaving its result on the secondary stack (the `xor`s and
 `&`s are on the primary stack), and allocates its result last; a long key's
 `HMAC_init` calls `Join (K)`, `Hk` on that result, and `Zero`. An override
 applies only where the stack's `Top` is the one its contract states, so
-each hash's lemma, with `Pad`, `Zero` and the `To_Bits` chain under it
+each hash's lemma, with `Pad`, `Zero` and `To_Bits` under it
 (`Word_Of` and `Foldl_Step` take no stack), is proved at the base where
 that call happens (`results.txt`: "the secondary stack at N bytes"), and
 `HMAC_init`'s at its two. A lemma's message is in one of three places
@@ -1876,23 +1898,54 @@ it text for text, the spec's `HMAC_init` is proved against the copy, and
 overrides, which ties the copy to `Main.cry` (as `Step` ties
 `SHA256Step.cry`).
 
-**Measured** (`results.txt`, the default run at `937e485` on the x86_64
-IOD, 2026-10-21): 2800 proofs of the spec layer, 1137 of AES (768 of them
-the exhaustive `Pgcd`, `Inverse` and `Affine`, recorded as three
-`RESULTS 256` lines; 108 the fold lemmas, `Foldl_Take` at N = 0 .. M for
-M = 9, 11, 13 and each of the three rounds) and 1663 of SHA-256 and HMAC
-(1396 of them in the lax-arithmetic load; `Parse` at 1 and 2 blocks, 4 s
-and 15 s, are the two added by #67), with 12 negative controls of the
-spec layer failing as they must. `aes_spec.saw` takes 393 s,
-`sha256_spec.saw` 2337 s (most of it the `To_Bits` chains, 15 of them,
-and `Word_Of`), the whole `check-saw.sh` 3516 s. At `65ee4c2`, before
-#67's `Parse`: 2798, 3707 s. Before #75 and #80 (at
-`d874133`): 2742, of which AES 1083 and SHA-256 and HMAC 1659; peak
-memory then 3.8 GB. `SAW_LONG=1` (`results-long.txt`, at `a3e7c74`): 3582
-proofs of the spec layer (2178 lax; `Parse` at 1 to 4 blocks, 4, 15, 33
-and 53 s), `sha256_spec.saw` 6523 s, the whole 7708 s (at `a4ea138`,
-before #67's `Parse`: 3578, 7857 s; before #75, at `c31472e`: 3522, 7784 s, peak 7.2 GB; below, "Running
-it").
+**The prelude's instances on their own** (#75 item 3;
+`saw/aes_spec_prelude.saw` and `saw/sha256_spec_prelude.saw`, each
+included last by its module's script). The proofs above execute the
+Cryptol prelude's instances (README "The Cryptol prelude"), or take their
+recursions' lemmas as overrides. These prove each instance a spec layer
+calls by itself, at the sizes it is called at, against the Cryptol
+built-in it states:
+
+| instance (generic) | Cryptol built-in | sizes | overrides | tactic |
+|---|---|---|---|---|
+| GF28's `Byte_Bits`, `Product_Bits`, GF2's `Poly_Bits`, `Main.Byte_Bits.Word_Bits` (`Words`): `Bit`, `Head` | `x @ j`, `head x` | `[8]` in a byte, `[15]` and `[9]` in a `Poly`, `[8]` | | z3, rme |
+| `GF28.Products.Pmult` (`Polynomial_Products`) | `pmult` | `[8] x [8] -> [15]` | `Products` at 8 | rme |
+| `Cipher.Table_Indexing.Bulk_Index`, `Cipher.Block_Indexing.Bulk_Index` (`Bulk_Indexing`) | `xs @@ is` | `[256][8] @@ [16][8]`, any table; `[16][8] @@` 16 indices below 16, any permutation | | z3 |
+| `Cipher.Round_Folds.Foldl`, `.InvRound_Folds.`, `.InvRound_Prime_Folds.` (`Folds`) | `foldl f z xs` | M = 9, 11, 13 round keys | `Foldl_Take` at M | z3, the round uninterpreted |
+| `Cipher.Key_Sequences.Reverse_Of` (`Sequences`) | `reverse` | 9, 11, 13 round keys | | z3 |
+| `Main.Byte_Bits.Join`, `.Split_At` (`Join_Split`) | `join`, `split` | 16 bytes; 128, 192, 256 bits | | z3 |
+| `SHA2.Lengths.Ceil_Div`, `.Ceil_Mod` (`Numeric`) | `` `(a /^ b) ``, `` `(a %^ b) `` (type operators, so constants) | A = l + 65, B = 512, at the 14 lengths l `Hash` and HMAC's hashes are proved at | | z3 |
+| `SHA2.Sequences_Of_Bits.Zero`, `.Literal` (`Bit_Sequences`) | `zero : [n]`; the `[64]` literal of `v`, ``drop`{64} v`` | the 9 counts `Pad` and `HMAC_init` use; W = 64, unfolded | | z3 |
+| SHA-256's `Word_Sequences.Word_Bits.Bit`, `HMAC.Byte_Words.Word_Bits.Bit` (`Words`) | `x @ j` | `[32]`, `[8]` | | z3 |
+| SHA-256's `Word_Sequences.Join`, `.Split_At`; `HMAC.Byte_Words.Join` (`Join_Split`) | `join`, `split` | `[8][32]`; 512 and 1024 bits (with `SAW_LONG=1` also 1536, 2048), `Split_At` at each word index, as `Parse_Block` calls it (one `RESULTS` line per length; with the index symbolic the proof reached the 10G cap); keys of 0, 32, 64, 65, 100 bytes | `Value` at 32 for `Split_At` | z3 |
+| `HMAC.Byte_Sequences.Repeat` (`Sequences`) | `repeat` | `[64][8]` | | z3 |
+
+The recursions `Folds.Foldl_Take`, `Enumeration_Folds.Foldl` and
+`Polynomial_Products.Products` are proved in the tables above, against
+`foldl` and `pmult`. `Join_Split.Value`, the conversion from bits to a
+word, is not a Cryptol built-in: it is proved per bit count for SHA-256
+(`Word_Of`, above) and executed within `Split_At`'s proofs for AES.
+
+**Measured** (`results.txt`, the default run at `82b10e6` on the x86_64
+instance, 2026-10-23, after #99 and #75's item 3): 1808 proofs of the spec
+layer, 1141 of AES (768 of them the exhaustive `Pgcd`, `Inverse` and
+`Affine`, recorded as three `RESULTS 256` lines; 108 the cipher folds'
+lemmas, `Foldl_Take` at N = 0 .. M for M = 9, 11, 13 and each of the three
+rounds; 27 the prelude's instances on their own) and 667 of SHA-256 and
+HMAC (419 of them in the lax-arithmetic load; 95 the prelude's
+instances, 48 of them `Split_At` index by index), with 12 negative
+controls of the spec layer failing as they must. `aes_spec.saw` takes
+648 s (226 s of it the prelude's `@@` on a symbolic table),
+`sha256_spec.saw` 1385 s (most of it `Word_Of`), the whole
+`check-saw.sh` 2749 s. Before #99 (`5bf56ac`): 2800 proofs of the spec
+layer (AES 1137, SHA-256 and HMAC 1663, most of the difference the 975
+`To_Bits` lemmas, now 15 unfolded proofs), 3543 s; the same scripts at
+`6023e8a`, re-run on 2026-10-23 before this change, 3686 s. Before #75
+and #80 (at `d874133`): 2742; peak memory then 3.8 GB. `SAW_LONG=1`
+(`results-long.txt`, at `82b10e6`): 2055 proofs of the spec layer (666
+lax), `sha256_spec.saw` 4899 s, the whole 6257 s; before #99 (at
+`babab6f`) 3582, 7819 s (before #75, at `c31472e`: 3522, 7784 s, peak
+7.2 GB; below, "Running it").
 
 **Why the spec layer costs about 76 times the implementation** (#69;
 `.claude/campaign/measurements/2026-10-22-saw-cost.md`, experiments in
@@ -1921,11 +1974,11 @@ this says about checking a C-to-SPARK translation.
   "What SAW proves on its own, in place, or not at all").
 - HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and (100, 32) bytes
   only with `SAW_LONG=1`: each call of a hash is at a secondary-stack base
-  of its own, and each base costs `Pad`'s `To_Bits` chain again (65
-  lemmas, about 70 s); the default run proves one length per case of
+  of its own, and each base costs `Hash`'s lemma and those under it
+  (`Pad`, `Zero`, `To_Bits`) again; the default run proves one length per case of
   `HMAC_init`. HMAC at other lengths, or λ < 256: not attempted.
 - On their own: `Parse_Block`, `Join` and `Bit` (executed within
-  `Hash`, and `Parse_Block` within `Parse`'s own results), `Ceil_Div` and `Ceil_Mod` (within `Small_K`), GF2's `Inner`,
+  `Hash`, and `Parse_Block` within `Parse`'s own results), GF2's `Inner`,
   `Inner_Step`, `Inner_Next`, `Sub_Mult`, `Term`, `Lead`, `Reduce` and
   `Bit` (within `Pgcd` and the folds; `Inner` and the rest are pgcd's
   locals, with no Cryptol name), `SBox.Reversed_Bit` and `Affine_Bit`,
@@ -2133,11 +2186,12 @@ layer alone, with the `spec_*` controls. A one-layer run is never a
 record: the script requires `--print` with it, and prints its
 `layers` line.
 
-**What the default run proves, and `SAW_LONG`.** The default run (about
-an hour on the x86_64 IOD) proves everything above but `Hash` at 120, 128
-and 200 bytes and HMAC at (key, text) = (0, 0), (32, 32), (64, 3) and
-(100, 32) bytes; `SAW_LONG=1` adds those (`Word_Of`'s lemmas for 1536 and
-2048 bits, `Foldl_Step` at 3 and 4 blocks, and four more HMAC lengths
+**What the default run proves, and `SAW_LONG`.** The default run (2749 s
+on the x86_64 instance, `results.txt`) proves everything above but `Hash`
+at 120, 128 and 200 bytes and HMAC at (key, text) = (0, 0), (32, 32),
+(64, 3) and (100, 32) bytes; `SAW_LONG=1` (6257 s) adds those (`Word_Of`'s
+lemmas for 1536 and 2048 bits, `Foldl_Step` at 3 and 4 blocks, the
+prelude's `Split_At` at those lengths, and four more HMAC lengths
 with their hashes' lemmas at their stack bases) and records the run in
 `saw/results-long.txt`. Each record's `options` line says which it was.
 

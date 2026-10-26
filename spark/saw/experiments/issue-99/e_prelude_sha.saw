@@ -1,0 +1,23 @@
+/*
+ * #75 item 3, a trial run of saw/sha256_spec_prelude.saw: the definitions
+ * of the SHA-256 spec scripts it rests on, Word_Of's lemmas for 1 and 2
+ * blocks (Split_At's overrides), then the prelude's proofs, as
+ * sha256_spec.saw runs them by default (saw_long false).
+ */
+include "sha256_spec_common.saw";
+let verify_spec = verify_spec_lax;
+include "sha256_spec_step.saw";
+include "sha256_spec_pad.saw";
+include "sha256_spec_hash.saw";
+let saw_long = false;
+i_word_of_1 <- word_of_lemmas 512 0 [];
+i_word_of_2 <- word_of_lemmas 1024 0 [];
+let i_word_of_3 = i_word_of_2;
+let i_word_of_4 = i_word_of_2;
+/* Named by sha256_spec_hmac.saw's functions, which this trial does not call. */
+let i_foldl_step_1 = i_step;
+let i_foldl_step_2 = i_step;
+include "sha256_spec_hmac.saw";
+print "== sha256_spec_prelude.saw";
+include "sha256_spec_prelude.saw";
+print "== done";

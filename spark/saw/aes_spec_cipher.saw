@@ -66,7 +66,8 @@ c_invround_prime <- verify_spec "cipher__invround_prime" [c_addroundkey, c_invmi
  * SubBytes and InvSubBytes now call Table_Indexing.Bulk_Index, and
  * ShiftRows and InvShiftRows Block_Indexing.Bulk_Index (the prelude's @@,
  * #75): their contracts above are unchanged, and SAW executes the
- * instances. Reverse_Keys stays inline (#75).
+ * instances. Since #111 Reverse_Keys calls the prelude's
+ * Key_Sequences.Reverse_Of (below).
  */
 c_foldl_round <- foldls true "cipher__round_folds__foldl_take" c_round {{ Round }} "Round";
 c_foldl_invround <- foldls false "cipher__invround_folds__foldl_take" c_invround {{ InvRound }} "InvRound";
@@ -97,7 +98,11 @@ c_cipher_256 <- verify_spec_cipher 256 14;
  * Reverse_Keys = Cryptol's reverse at [m]Block, at the lengths InvCipher
  * and InvCipher' reverse (Nr - 1 = 9, 11, 13), with bounds {1, m}. The
  * result is on the secondary stack (README "SAW", "The secondary
- * stack"), whose SS_Allocate (GNAT Pro's) is executed.
+ * stack"), whose SS_Allocate (GNAT Pro's) is executed. Since #111
+ * Reverse_Keys calls the prelude's Key_Sequences.Reverse_Of (Sequences),
+ * executed: it returns Reverse_Of's fat pointer as it is, with no copy
+ * (GNAT-LLVM 27's IR), so the contract, and InvCipher's stack, are as
+ * before.
  */
 let verify_reverse_keys (m : Int) =
   verify_spec "cipher__reverse_keys" [] (reverse_keys_contract m) z3 "z3"

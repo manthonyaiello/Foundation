@@ -1,0 +1,185 @@
+/*
+ * The Cryptol prelude in SPARK (spark/src/cryptol/, #75), as the AES spec
+ * layer instantiates it, proved on its own against Cryptol's built-ins
+ * (#75 item 3). Included by aes_spec.saw last, after the other
+ * aes_spec_*.saw files, whose lemmas it uses as overrides.
+ *
+ * The spec layer's own proofs execute these instances (or take their
+ * lemmas as overrides), so each is already checked through its caller.
+ * Here each is proved by itself, at the types and sizes AES uses it,
+ * against the built-in the prelude states it from (README "The Cryptol
+ * prelude"): `@` and `head` on a word (Words), `pmult` (Polynomial_
+ * Products), `@@` (Bulk_Indexing), `foldl` (Folds), `reverse` (Sequences),
+ * and `join` and `split` between bytes and bits (Join_Split). The
+ * recursions of Folds.Foldl_Take and Products.Products are proved in
+ * aes_spec_cipher.saw and aes_spec_gf.saw; their lemmas are the overrides
+ * of Foldl and Pmult here. Join_Split.Value, the conversion from bits to
+ * a word that Cryptol needs no name for, is not a built-in: it is
+ * executed within Split_At's proofs.
+ *
+ * Cryptol.cry's line numbers are Cryptol 3.6.0's (README "The Cryptol
+ * prelude").
+ */
+
+/* --- Words: `@` and `head` on a word (Cryptol.cry:900, :855) -------------- */
+
+/*
+ * Bit (X, J) = x @ j and Head (X) = head x on a [w] held in an integer of
+ * the instance's Word: GF28's Byte_Bits at [8] in a Byte, Product_Bits at
+ * [15] in a Poly (i16), GF2's Poly_Bits at [9] in a Poly, and Spec.Main's
+ * Byte_Bits.Word_Bits at [8]. The [w] is the low w bits of the word.
+ * Booleans are i8, 0 or 1.
+ */
+let words_bit_contract (iw : Int) (w : Int) = do {
+  x <- llvm_fresh_var "x" (llvm_int iw);
+  j <- llvm_fresh_var "j" (llvm_int 32);
+  llvm_precond {{ j < `w }};
+  llvm_execute_func [llvm_term x, llvm_term j];
+  llvm_return (llvm_term {{ if (drop`{iw - w} x : [w]) @ j then 1 else 0 : [8] }});
+};
+let words_head_contract (iw : Int) (w : Int) = do {
+  x <- llvm_fresh_var "x" (llvm_int iw);
+  llvm_execute_func [llvm_term x];
+  llvm_return (llvm_term {{ if head (drop`{iw - w} x : [w]) then 1 else 0 : [8] }});
+};
+let verify_words (inst : String) (iw : Int) (w : Int) = do {
+  verify_spec (str_concat inst "__bit") [] (words_bit_contract iw w) z3 "z3"
+    (str_concat (str_concat (str_concat (str_concat "\\x j -> x @ j at [" (show w)) "] in an i") (show iw)) ", j < w");
+  verify_spec (str_concat inst "__head") [] (words_head_contract iw w) rme "rme"
+    (str_concat (str_concat (str_concat (str_concat "\\x -> head x at [" (show w)) "] in an i") (show iw)) "");
+  return ();
+};
+verify_words "gf28__byte_bits" 8 8;
+verify_words "gf28__product_bits" 16 15;
+verify_words "gf2__poly_bits" 16 9;
+verify_words "main__byte_bits__word_bits" 8 8;
+
+/* --- Polynomial_Products: pmult (Cryptol.cry:1005) ------------------------ */
+
+/*
+ * GF28's Products.Pmult (X, Y) = pmult x y at [8] x [8] -> [15] (the
+ * instance at {u, v} = {7, 7}), held in a Poly, for X and Y below 2 ** 8.
+ * It calls Products at N = 8, whose lemma (aes_spec_gf.saw) is the
+ * override.
+ */
+verify_spec "gf28__products__pmult" [products_8]
+  (do {
+     x <- llvm_fresh_var "x" poly_t;
+     y <- llvm_fresh_var "y" poly_t;
+     llvm_precond {{ x < 256 /\ y < 256 }};
+     llvm_execute_func [llvm_term x, llvm_term y];
+     llvm_return (llvm_term {{ zext (pmult (drop`{8} x : [8]) (drop`{8} y : [8])) : [16] }});
+   }) rme "rme" "\\x y -> zext (pmult x y) at [8] x [8] -> [15], x, y < 256";
+
+/* --- Bulk_Indexing: `@@` (Cryptol.cry:906) --------------------------------- */
+
+/*
+ * Table_Indexing.Bulk_Index (Xs, Ixs) = xs @@ ixs at [256][8] @@ [16][8]
+ * (SubBytes' and InvSubBytes' SBox @@ bs), the table by reference and
+ * any table, not only the S-boxes; and Block_Indexing.Bulk_Index at
+ * [16][8] @@ [16]Block_Index (ShiftRows' bs @@ indices), the indices by
+ * reference, i32, each below 16, and any permutation.
+ */
+verify_spec "cipher__table_indexing__bulk_index" []
+  (do {
+     xs <- llvm_fresh_var "xs" (llvm_array 256 byte_t);
+     xsp <- llvm_alloc_readonly (llvm_array 256 byte_t);
+     llvm_points_to xsp (llvm_term xs);
+     ixs <- llvm_fresh_var "ixs" block_t;
+     llvm_execute_func [xsp, llvm_term ixs];
+     llvm_return (llvm_term {{ xs @@ ixs }});
+   }) z3 "z3" "\\xs ixs -> xs @@ ixs at [256][8] @@ [16][8]";
+verify_spec "cipher__block_indexing__bulk_index" []
+  (do {
+     xs <- llvm_fresh_var "xs" block_t;
+     ixs <- llvm_fresh_var "ixs" (llvm_array 16 (llvm_int 32));
+     llvm_precond {{ all (\i -> i < 16) ixs }};
+     ixp <- llvm_alloc_readonly (llvm_array 16 (llvm_int 32));
+     llvm_points_to ixp (llvm_term ixs);
+     llvm_execute_func [llvm_term xs, ixp];
+     llvm_return (llvm_term {{ xs @@ ixs }});
+   }) z3 "z3" "\\xs ixs -> xs @@ ixs at [16][8] @@ [16][32], each index < 16";
+
+/* --- Folds: `foldl` (Cryptol.cry:1146) ------------------------------------- */
+
+/*
+ * Round_Folds.Foldl (Z, Xs) = foldl Round z xs, and InvRound_Folds' and
+ * InvRound_Prime_Folds' likewise, over the [M]Block slices Cipher,
+ * InvCipher and InvCipher' fold (M = 9, 11, 13), with the slice's bounds
+ * as foldl_take_contract has them (aes_spec_common.saw). Foldl calls
+ * Foldl_Take (Z, Xs, Xs'Length), whose lemma at N = M
+ * (aes_spec_cipher.saw) is the override.
+ */
+let verify_foldl (ro : Bool) (inst : String) (lemmas : [LLVMSpec]) (f : Term) (cry : String) (m : Int) =
+  verify_spec (str_concat inst "__foldl") lemmas
+    (do {
+       z <- llvm_fresh_var "z" block_t;
+       xs <- llvm_fresh_var "xs" (llvm_array m block_t);
+       xsp <- llvm_alloc (llvm_array m block_t);
+       llvm_points_to xsp (llvm_term xs);
+       first <- llvm_fresh_var "first" (llvm_int 32);
+       llvm_precond {{ first >= 1 /\ first <= 15 - `m }};
+       xsb <- if ro then bounds first {{ first + `m - 1 }} else slice_bounds first {{ first + `m - 1 }};
+       llvm_execute_func [llvm_term z, llvm_struct_value [xsp, xsb]];
+       llvm_points_to xsp (llvm_term xs);
+       if ro then return ()
+       else llvm_points_to xsb (llvm_struct_value [llvm_term first, llvm_term {{ first + `m - 1 }}]);
+       llvm_return (llvm_term {{ foldl f z xs }});
+     })
+    (w4_unint_z3 [cry]) (str_concat "w4_unint_z3 " cry)
+    (str_concat (str_concat (str_concat "M = " (show m)) ": foldl Cipher::") cry);
+for [9, 11, 13] (\m -> do {
+  verify_foldl true "cipher__round_folds" c_foldl_round {{ Round }} "Round" m;
+  verify_foldl false "cipher__invround_folds" c_foldl_invround {{ InvRound }} "InvRound" m;
+  verify_foldl false "cipher__invround_prime_folds" c_foldl_invround_prime {{ InvRound' }} "InvRound'" m;
+  return ();
+});
+
+/* --- Sequences: `reverse` (Cryptol.cry:828) -------------------------------- */
+
+/*
+ * Key_Sequences.Reverse_Of (Xs) = reverse xs over round keys, at the
+ * lengths InvCipher and InvCipher' reverse (M = 9, 11, 13), bounds {1, M},
+ * the result on the secondary stack: reverse_keys_contract
+ * (aes_spec_common.saw), which Reverse_Keys, its caller, is proved with.
+ */
+for [9, 11, 13] (\m ->
+  verify_spec "cipher__key_sequences__reverse_of" [] (reverse_keys_contract m) z3 "z3"
+    (str_concat (str_concat "reverse : [" (show m)) "]Block, bounds {1, M}"));
+
+/* --- Join_Split: `join` and `split` (Cryptol.cry:815, :822) ---------------- */
+
+/*
+ * Spec.Main's Byte_Bits (Join_Split at [8], AES's Bit_Index i16):
+ *  - Join (Xs) = join xs : [n][8] -> [8 n], at the block's 16 bytes
+ *    (Join_Block's), Xs a fat pointer with bounds {0, 15} (i32); the result
+ *    on the empty secondary stack, its {i16, i16} bounds then 128 bits;
+ *  - Split_At (P, K) = (split p : [n / 8][8]) @ k, word K of P, at the
+ *    lengths Split_Block and Split_Key split (128, 192, 256 bits), K
+ *    symbolic. It calls Value (P, 8 K, 8), executed.
+ */
+verify_spec "main__byte_bits__join" []
+  (do {
+     stack <- secondary_stack;
+     xs <- llvm_fresh_var "xs" block_t;
+     xsp <- llvm_alloc_readonly block_t;
+     llvm_points_to xsp (llvm_term xs);
+     xsb <- bounds {{ 0 : [32] }} {{ 15 : [32] }};
+     llvm_execute_func [llvm_struct_value [xsp, xsb]];
+     ss_post stack (ss_size 4 128);
+     llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [16] }}, llvm_term {{ 127 : [16] }}]);
+     llvm_points_to_untyped (ss_at stack 4) (llvm_term {{ [ if b then 1 else 0 | b <- join xs ] : [128][8] }});
+     llvm_return (llvm_struct_value [ss_at stack 4, ss_at stack 0]);
+   }) z3 "z3" "join : [16][8] -> [128]";
+let verify_split_at (n : Int) =
+  verify_spec "main__byte_bits__split_at" []
+    (do {
+       (bs, fp) <- fresh_bits_fp "p" n;
+       k <- llvm_fresh_var "k" bit_index_t;
+       llvm_precond {{ k < `n / 8 }};
+       llvm_execute_func [fp, llvm_term k];
+       llvm_return (llvm_term {{ (split (bits_of bs) : [n / 8][8]) @ k }});
+     }) z3 "z3" (str_concat (str_concat "\\p k -> (split p : [n / 8][8]) @ k, p : [" (show n)) "]");
+verify_split_at 128;
+verify_split_at 192;
+verify_split_at 256;

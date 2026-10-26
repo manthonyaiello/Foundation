@@ -4,7 +4,7 @@
  * The spec layer's Pad at l = 8 bits (a 1-byte message) against
  * Preprocessing.cry's pad of the message's bits complemented, with the
  * overrides of sha256_spec.saw's proof at that length (Small_K's, Zero's
- * and To_Bits' chain's lemmas, proved here as it proves them), in the
+ * and To_Bits' lemmas, proved here as it proves them), in the
  * module's load with lax arithmetic. The proof must fail with a
  * counterexample message, which shows that the Pad proofs, whose callees
  * leave their results on the secondary stack, compare the padded message
@@ -18,7 +18,7 @@ include "../sha256_spec_pad.saw";
 let k = small_k 8;
 sk <- verify_small_k 8;
 z <- verify_zero k;
-tb <- to_bits_lemmas (ss_size 32 k) (eval_int {{ 32 + `k : [64] }}) 0 [];
+tb <- to_bits (ss_size 32 k) (eval_int {{ 32 + `k : [64] }});
 verify_spec "sha256__pad" [sk, z, tb]
   (do {
      let len = eval_int {{ 8 + 1 + `k + 64 : [64] }};

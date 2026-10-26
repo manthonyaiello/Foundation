@@ -1,0 +1,66 @@
+/*
+ * #99, experiment "unfold_sha": the SHA-256 spec layer's linear
+ * recursions, each proved unfolded (as the recorded scripts now prove
+ * them) and as the per-index lemma chain the scripts proved before #99,
+ * same contracts, overrides and tactics, one after the other in one saw
+ * run, so that the two are timed on the same machine and state.
+ *
+ *  1. Rounds.Foldl at N = 64 (Step3's lemmas as overrides): unfolded is
+ *     sha256_spec_step.saw's own proof (its RESULT line); the chain is
+ *     the 65 lemmas N = 0 .. 64.
+ *  2. In the load with lax arithmetic: Literal (To_Bits) at W = 64, the
+ *     secondary stack at 48 bytes with the first 39 kept (Pad at l = 8),
+ *     unfolded against the chain W = 0 .. 64.
+ *  3. Blocks.Foldl_Take (Foldl_Step) at 1 and 2 blocks (Step's lemma as
+ *     the override), unfolded against the chain N = 0 .. nt.
+ *
+ * Each block prints "== <label>" before SAW's "Time:" lines; run.sh
+ * collects them.
+ */
+include "sha256_spec_common.saw";
+print "== (sha256_spec_step.saw, strict load)";
+include "sha256_spec_step.saw";
+
+print "== Rounds.Foldl chain, N = 0 .. 64";
+rec foldl_chain (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- llvm_verify sha256_spec (spec_symbol "sha256__rounds__foldl") (concat prev i_step3) false
+             (rounds_foldl_contract n) unint_sigmas;
+  if eval_bool {{ `n == (64 : Integer) }} then return lemma
+  else foldl_chain (eval_int {{ `n + 1 : [32] }}) [lemma];
+};
+time (foldl_chain 0 []);
+print "== Rounds.Foldl unfolded, N = 64";
+time (llvm_verify sha256_spec (spec_symbol "sha256__rounds__foldl") i_step3 false (rounds_foldl_contract 64) unint_sigmas);
+
+let verify_spec = verify_spec_lax;
+print "== (sha256_spec_step.saw, lax load)";
+include "sha256_spec_step.saw";
+include "sha256_spec_pad.saw";
+include "sha256_spec_hash.saw";
+
+let sym = spec_symbol "sequences_of_bits__literal";
+print "== To_Bits chain, stack at 48, W = 0 .. 64";
+rec tb_chain (w : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- llvm_verify sha256_spec_lax sym prev false (to_bits_contract_at 48 0 39 0 0 w) z3;
+  if eval_bool {{ `w == (64 : Integer) }} then return lemma
+  else tb_chain (eval_int {{ `w + 1 : [32] }}) [lemma];
+};
+time (tb_chain 0 []);
+print "== To_Bits unfolded, stack at 48, W = 64";
+time (llvm_verify sha256_spec_lax sym [] false (to_bits_contract_at 48 0 39 0 0 64) z3);
+
+rec fs_chain (nt : Int) (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- llvm_verify sha256_spec_lax (spec_symbol "sha256__blocks__foldl_take") (concat prev [i_step]) false
+             (foldl_step_contract nt n) (w4_unint_z3 ["step"]);
+  if eval_bool {{ `n == `nt }} then return lemma
+  else fs_chain nt (eval_int {{ `n + 1 : [32] }}) [lemma];
+};
+for [1, 2] (\nt -> do {
+  print (str_concat "== Foldl_Step chain, N = 0 .. " (show nt));
+  time (fs_chain nt 0 []);
+  print (str_concat "== Foldl_Step unfolded, N = " (show nt));
+  time (llvm_verify sha256_spec_lax (spec_symbol "sha256__blocks__foldl_take") [i_step] false
+          (foldl_step_contract nt nt) (w4_unint_z3 ["step"]));
+  return ();
+});
+print "== done";

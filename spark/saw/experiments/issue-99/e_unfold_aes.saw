@@ -1,0 +1,79 @@
+/*
+ * #99, experiment "unfold_aes": the AES spec layer's linear recursions,
+ * each proved unfolded and as the per-index lemma chain, same contracts,
+ * overrides and tactics, one after the other in one saw run.
+ *
+ *  1. The cipher folds (Round_Folds, InvRound_Folds, InvRound_Prime_Folds
+ *     Foldl_Take) at M = 9, 11, 13: the chains N = 0 .. M (as the
+ *     recorded scripts prove them) against one unfolded proof at N = M.
+ *  2. The GF folds: GF28's Products at N = 8 and Pmod_Fold at 15, GF2's
+ *     Pmod_Fold and Pdiv_Fold at 9 (Pdiv_Fold calls Pmod_Fold at N - 1
+ *     too, so unfolded it executes Pmod_Fold at every level), unfolded,
+ *     against the chains. The GF2 chains are aes_spec_gf.saw's own (its
+ *     RESULT lines); the GF28 ones are proved here, as aes_spec_gf.saw
+ *     proved them before #99.
+ *
+ * Measured 2026-10-23 on the x86_64 instance (results-2026-10-23.txt).
+ */
+include "aes_spec_common.saw";
+print "== (aes_spec_gf.saw)";
+include "aes_spec_gf.saw";
+print "== (aes_spec_cipher.saw)";
+include "aes_spec_cipher.saw";
+
+rec chain (ro : Bool) (name : String) (round : LLVMSpec) (f : Term) (cry : String) (m : Int) (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- llvm_verify aes_spec (spec_symbol name) (concat prev [round]) false (foldl_take_contract ro m n f) (w4_unint_z3 [cry]);
+  if eval_bool {{ `n == `m }} then return lemma
+  else chain ro name round f cry m (eval_int {{ `n + 1 : [32] }}) [lemma];
+};
+let unfolded (ro : Bool) (name : String) (round : LLVMSpec) (f : Term) (cry : String) (m : Int) =
+  llvm_verify aes_spec (spec_symbol name) [round] false (foldl_take_contract ro m m f) (w4_unint_z3 [cry]);
+for [9, 11, 13] (\m -> do {
+  print (str_concat "== Round fold chain, M = " (show m));
+  time (chain true "cipher__round_folds__foldl_take" c_round {{ Round }} "Round" m 0 []);
+  print (str_concat "== Round fold unfolded, M = " (show m));
+  time (unfolded true "cipher__round_folds__foldl_take" c_round {{ Round }} "Round" m);
+  print (str_concat "== InvRound fold chain, M = " (show m));
+  time (chain false "cipher__invround_folds__foldl_take" c_invround {{ InvRound }} "InvRound" m 0 []);
+  print (str_concat "== InvRound fold unfolded, M = " (show m));
+  time (unfolded false "cipher__invround_folds__foldl_take" c_invround {{ InvRound }} "InvRound" m);
+  print (str_concat "== InvRound' fold chain, M = " (show m));
+  time (chain false "cipher__invround_prime_folds__foldl_take" c_invround_prime {{ InvRound' }} "InvRound'" m 0 []);
+  print (str_concat "== InvRound' fold unfolded, M = " (show m));
+  time (unfolded false "cipher__invround_prime_folds__foldl_take" c_invround_prime {{ InvRound' }} "InvRound'" m);
+  return ();
+});
+
+print "== GF28 Products chain, N = 0 .. 8";
+rec products_chain (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- llvm_verify aes_spec (spec_symbol "gf28__products__products") prev false
+             (products_contract n {{ \(b : [8]) (c : [8]) -> zext (pmult b (take`{n} c)) : [16] }}) rme;
+  if eval_bool {{ `n == (8 : Integer) }} then return lemma
+  else products_chain (eval_int {{ `n + 1 : [32] }}) [lemma];
+};
+time (do {
+  p0 <- llvm_verify aes_spec (spec_symbol "gf28__products__products") [] false
+          (products_contract 0 {{ \(b : [8]) (c : [8]) -> 0 : [16] }}) rme;
+  products_chain 1 [p0];
+});
+print "== GF28 Products unfolded, N = 8";
+time (llvm_verify aes_spec (spec_symbol "gf28__products__products") [] false
+        (products_contract 8 {{ \(b : [8]) (c : [8]) -> zext (pmult b (take`{8} c)) : [16] }}) rme);
+print "== GF28 Pmod_Fold chain, N = 0 .. 15";
+rec pmod_chain (n : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec = do {
+  lemma <- llvm_verify aes_spec (spec_symbol "gf28__pmod_fold") (concat prev [gf28_reduce, gf28_product_bit]) false
+             (pmod_fold_contract n {{ \(x : [16]) (y : [16]) -> pmod (take`{n} (drop`{1} x : [15])) (drop`{7} y : [9]) }}) rme;
+  if eval_bool {{ `n == (15 : Integer) }} then return lemma
+  else pmod_chain (eval_int {{ `n + 1 : [32] }}) [lemma];
+};
+time (pmod_chain 0 []);
+print "== GF28 Pmod_Fold unfolded, N = 15";
+time (llvm_verify aes_spec (spec_symbol "gf28__pmod_fold") [gf28_reduce, gf28_product_bit] false
+        (pmod_fold_contract 15 {{ \(x : [16]) (y : [16]) -> pmod (take`{15} (drop`{1} x : [15])) (drop`{7} y : [9]) }}) rme);
+print "== GF2 Pmod_Fold unfolded, N = 9";
+time (llvm_verify aes_spec (spec_symbol "gf2__pmod_fold") [] false
+        (gf2_fold_contract 9 {{ \(x : [16]) (y : [16]) -> zext (pmod (take`{9} (drop`{7} x : [9])) (drop`{7} y : [9])) : [16] }}) rme);
+print "== GF2 Pdiv_Fold unfolded, N = 9";
+time (llvm_verify aes_spec (spec_symbol "gf2__pdiv_fold") [] false
+        (gf2_fold_contract 9 {{ \(x : [16]) (y : [16]) -> zext (pdiv (take`{9} (drop`{7} x : [9])) (drop`{7} y : [9])) : [16] }}) rme);
+print "== done";

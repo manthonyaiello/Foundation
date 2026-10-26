@@ -1,0 +1,236 @@
+/*
+ * The Cryptol prelude in SPARK (spark/src/cryptol/, #75), as the SHA-256
+ * and HMAC-SHA-256 spec layers instantiate it, proved on its own against
+ * Cryptol's built-ins (#75 item 3). Included by sha256_spec.saw last,
+ * after the other sha256_spec_*.saw files, whose lemmas it uses as
+ * overrides.
+ *
+ * The spec layer's own proofs execute these instances (or take their
+ * lemmas as overrides), so each is already checked through its caller.
+ * Here each is proved by itself, at the types and sizes SHA-256 and HMAC
+ * use it, against the built-in the prelude states it from (README "The
+ * Cryptol prelude"): the type operators `/^` and `%^` (Numeric), `zero`
+ * and a literal (Bit_Sequences), `@` on a word, `join` and `split`
+ * (Join_Split), and `repeat` (Sequences). The recursions of
+ * Enumeration_Folds.Foldl (Rounds), Folds.Foldl_Take (Blocks) and
+ * Join_Split.Value (Word_Sequences) are proved in sha256_spec_step.saw
+ * and sha256_spec_hash.saw, against `foldl` and the words of `split`;
+ * Value's lemma is Split_At's override here. Literal is proved there too,
+ * at each secondary-stack state Pad calls it in; here once more, on its
+ * own, against the literal itself.
+ *
+ * The instances are proved in the module as loaded, but for three in the
+ * load with lax arithmetic (sha256_spec_pad.saw says why): Literal and
+ * Join of an empty key, which make a null range, and Split_At, whose
+ * override (Value's lemma) is of that load.
+ *
+ * Cryptol.cry's line numbers are Cryptol 3.6.0's (README "The Cryptol
+ * prelude").
+ */
+
+/*
+ * llvm_verify of the function `symbol` (its full LLVM name) of module m,
+ * timed, with the RESULT line check-saw.sh records, under the name given.
+ */
+let verify_prelude (m : LLVMModule) (tag : String) (symbol : String) name overrides contract tactic tactic_name cryptol = do {
+  result <- time (llvm_verify m symbol overrides false contract tactic);
+  print (str_concat (str_concat (str_concat (str_concat (str_concat (str_concat "RESULT proved " name) tag) " = ") cryptol) " [") (str_concat tactic_name "]"));
+  return result;
+};
+let sha2_prelude (lax : Bool) name =
+  verify_prelude (if lax then sha256_spec_lax else sha256_spec) (if lax then " (lax arithmetic module)" else "")
+    (str_concat "foundation_spark__sha2__" name) name;
+let hmac_prelude (lax : Bool) name =
+  verify_prelude (if lax then sha256_spec_lax else sha256_spec) (if lax then " (lax arithmetic module)" else "")
+    (str_concat "foundation_spark__" name) name;
+
+/* --- Numeric: `/^` and `%^` (Cryptol.cry:135, :141) ---------------------- */
+
+/*
+ * SHA2.Lengths.Ceil_Div (A, B) = `(a /^ b) and Ceil_Mod (A, B) =
+ * `(a %^ b), on Bit_Index (i128), at the arguments Main.cry's hash gives
+ * them for each message length l SAW proves Hash or HMAC's hashes at:
+ * A = l + 1 + 2 * 32, B = 512 (Main's N and Small_K, Main.cry:58-59). Both
+ * are type operators in Cryptol, so the arguments are constants, as they
+ * are in Cryptol.
+ */
+let ceil_lengths = [0, 8, 440, 448, 504, 512, 520, 536, 768, 800, 952, 960, 1024, 1600];
+for ceil_lengths (\l -> do {
+  let a = eval_int {{ `l + 65 : [64] }};
+  sha2_prelude false "lengths__ceil_div" []
+    (do {
+       llvm_execute_func [llvm_term {{ `a : [128] }}, llvm_term {{ 512 : [128] }}];
+       llvm_return (llvm_term {{ `(a /^ 512) : [128] }});
+     }) z3 "z3" (str_concat (str_concat "A = " (show a)) ", B = 512: `(A /^ B)");
+  sha2_prelude false "lengths__ceil_mod" []
+    (do {
+       llvm_execute_func [llvm_term {{ `a : [128] }}, llvm_term {{ 512 : [128] }}];
+       llvm_return (llvm_term {{ `(a %^ 512) : [128] }});
+     }) z3 "z3" (str_concat (str_concat "A = " (show a)) ", B = 512: `(A %^ B)");
+  return ();
+});
+
+/* --- Bit_Sequences: `zero` (Cryptol.cry:304) and a literal ------------------ */
+
+/*
+ * Sequences_Of_Bits.Zero (Count) = zero : [Count], at the Counts SHA-256's
+ * Pad (k = Small_K (l), sha256_spec_pad.saw's seven) and HMAC_init
+ * (8 (B - k) for k = 0 and 32, and 8 (B - L): 512, 256) use, on the empty
+ * secondary stack: bounds {0, Count - 1}, then Count bytes of 0.
+ */
+for [7, 159, 383, 439, 447, 455, 511, 256, 512] (\k ->
+  sha2_prelude false "sequences_of_bits__zero" []
+    (do {
+       stack <- secondary_stack;
+       llvm_execute_func [llvm_term {{ `k : [128] }}];
+       ss_post stack (ss_size 32 k);
+       llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `k - 1 : [128] }}]);
+       llvm_points_to_untyped (ss_at stack 32) (llvm_term {{ bytes_of (zero : [k]) }});
+       llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+     }) z3 "z3" (str_concat (str_concat "zero : [" (show k)) "]"));
+
+/*
+ * Sequences_Of_Bits.Literal (V, 64) = the [64] literal of v (RefMan
+ * BasicSyntax.rst:349; Pad's (`l : [64])), which is v modulo 2 ^^ 64:
+ * drop`{64} (v : [128]), for V <= 2 ** 126, on the empty secondary
+ * stack, its recursion unfolded (#99): it leaves its result and every
+ * shorter one on the stack (to_bits_used, sha256_spec_pad.saw), and
+ * returns the last. In the load with lax arithmetic (its width 1
+ * concatenates a null range). Stated as fromInteger (toInteger v) : [64]
+ * instead, the proof reached the 10G memory cap (2026-10-23): SAW's
+ * translation of toInteger on a symbolic [128].
+ */
+sha2_prelude true "sequences_of_bits__literal" []
+  (do {
+     let at = to_bits_used 63;
+     let data = eval_int {{ `at + 32 : [64] }};
+     stack <- secondary_stack;
+     v <- llvm_fresh_var "v" (llvm_int 128);
+     llvm_precond {{ v <= 2 ^^ 126 }};
+     llvm_execute_func [llvm_term v, llvm_term {{ 64 : [128] }}];
+     ss_post stack (to_bits_used 64);
+     llvm_points_to_untyped (ss_at stack at) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 63 : [128] }}]);
+     llvm_points_to_untyped (ss_at stack data) (llvm_term {{ bytes_of (drop`{64} v) }});
+     llvm_return (llvm_struct_value [ss_at stack data, ss_at stack at]);
+   }) z3 "z3" "W = 64, unfolded, on the empty secondary stack: \\v -> drop`{64} v, the [64] literal of v, v <= 2 ^^ 126";
+
+/* --- Words: `@` on a word (Cryptol.cry:900) -------------------------------- */
+
+/*
+ * Bit (X, J) = x @ j: the SHA-256 Word_Sequences.Word_Bits at [32] (SHA-2's
+ * Bit), and HMAC.Byte_Words.Word_Bits at [8] (HMAC's Byte_Bit). Booleans
+ * are i8, 0 or 1.
+ */
+let word_bit_contract (w : Int) = do {
+  x <- llvm_fresh_var "x" (llvm_int w);
+  j <- llvm_fresh_var "j" (llvm_int 32);
+  llvm_precond {{ j < `w }};
+  llvm_execute_func [llvm_term x, llvm_term j];
+  llvm_return (llvm_term {{ if x @ j then 1 else 0 : [8] }});
+};
+sha2_prelude false "sha256__word_sequences__word_bits__bit" [] (word_bit_contract 32) z3 "z3" "\\x j -> x @ j at [32], j < 32";
+hmac_prelude false "hmac__byte_words__word_bits__bit" [] (word_bit_contract 8) z3 "z3" "\\x j -> x @ j at [8], j < 8";
+
+/* --- Join_Split: `join` and `split` (Cryptol.cry:815, :822) ----------------- */
+
+/*
+ * The SHA-256 Word_Sequences.Join (Xs) = join xs : [8][32] -> [256] (SHA-2's
+ * Join of the hash value), Xs a fat pointer with bounds {0, 7} (i32); the
+ * result on the empty secondary stack, bounds {0, 255} then 256 bits.
+ */
+let words_bounds_t = llvm_alias "foundation_spark__sha2__words_32_BOUNDS";
+sha2_prelude false "sha256__word_sequences__join" []
+  (do {
+     stack <- secondary_stack;
+     xs <- llvm_fresh_var "xs" hash_value_t;
+     xsp <- llvm_alloc_readonly hash_value_t;
+     llvm_points_to xsp (llvm_term xs);
+     xsb <- llvm_alloc_readonly words_bounds_t;
+     llvm_points_to xsb (llvm_struct_value [llvm_term {{ 0 : [32] }}, llvm_term {{ 7 : [32] }}]);
+     llvm_execute_func [llvm_struct_value [xsp, xsb]];
+     ss_post stack (ss_size 32 256);
+     llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ 255 : [128] }}]);
+     llvm_points_to_untyped (ss_at stack 32) (llvm_term {{ bytes_of (join xs) }});
+     llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+   }) z3 "z3" "join : [8][32] -> [256]";
+
+/*
+ * The SHA-256 Word_Sequences.Split_At (P, K) = (split p : [n / 32][32]) @ k,
+ * word K of P (Preprocessing.cry's parse takes its words so), at the
+ * padded lengths Parse splits (512 and 1024 bits; 1536 and 2048 too with
+ * saw_long), at each K (16 per block), as Parse_Block calls it: one
+ * llvm_verify per K, recorded as one RESULTS line per length. With K
+ * symbolic the proof reached the 10G memory cap (2026-10-23). P and its
+ * bounds are writable and stated unchanged, as Value's lemma (Word_Of's,
+ * sha256_spec_hash.saw), at Count = 32 for that length, takes them: it is
+ * the override of Split_At's call Value (P, 32 K, 32).
+ */
+let split_at_contract (len : Int) (k : Int) = do {
+  p <- llvm_fresh_var "p" (llvm_array len (llvm_int 8));
+  llvm_precond {{ all (\b -> b <= 1) p }};
+  pp <- llvm_alloc (llvm_array len (llvm_int 8));
+  llvm_points_to pp (llvm_term p);
+  pb <- llvm_alloc_aligned 1 bits_bounds_t;
+  llvm_points_to pb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `len - 1 : [128] }}]);
+  llvm_execute_func [llvm_struct_value [pp, pb], llvm_term {{ `k : [128] }}];
+  llvm_points_to pp (llvm_term p);
+  llvm_points_to pb (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `len - 1 : [128] }}]);
+  llvm_return (llvm_term {{ (split (bits_of p) : [len / 32][32]) @ (`k : [128]) }});
+};
+let verify_split_at (nb : Int) (word_of : LLVMSpec) = do {
+  let len = eval_int {{ 512 * `nb : [64] }};
+  let n = eval_int {{ 16 * `nb : [64] }};
+  time (for (eval_list {{ [0 .. 16 * nb - 1] : [16 * nb][64] }}) (\kt ->
+    llvm_verify sha256_spec_lax "foundation_spark__sha2__sha256__word_sequences__split_at" [word_of] false
+      (split_at_contract len (eval_int kt)) z3));
+  print (str_concat (str_concat (str_concat (str_concat (str_concat
+    "RESULTS " (show n)) " proved sha256__word_sequences__split_at (lax arithmetic module) = \\p k -> (split p : [n / 32][32]) @ k, p : [")
+    (show len)) "], every k < ") (str_concat (show n) " [z3]"));
+};
+verify_split_at 1 i_word_of_1;
+verify_split_at 2 i_word_of_2;
+if saw_long then do {
+  verify_split_at 3 i_word_of_3;
+  verify_split_at 4 i_word_of_4;
+  return ();
+} else return ();
+
+/*
+ * HMAC.Byte_Words.Join (Xs) = join xs : [k][8] -> [8 k] (HMAC's Join), at
+ * the key lengths SAW proves HMAC at (0, 32, 64, 65 and 100 bytes; 64 is
+ * also Opad's and Ipad's), Xs a fat pointer with bounds {0, k - 1} (i64);
+ * the result on the empty secondary stack, bounds {0, 8 k - 1} then 8 k
+ * bits. At 0 bytes, in the load with lax arithmetic (the null range).
+ */
+for [0, 32, 64, 65, 100] (\k -> do {
+  let n = eval_int {{ 8 * `k : [64] }};
+  hmac_prelude (eval_bool {{ `k == (0 : Integer) }}) "hmac__byte_words__join" []
+    (do {
+       stack <- secondary_stack;
+       (xs, xa) <- key_arg k;
+       llvm_execute_func [xa];
+       ss_post stack (ss_size 32 n);
+       llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [128] }}, llvm_term {{ `n - 1 : [128] }}]);
+       if eval_bool {{ `k == (0 : Integer) }} then return ()
+       else llvm_points_to_untyped (ss_at stack 32) (llvm_term {{ bytes_of (join xs) }});
+       llvm_return (llvm_struct_value [ss_at stack 32, ss_at stack 0]);
+     }) z3 "z3" (str_concat (str_concat "join : [" (show k)) "][8] -> [8 k]");
+});
+
+/* --- Sequences: `repeat` (Cryptol.cry:1215) -------------------------------- */
+
+/*
+ * HMAC.Byte_Sequences.Repeat (Count, X) = repeat`{Count} x : [Count][8], at
+ * Count = B = 64 (Opad's and Ipad's), X symbolic, on the empty secondary
+ * stack: bounds {0, 63} (i64), then 64 bytes.
+ */
+hmac_prelude false "hmac__byte_sequences__repeat" []
+  (do {
+     stack <- secondary_stack;
+     x <- llvm_fresh_var "x" (llvm_int 8);
+     llvm_execute_func [llvm_term {{ 64 : [64] }}, llvm_term x];
+     ss_post stack (ss_size 16 64);
+     llvm_points_to_untyped (ss_at stack 0) (llvm_struct_value [llvm_term {{ 0 : [64] }}, llvm_term {{ 63 : [64] }}]);
+     llvm_points_to_untyped (ss_at stack 16) (llvm_term {{ repeat`{64} x }});
+     llvm_return (llvm_struct_value [ss_at stack 16, ss_at stack 0]);
+   }) z3 "z3" "\\x -> repeat`{64} x : [64][8]";

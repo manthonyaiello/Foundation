@@ -1,0 +1,1249 @@
+# #99's measurements, 2026-10-23, on the x86_64 instance (8 CPUs, 15.7 GB,
+# no swap), at the bitcode check-saw.sh builds from main = 6023e8a (spark/src
+# unchanged by #99), SAW 1.6, z3 4.8.14, each saw run alone, capped at 10G.
+# run.sh's summary.txt of each experiment: "== <label>" then the "Time:"
+# lines SAW printed under it (a chain's whole time is the one line under
+# "chain"), the RESULT lines of the scripts it includes, wall-clock and
+# peak RSS of the saw process.
+#
+# Verdicts (README "SAW", "The spec layer"):
+#   Rounds.Foldl at 64       unfolded  2.43 s   chain 25.89 s   -> unfolded
+#   Literal (To_Bits) at 64  unfolded  1.46 s   chain 48.03 s   -> unfolded
+#   Foldl_Step at 1, 2       unfolded  0.12, 0.13 s   chains 0.29, 0.46 s -> unfolded
+#   GF28 Products at 8       unfolded  0.06 s   chain 0.88 s    -> unfolded
+#   GF28 Pmod_Fold at 15     unfolded  0.19 s   chain 1.65 s    -> unfolded
+#   cipher folds at M = 9, 11, 13 (Round): unfolded 8.2, 13.9, 24.3 s;
+#                            chains 7.2, 10.9, 14.2 s (the inverse rounds
+#                            likewise)                          -> per index
+#   GF2 Pmod_Fold, Pdiv_Fold at 9: unfolded 34.1 s each; chains 8.1 s and
+#                            4.4 s (aes_spec_gf.saw's RESULT lines) -> per index
+
+## e_unfold_sha.saw
+== (sha256_spec_step.saw, strict load)
+   0.024183196s
+   RESULT proved functions__sigma_256_0 = Functions::SIGMA_256_0 [rme]
+   0.022099657s
+   RESULT proved functions__sigma_256_1 = Functions::SIGMA_256_1 [rme]
+   0.020393726s
+   RESULT proved functions__small_sigma_256_0 = Functions::sigma_256_0 [rme]
+   0.019813966s
+   RESULT proved functions__small_sigma_256_1 = Functions::sigma_256_1 [rme]
+   0.018617856s
+   RESULT proved sha256__logical__ch = Functions::Ch at [32] [rme]
+   0.018074936s
+   RESULT proved sha256__logical__maj = Functions::Maj at [32] [rme]
+   0.1030827s
+   RESULT proved sha256__w = T = 0: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.10772705s
+   RESULT proved sha256__w = T = 1: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.105102162s
+   RESULT proved sha256__w = T = 2: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.101859042s
+   RESULT proved sha256__w = T = 3: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.107132789s
+   RESULT proved sha256__w = T = 4: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.103293587s
+   RESULT proved sha256__w = T = 5: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.103579693s
+   RESULT proved sha256__w = T = 6: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.104741142s
+   RESULT proved sha256__w = T = 7: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.107684068s
+   RESULT proved sha256__w = T = 8: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.110443897s
+   RESULT proved sha256__w = T = 9: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.107765022s
+   RESULT proved sha256__w = T = 10: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.101868915s
+   RESULT proved sha256__w = T = 11: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.159624619s
+   RESULT proved sha256__w = T = 12: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.101924354s
+   RESULT proved sha256__w = T = 13: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.102260743s
+   RESULT proved sha256__w = T = 14: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.107837411s
+   RESULT proved sha256__w = T = 15: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.126777669s
+   RESULT proved sha256__w = T = 16: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129437642s
+   RESULT proved sha256__w = T = 17: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.121521063s
+   RESULT proved sha256__w = T = 18: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124954367s
+   RESULT proved sha256__w = T = 19: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12836313s
+   RESULT proved sha256__w = T = 20: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.121247003s
+   RESULT proved sha256__w = T = 21: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131910868s
+   RESULT proved sha256__w = T = 22: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12456714s
+   RESULT proved sha256__w = T = 23: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12226866s
+   RESULT proved sha256__w = T = 24: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.123751151s
+   RESULT proved sha256__w = T = 25: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124898398s
+   RESULT proved sha256__w = T = 26: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128715167s
+   RESULT proved sha256__w = T = 27: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136549622s
+   RESULT proved sha256__w = T = 28: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129305665s
+   RESULT proved sha256__w = T = 29: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130560597s
+   RESULT proved sha256__w = T = 30: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131706031s
+   RESULT proved sha256__w = T = 31: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.189298526s
+   RESULT proved sha256__w = T = 32: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129749338s
+   RESULT proved sha256__w = T = 33: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133463115s
+   RESULT proved sha256__w = T = 34: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131108209s
+   RESULT proved sha256__w = T = 35: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133741735s
+   RESULT proved sha256__w = T = 36: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129697349s
+   RESULT proved sha256__w = T = 37: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131895377s
+   RESULT proved sha256__w = T = 38: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.135636572s
+   RESULT proved sha256__w = T = 39: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.13176215s
+   RESULT proved sha256__w = T = 40: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.126576838s
+   RESULT proved sha256__w = T = 41: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.13066532s
+   RESULT proved sha256__w = T = 42: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127601472s
+   RESULT proved sha256__w = T = 43: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129166806s
+   RESULT proved sha256__w = T = 44: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144413682s
+   RESULT proved sha256__w = T = 45: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136996532s
+   RESULT proved sha256__w = T = 46: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140901519s
+   RESULT proved sha256__w = T = 47: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131634935s
+   RESULT proved sha256__w = T = 48: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.190022154s
+   RESULT proved sha256__w = T = 49: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145420856s
+   RESULT proved sha256__w = T = 50: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134675125s
+   RESULT proved sha256__w = T = 51: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134047343s
+   RESULT proved sha256__w = T = 52: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.137317306s
+   RESULT proved sha256__w = T = 53: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.135877904s
+   RESULT proved sha256__w = T = 54: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.138943479s
+   RESULT proved sha256__w = T = 55: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140293007s
+   RESULT proved sha256__w = T = 56: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144993087s
+   RESULT proved sha256__w = T = 57: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145843723s
+   RESULT proved sha256__w = T = 58: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.141725358s
+   RESULT proved sha256__w = T = 59: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.141022204s
+   RESULT proved sha256__w = T = 60: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.148549678s
+   RESULT proved sha256__w = T = 61: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144052151s
+   RESULT proved sha256__w = T = 62: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.143135238s
+   RESULT proved sha256__w = T = 63: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.090573366s
+   RESULT proved sha256__t2 = T2 (Main.cry's step3's T2) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.180290187s
+   RESULT proved sha256__t1 = T = 0: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.118265092s
+   RESULT proved sha256__step3 = T = 0: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128480461s
+   RESULT proved sha256__t1 = T = 1: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.116375393s
+   RESULT proved sha256__step3 = T = 1: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.119951659s
+   RESULT proved sha256__t1 = T = 2: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.111888086s
+   RESULT proved sha256__step3 = T = 2: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124399769s
+   RESULT proved sha256__t1 = T = 3: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.113990677s
+   RESULT proved sha256__step3 = T = 3: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129401922s
+   RESULT proved sha256__t1 = T = 4: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.115087386s
+   RESULT proved sha256__step3 = T = 4: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.125038978s
+   RESULT proved sha256__t1 = T = 5: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.120834034s
+   RESULT proved sha256__step3 = T = 5: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130226486s
+   RESULT proved sha256__t1 = T = 6: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.116494825s
+   RESULT proved sha256__step3 = T = 6: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.13004s
+   RESULT proved sha256__t1 = T = 7: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.11932932s
+   RESULT proved sha256__step3 = T = 7: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133050431s
+   RESULT proved sha256__t1 = T = 8: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.172901565s
+   RESULT proved sha256__step3 = T = 8: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128374867s
+   RESULT proved sha256__t1 = T = 9: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.109347128s
+   RESULT proved sha256__step3 = T = 9: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.121558165s
+   RESULT proved sha256__t1 = T = 10: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.110043292s
+   RESULT proved sha256__step3 = T = 10: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129078091s
+   RESULT proved sha256__t1 = T = 11: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.112277227s
+   RESULT proved sha256__step3 = T = 11: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129650492s
+   RESULT proved sha256__t1 = T = 12: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.113639756s
+   RESULT proved sha256__step3 = T = 12: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124399588s
+   RESULT proved sha256__t1 = T = 13: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.112956422s
+   RESULT proved sha256__step3 = T = 13: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130970735s
+   RESULT proved sha256__t1 = T = 14: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.117063516s
+   RESULT proved sha256__step3 = T = 14: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124496768s
+   RESULT proved sha256__t1 = T = 15: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.109221281s
+   RESULT proved sha256__step3 = T = 15: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131758098s
+   RESULT proved sha256__t1 = T = 16: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.111690618s
+   RESULT proved sha256__step3 = T = 16: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133541998s
+   RESULT proved sha256__t1 = T = 17: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.114301081s
+   RESULT proved sha256__step3 = T = 17: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.125792437s
+   RESULT proved sha256__t1 = T = 18: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.164564513s
+   RESULT proved sha256__step3 = T = 18: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124962631s
+   RESULT proved sha256__t1 = T = 19: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.118813295s
+   RESULT proved sha256__step3 = T = 19: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.122564441s
+   RESULT proved sha256__t1 = T = 20: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.121902689s
+   RESULT proved sha256__step3 = T = 20: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132642896s
+   RESULT proved sha256__t1 = T = 21: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128096929s
+   RESULT proved sha256__step3 = T = 21: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128694148s
+   RESULT proved sha256__t1 = T = 22: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.111628252s
+   RESULT proved sha256__step3 = T = 22: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.126848969s
+   RESULT proved sha256__t1 = T = 23: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.115686489s
+   RESULT proved sha256__step3 = T = 23: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130685207s
+   RESULT proved sha256__t1 = T = 24: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.116660832s
+   RESULT proved sha256__step3 = T = 24: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.123981855s
+   RESULT proved sha256__t1 = T = 25: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.120086971s
+   RESULT proved sha256__step3 = T = 25: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127198106s
+   RESULT proved sha256__t1 = T = 26: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.173144158s
+   RESULT proved sha256__step3 = T = 26: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127495805s
+   RESULT proved sha256__t1 = T = 27: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.114702262s
+   RESULT proved sha256__step3 = T = 27: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.143928289s
+   RESULT proved sha256__t1 = T = 28: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.113536272s
+   RESULT proved sha256__step3 = T = 28: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.138718643s
+   RESULT proved sha256__t1 = T = 29: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124271968s
+   RESULT proved sha256__step3 = T = 29: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.139882237s
+   RESULT proved sha256__t1 = T = 30: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.117705909s
+   RESULT proved sha256__step3 = T = 30: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132473242s
+   RESULT proved sha256__t1 = T = 31: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124782379s
+   RESULT proved sha256__step3 = T = 31: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133320591s
+   RESULT proved sha256__t1 = T = 32: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.121133198s
+   RESULT proved sha256__step3 = T = 32: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.138026504s
+   RESULT proved sha256__t1 = T = 33: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128026826s
+   RESULT proved sha256__step3 = T = 33: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.188298053s
+   RESULT proved sha256__t1 = T = 34: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.120597515s
+   RESULT proved sha256__step3 = T = 34: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.137496244s
+   RESULT proved sha256__t1 = T = 35: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.125339004s
+   RESULT proved sha256__step3 = T = 35: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140092014s
+   RESULT proved sha256__t1 = T = 36: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130917071s
+   RESULT proved sha256__step3 = T = 36: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134226799s
+   RESULT proved sha256__t1 = T = 37: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127409316s
+   RESULT proved sha256__step3 = T = 37: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.139105014s
+   RESULT proved sha256__t1 = T = 38: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124653335s
+   RESULT proved sha256__step3 = T = 38: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144454408s
+   RESULT proved sha256__t1 = T = 39: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.125800933s
+   RESULT proved sha256__step3 = T = 39: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.150337741s
+   RESULT proved sha256__t1 = T = 40: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.186960431s
+   RESULT proved sha256__step3 = T = 40: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145845254s
+   RESULT proved sha256__t1 = T = 41: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.135509889s
+   RESULT proved sha256__step3 = T = 41: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.150709416s
+   RESULT proved sha256__t1 = T = 42: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.138476583s
+   RESULT proved sha256__step3 = T = 42: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140802652s
+   RESULT proved sha256__t1 = T = 43: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131912743s
+   RESULT proved sha256__step3 = T = 43: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.14875735s
+   RESULT proved sha256__t1 = T = 44: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133582616s
+   RESULT proved sha256__step3 = T = 44: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.146025526s
+   RESULT proved sha256__t1 = T = 45: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131161871s
+   RESULT proved sha256__step3 = T = 45: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.1420128s
+   RESULT proved sha256__t1 = T = 46: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127841339s
+   RESULT proved sha256__step3 = T = 46: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.201534959s
+   RESULT proved sha256__t1 = T = 47: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130314668s
+   RESULT proved sha256__step3 = T = 47: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.147310652s
+   RESULT proved sha256__t1 = T = 48: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127507043s
+   RESULT proved sha256__step3 = T = 48: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134881512s
+   RESULT proved sha256__t1 = T = 49: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136423094s
+   RESULT proved sha256__step3 = T = 49: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144587215s
+   RESULT proved sha256__t1 = T = 50: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128498498s
+   RESULT proved sha256__step3 = T = 50: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.150783711s
+   RESULT proved sha256__t1 = T = 51: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.137463752s
+   RESULT proved sha256__step3 = T = 51: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145727886s
+   RESULT proved sha256__t1 = T = 52: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.138199713s
+   RESULT proved sha256__step3 = T = 52: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.205612816s
+   RESULT proved sha256__t1 = T = 53: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.143616627s
+   RESULT proved sha256__step3 = T = 53: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.146874962s
+   RESULT proved sha256__t1 = T = 54: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.142217625s
+   RESULT proved sha256__step3 = T = 54: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.1476052s
+   RESULT proved sha256__t1 = T = 55: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134677221s
+   RESULT proved sha256__step3 = T = 55: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145888346s
+   RESULT proved sha256__t1 = T = 56: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144705047s
+   RESULT proved sha256__step3 = T = 56: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.153686021s
+   RESULT proved sha256__t1 = T = 57: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.142633285s
+   RESULT proved sha256__step3 = T = 57: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144804009s
+   RESULT proved sha256__t1 = T = 58: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136846787s
+   RESULT proved sha256__step3 = T = 58: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.199351553s
+   RESULT proved sha256__t1 = T = 59: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136236945s
+   RESULT proved sha256__step3 = T = 59: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.151702076s
+   RESULT proved sha256__t1 = T = 60: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.137520996s
+   RESULT proved sha256__step3 = T = 60: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.158921739s
+   RESULT proved sha256__t1 = T = 61: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144318571s
+   RESULT proved sha256__step3 = T = 61: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.161600861s
+   RESULT proved sha256__t1 = T = 62: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.142096885s
+   RESULT proved sha256__step3 = T = 62: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.151409539s
+   RESULT proved sha256__t1 = T = 63: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.14486811s
+   RESULT proved sha256__step3 = T = 63: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   2.487478804s
+   RESULT proved sha256__rounds__foldl = N = 64, unfolded: foldl (step3 m) h [0 ..< N] (Rounds.Foldl) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.429799688s
+   RESULT proved sha256__foldl_step3 = N = 64: foldl (step3 m) h [0 ..< N] [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.03455216s
+   RESULT proved sha256__Oadd = \l r -> l + r : [8][32] [z3]
+   0.823140871s
+   RESULT proved sha256__step = SHA256Main::step (Main.cry's step at SHA-256) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+== Rounds.Foldl chain, N = 0 .. 64
+   25.889161978s
+== Rounds.Foldl unfolded, N = 64
+   2.434381963s
+== (sha256_spec_step.saw, lax load)
+   0.083721807s
+   RESULT proved functions__sigma_256_0 (lax arithmetic module) = Functions::SIGMA_256_0 [rme]
+   0.021198503s
+   RESULT proved functions__sigma_256_1 (lax arithmetic module) = Functions::SIGMA_256_1 [rme]
+   0.019287138s
+   RESULT proved functions__small_sigma_256_0 (lax arithmetic module) = Functions::sigma_256_0 [rme]
+   0.023082056s
+   RESULT proved functions__small_sigma_256_1 (lax arithmetic module) = Functions::sigma_256_1 [rme]
+   0.020779246s
+   RESULT proved sha256__logical__ch (lax arithmetic module) = Functions::Ch at [32] [rme]
+   0.019107345s
+   RESULT proved sha256__logical__maj (lax arithmetic module) = Functions::Maj at [32] [rme]
+   0.110214512s
+   RESULT proved sha256__w (lax arithmetic module) = T = 0: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.104666121s
+   RESULT proved sha256__w (lax arithmetic module) = T = 1: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.100897256s
+   RESULT proved sha256__w (lax arithmetic module) = T = 2: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.103974863s
+   RESULT proved sha256__w (lax arithmetic module) = T = 3: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.101073634s
+   RESULT proved sha256__w (lax arithmetic module) = T = 4: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.105717443s
+   RESULT proved sha256__w (lax arithmetic module) = T = 5: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.11896027s
+   RESULT proved sha256__w (lax arithmetic module) = T = 6: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.110241432s
+   RESULT proved sha256__w (lax arithmetic module) = T = 7: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.099019069s
+   RESULT proved sha256__w (lax arithmetic module) = T = 8: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.108480449s
+   RESULT proved sha256__w (lax arithmetic module) = T = 9: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.104842397s
+   RESULT proved sha256__w (lax arithmetic module) = T = 10: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.108256666s
+   RESULT proved sha256__w (lax arithmetic module) = T = 11: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.110230936s
+   RESULT proved sha256__w (lax arithmetic module) = T = 12: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.1027174s
+   RESULT proved sha256__w (lax arithmetic module) = T = 13: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.1009866s
+   RESULT proved sha256__w (lax arithmetic module) = T = 14: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.107648595s
+   RESULT proved sha256__w (lax arithmetic module) = T = 15: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124212651s
+   RESULT proved sha256__w (lax arithmetic module) = T = 16: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127198057s
+   RESULT proved sha256__w (lax arithmetic module) = T = 17: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129732887s
+   RESULT proved sha256__w (lax arithmetic module) = T = 18: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127970298s
+   RESULT proved sha256__w (lax arithmetic module) = T = 19: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.135195573s
+   RESULT proved sha256__w (lax arithmetic module) = T = 20: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128011709s
+   RESULT proved sha256__w (lax arithmetic module) = T = 21: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128572012s
+   RESULT proved sha256__w (lax arithmetic module) = T = 22: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132980916s
+   RESULT proved sha256__w (lax arithmetic module) = T = 23: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12878641s
+   RESULT proved sha256__w (lax arithmetic module) = T = 24: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131126981s
+   RESULT proved sha256__w (lax arithmetic module) = T = 25: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136471411s
+   RESULT proved sha256__w (lax arithmetic module) = T = 26: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134472743s
+   RESULT proved sha256__w (lax arithmetic module) = T = 27: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130911518s
+   RESULT proved sha256__w (lax arithmetic module) = T = 28: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127532942s
+   RESULT proved sha256__w (lax arithmetic module) = T = 29: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131015054s
+   RESULT proved sha256__w (lax arithmetic module) = T = 30: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129367087s
+   RESULT proved sha256__w (lax arithmetic module) = T = 31: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.125802418s
+   RESULT proved sha256__w (lax arithmetic module) = T = 32: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132365868s
+   RESULT proved sha256__w (lax arithmetic module) = T = 33: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128124267s
+   RESULT proved sha256__w (lax arithmetic module) = T = 34: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.118278888s
+   RESULT proved sha256__w (lax arithmetic module) = T = 35: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12293297s
+   RESULT proved sha256__w (lax arithmetic module) = T = 36: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.123630186s
+   RESULT proved sha256__w (lax arithmetic module) = T = 37: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132784934s
+   RESULT proved sha256__w (lax arithmetic module) = T = 38: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127071023s
+   RESULT proved sha256__w (lax arithmetic module) = T = 39: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.122050275s
+   RESULT proved sha256__w (lax arithmetic module) = T = 40: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.123889672s
+   RESULT proved sha256__w (lax arithmetic module) = T = 41: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.13451675s
+   RESULT proved sha256__w (lax arithmetic module) = T = 42: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136785028s
+   RESULT proved sha256__w (lax arithmetic module) = T = 43: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.13880282s
+   RESULT proved sha256__w (lax arithmetic module) = T = 44: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136993424s
+   RESULT proved sha256__w (lax arithmetic module) = T = 45: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.138876653s
+   RESULT proved sha256__w (lax arithmetic module) = T = 46: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.141326133s
+   RESULT proved sha256__w (lax arithmetic module) = T = 47: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.142489893s
+   RESULT proved sha256__w (lax arithmetic module) = T = 48: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.20562523s
+   RESULT proved sha256__w (lax arithmetic module) = T = 49: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144393174s
+   RESULT proved sha256__w (lax arithmetic module) = T = 50: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.141065971s
+   RESULT proved sha256__w (lax arithmetic module) = T = 51: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144183731s
+   RESULT proved sha256__w (lax arithmetic module) = T = 52: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136363424s
+   RESULT proved sha256__w (lax arithmetic module) = T = 53: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127525039s
+   RESULT proved sha256__w (lax arithmetic module) = T = 54: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.13233351s
+   RESULT proved sha256__w (lax arithmetic module) = T = 55: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131813229s
+   RESULT proved sha256__w (lax arithmetic module) = T = 56: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.139223348s
+   RESULT proved sha256__w (lax arithmetic module) = T = 57: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140499565s
+   RESULT proved sha256__w (lax arithmetic module) = T = 58: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.146255429s
+   RESULT proved sha256__w (lax arithmetic module) = T = 59: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129567914s
+   RESULT proved sha256__w (lax arithmetic module) = T = 60: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132476572s
+   RESULT proved sha256__w (lax arithmetic module) = T = 61: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145243462s
+   RESULT proved sha256__w (lax arithmetic module) = T = 62: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.139624409s
+   RESULT proved sha256__w (lax arithmetic module) = T = 63: Ws m @ T (Main.cry's step's W@t) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.092250754s
+   RESULT proved sha256__t2 (lax arithmetic module) = T2 (Main.cry's step3's T2) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.121198233s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 0: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.113941114s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 0: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.117240539s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 1: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.112905727s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 1: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124667179s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 2: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.181790327s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 2: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131011271s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 3: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.110232775s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 3: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.120124269s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 4: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.106731533s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 4: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.125981552s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 5: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.113830265s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 5: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128754486s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 6: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.117200958s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 6: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.114594119s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 7: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.108503639s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 7: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.123046783s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 8: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.113677807s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 8: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131433167s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 9: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.120066399s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 9: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.119875714s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 10: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.105438571s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 10: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130866922s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 11: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.118168003s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 11: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128537559s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 12: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.114496783s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 12: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.121942569s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 13: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.115456173s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 13: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.120842914s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 14: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.177170758s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 14: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124502673s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 15: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.108761297s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 15: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132201543s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 16: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.112827455s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 16: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.118121513s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 17: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.11116784s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 17: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12588216s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 18: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.113392529s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 18: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.126479078s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 19: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.11857714s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 19: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124262788s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 20: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.112849926s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 20: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12509953s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 21: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.115556243s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 21: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131387933s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 22: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.122603952s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 22: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131592525s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 23: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.11873332s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 23: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.135651899s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 24: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12289921s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 24: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.19439099s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 25: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12225545s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 25: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.13100322s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 26: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.109190722s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 26: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134130337s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 27: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.125959713s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 27: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136969939s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 28: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.124959916s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 28: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144571836s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 29: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.120823177s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 29: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.138872926s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 30: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129603059s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 30: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132243663s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 31: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.122483985s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 31: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.149218577s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 32: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.12461057s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 32: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132363584s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 33: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.125995018s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 33: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136139727s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 34: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127229242s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 34: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140211123s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 35: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132208241s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 35: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136017297s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 36: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133825204s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 36: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.13363671s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 37: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.129332808s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 37: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.141550137s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 38: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133728526s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 38: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.14036253s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 39: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134259737s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 39: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.142829395s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 40: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132920884s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 40: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140248091s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 41: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128394814s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 41: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.134470073s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 42: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131232445s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 42: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.201802339s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 43: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.141642903s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 43: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145610992s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 44: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.122881211s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 44: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.137687047s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 45: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.131349588s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 45: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145677973s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 46: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128375996s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 46: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145943066s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 47: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132943216s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 47: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133784453s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 48: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.127360248s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 48: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.147871339s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 49: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.142641328s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 49: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.142400677s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 50: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.132557574s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 50: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.207340855s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 51: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.133370512s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 51: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145926945s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 52: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.130582606s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 52: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.149647099s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 53: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.128636841s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 53: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.144899705s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 54: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.135030037s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 54: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.151241875s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 55: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140575549s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 55: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.150492423s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 56: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.136505974s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 56: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.145880355s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 57: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.143993082s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 57: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.156173446s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 58: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.207930835s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 58: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.147618292s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 59: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.137663921s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 59: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.14578144s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 60: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.14091857s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 60: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.152681843s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 61: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.151171539s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 61: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.153968155s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 62: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.138323741s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 62: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.141724632s
+   RESULT proved sha256__t1 (lax arithmetic module) = T = 63: T1 m vars T (Main.cry's step3's T1) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.140701985s
+   RESULT proved sha256__step3 (lax arithmetic module) = T = 63: step3 m vars T (Main.cry's step's step3) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   2.513072589s
+   RESULT proved sha256__rounds__foldl (lax arithmetic module) = N = 64, unfolded: foldl (step3 m) h [0 ..< N] (Rounds.Foldl) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.431075199s
+   RESULT proved sha256__foldl_step3 (lax arithmetic module) = N = 64: foldl (step3 m) h [0 ..< N] [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+   0.034267484s
+   RESULT proved sha256__Oadd (lax arithmetic module) = \l r -> l + r : [8][32] [z3]
+   0.784906242s
+   RESULT proved sha256__step (lax arithmetic module) = SHA256Main::step (Main.cry's step at SHA-256) [w4_unint_z3 SIGMA_256_0 SIGMA_256_1 sigma_256_0 sigma_256_1]
+== To_Bits chain, stack at 48, W = 0 .. 64
+   48.027676245s
+== To_Bits unfolded, stack at 48, W = 64
+   1.460079365s
+== Foldl_Step chain, N = 0 .. 1
+   0.289866435s
+== Foldl_Step unfolded, N = 1
+   0.11880441s
+== Foldl_Step chain, N = 0 .. 2
+   0.460658034s
+== Foldl_Step unfolded, N = 2
+   0.126649927s
+== done
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:31.69
+	Maximum resident set size (kbytes): 391292
+exit 0
+
+## e_unfold_aes.saw
+== (aes_spec_gf.saw)
+   0.047027685s
+   RESULT proved types__nk = \k -> k / 32 (Types::Nk) [z3]
+   0.058325877s
+   RESULT proved types__nr = \k -> k / 32 + 6 (Types::Nr) [z3]
+   0.02269518s
+   RESULT proved types__split = split : Block -> [4]AESWord [rme]
+   0.021753285s
+   RESULT proved types__join = join : [4]AESWord -> Block [rme]
+   0.019539462s
+   RESULT proved gf28__xtimes = GF28::xTimes [rme]
+   0.019617762s
+   RESULT proved gf28__head = \b -> head b [rme]
+   0.077950387s
+   RESULT proved gf28__bit = \b i -> b @ i, i < 8 [z3]
+   0.079712681s
+   RESULT proved gf28__product_bit = \x i -> (drop`{1} x : [15]) @ i, i < 15 [z3]
+   0.057986893s
+   RESULT proved gf28__products__products = N = 8, unfolded: \x y -> zext (pmult x (take`{N} y)) [rme]
+   0.025486922s
+   RESULT proved gf28__pmult = \b c -> zext (pmult b c) [rme]
+   0.685445088s
+   RESULT proved gf28__reduce = \r y -> pmod (drop`{7} r : [9]) (drop`{7} y : [9]), r < 512, 256 <= y < 512 [rme]
+   0.188682667s
+   RESULT proved gf28__pmod_fold = N = 15, unfolded: \x y -> pmod (take`{N} (drop`{1} x : [15])) (drop`{7} y : [9]), 256 <= y < 512 [rme]
+   0.052362345s
+   RESULT proved gf28__pmod = \x y -> pmod (drop`{1} x : [15]) (drop`{7} y : [9]), 256 <= y < 512 [rme]
+   0.024047013s
+   RESULT proved gf28__dot = GF28::(•) [rme]
+   0.082018108s
+   RESULT proved gf2__pmult = \x y -> zext (pmult (drop`{7} x : [9]) (drop`{7} y : [9])) (GF2::(^*)), x, y < 512 [rme]
+   0.244082443s
+   RESULT proved gf2__pdeg = \p -> fromInteger (pdeg (drop`{7} p : [9])) (GF2::pdeg), p < 512 [z3]
+   0.054663792s
+   RESULT proved gf2__pmod_fold = N = 0: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.05057798s
+   RESULT proved gf2__pdiv_fold = N = 0: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.185996734s
+   RESULT proved gf2__pmod_fold = N = 1: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.214797596s
+   RESULT proved gf2__pdiv_fold = N = 1: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.227120462s
+   RESULT proved gf2__pmod_fold = N = 2: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.254168552s
+   RESULT proved gf2__pdiv_fold = N = 2: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.277978259s
+   RESULT proved gf2__pmod_fold = N = 3: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.298473507s
+   RESULT proved gf2__pdiv_fold = N = 3: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.392177964s
+   RESULT proved gf2__pmod_fold = N = 4: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.340506988s
+   RESULT proved gf2__pdiv_fold = N = 4: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.449847747s
+   RESULT proved gf2__pmod_fold = N = 5: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.393693725s
+   RESULT proved gf2__pdiv_fold = N = 5: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.675774535s
+   RESULT proved gf2__pmod_fold = N = 6: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.462793045s
+   RESULT proved gf2__pdiv_fold = N = 6: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   1.015021486s
+   RESULT proved gf2__pmod_fold = N = 7: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.557840718s
+   RESULT proved gf2__pdiv_fold = N = 7: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   1.727515536s
+   RESULT proved gf2__pmod_fold = N = 8: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.722584582s
+   RESULT proved gf2__pdiv_fold = N = 8: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   3.113662588s
+   RESULT proved gf2__pmod_fold = N = 9: \x y -> zext (pmod (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   1.070684771s
+   RESULT proved gf2__pdiv_fold = N = 9: \x y -> zext (pdiv (take`{N} (drop`{7} x : [9])) (drop`{7} y : [9])), x, y < 512, y /= 0 [rme]
+   0.04962297s
+   RESULT proved gf2__pdiv = \x y -> zext (pdiv (drop`{7} x : [9]) (drop`{7} y : [9])) (GF2::(^/)), x, y < 512, y /= 0 [rme]
+== (aes_spec_cipher.saw)
+   0.856406324s
+   RESULT proved cipher__subbytes = Cipher::SubBytes [rme]
+   0.866699805s
+   RESULT proved cipher__invsubbytes = Cipher::InvSubBytes [rme]
+   0.025720516s
+   RESULT proved cipher__shiftrows = Cipher::ShiftRows [rme]
+   0.021246219s
+   RESULT proved cipher__invshiftrows = Cipher::InvShiftRows [rme]
+   0.021093363s
+   RESULT proved cipher__addroundkey = Cipher::AddRoundKey [rme]
+   0.024253941s
+   RESULT proved cipher__mixcolumnsstep = Cipher::MixColumnsStep [rme]
+   0.030447801s
+   RESULT proved cipher__invmixcolumnsstep = Cipher::InvMixColumnsStep [rme]
+   0.042182835s
+   RESULT proved cipher__mixcolumns = Cipher::MixColumns [rme]
+   0.056995216s
+   RESULT proved cipher__invmixcolumns = Cipher::InvMixColumns [rme]
+   0.055543989s
+   RESULT proved cipher__round = Cipher::Round [rme]
+   0.082910249s
+   RESULT proved cipher__invround = Cipher::InvRound [rme]
+   0.160247721s
+   RESULT proved cipher__invround_prime = Cipher::InvRound' [w4_unint_z3 InvSubBytes InvShiftRows InvMixColumns AddRoundKey]
+   0.10194505s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 0: foldl Cipher::Round [w4_unint_z3 Round]
+   0.48590205s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 1: foldl Cipher::Round [w4_unint_z3 Round]
+   0.716719528s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 2: foldl Cipher::Round [w4_unint_z3 Round]
+   0.774976359s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 3: foldl Cipher::Round [w4_unint_z3 Round]
+   0.708624604s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 4: foldl Cipher::Round [w4_unint_z3 Round]
+   0.76979464s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 5: foldl Cipher::Round [w4_unint_z3 Round]
+   0.75159236s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 6: foldl Cipher::Round [w4_unint_z3 Round]
+   0.756172554s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 7: foldl Cipher::Round [w4_unint_z3 Round]
+   0.862048191s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 8: foldl Cipher::Round [w4_unint_z3 Round]
+   0.721549545s
+   RESULT proved cipher__round_folds__foldl_take = M = 9, N = 9: foldl Cipher::Round [w4_unint_z3 Round]
+   0.105704766s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 0: foldl Cipher::Round [w4_unint_z3 Round]
+   0.546829498s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 1: foldl Cipher::Round [w4_unint_z3 Round]
+   0.922858215s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 2: foldl Cipher::Round [w4_unint_z3 Round]
+   0.846631952s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 3: foldl Cipher::Round [w4_unint_z3 Round]
+   0.961586958s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 4: foldl Cipher::Round [w4_unint_z3 Round]
+   0.852839669s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 5: foldl Cipher::Round [w4_unint_z3 Round]
+   0.867018754s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 6: foldl Cipher::Round [w4_unint_z3 Round]
+   0.944956857s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 7: foldl Cipher::Round [w4_unint_z3 Round]
+   0.822319003s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 8: foldl Cipher::Round [w4_unint_z3 Round]
+   0.83524426s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 9: foldl Cipher::Round [w4_unint_z3 Round]
+   1.089518235s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 10: foldl Cipher::Round [w4_unint_z3 Round]
+   1.069428954s
+   RESULT proved cipher__round_folds__foldl_take = M = 11, N = 11: foldl Cipher::Round [w4_unint_z3 Round]
+   0.106287644s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 0: foldl Cipher::Round [w4_unint_z3 Round]
+   0.60542434s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 1: foldl Cipher::Round [w4_unint_z3 Round]
+   0.999199085s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 2: foldl Cipher::Round [w4_unint_z3 Round]
+   0.945470561s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 3: foldl Cipher::Round [w4_unint_z3 Round]
+   1.074680524s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 4: foldl Cipher::Round [w4_unint_z3 Round]
+   0.927707072s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 5: foldl Cipher::Round [w4_unint_z3 Round]
+   0.948244516s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 6: foldl Cipher::Round [w4_unint_z3 Round]
+   1.086854616s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 7: foldl Cipher::Round [w4_unint_z3 Round]
+   0.993087555s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 8: foldl Cipher::Round [w4_unint_z3 Round]
+   0.918860676s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 9: foldl Cipher::Round [w4_unint_z3 Round]
+   1.14515975s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 10: foldl Cipher::Round [w4_unint_z3 Round]
+   0.979967995s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 11: foldl Cipher::Round [w4_unint_z3 Round]
+   1.179777383s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 12: foldl Cipher::Round [w4_unint_z3 Round]
+   1.025821196s
+   RESULT proved cipher__round_folds__foldl_take = M = 13, N = 13: foldl Cipher::Round [w4_unint_z3 Round]
+   0.121075297s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 0: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.517195421s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 1: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.764023898s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 2: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.72014838s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 3: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.742478512s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 4: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.8905422s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 5: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.763851859s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 6: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.73092676s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 7: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.790999148s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 8: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.762630837s
+   RESULT proved cipher__invround_folds__foldl_take = M = 9, N = 9: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.113719128s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 0: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.572943891s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 1: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   1.030986647s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 2: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.830358692s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 3: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.895912262s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 4: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.841733155s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 5: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.901090248s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 6: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.835845508s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 7: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   1.061264924s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 8: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.854079547s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 9: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.980663334s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 10: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.942034615s
+   RESULT proved cipher__invround_folds__foldl_take = M = 11, N = 11: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.120461144s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 0: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.639949274s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 1: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.939380069s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 2: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   1.145410505s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 3: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.957131865s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 4: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.931944685s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 5: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   1.001288233s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 6: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.967831307s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 7: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.965263652s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 8: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   1.158571057s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 9: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   1.255685032s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 10: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   1.254222971s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 11: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   1.256292493s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 12: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.984183471s
+   RESULT proved cipher__invround_folds__foldl_take = M = 13, N = 13: foldl Cipher::InvRound [w4_unint_z3 InvRound]
+   0.114436513s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 0: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.525107848s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 1: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.735170118s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 2: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.747956643s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 3: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.760027961s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 4: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.756402547s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 5: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.808267117s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 6: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.759065645s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 7: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.782098574s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 8: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   1.031765661s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 9, N = 9: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.117521434s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 0: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.574779257s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 1: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.870777181s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 2: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.818812236s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 3: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.85070105s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 4: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.851282036s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 5: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.84524544s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 6: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.869217643s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 7: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.8623244s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 8: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   1.140795785s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 9: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.958856277s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 10: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.959821183s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 11, N = 11: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.125236103s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 0: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.651047195s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 1: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.965219912s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 2: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.992403852s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 3: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.988650474s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 4: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.955898023s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 5: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.982707316s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 6: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.978554207s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 7: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   1.033518529s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 8: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.97848359s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 9: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   1.342951282s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 10: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   1.350129584s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 11: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   1.053750877s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 12: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   1.37651621s
+   RESULT proved cipher__invround_prime_folds__foldl_take = M = 13, N = 13: foldl Cipher::InvRound' [w4_unint_z3 InvRound']
+   0.185360192s
+   RESULT proved aes128__cipher = Cipher::Cipher`{128} [w4_unint_z3 Round SubBytes ShiftRows AddRoundKey]
+   0.191089772s
+   RESULT proved aes192__cipher = Cipher::Cipher`{192} [w4_unint_z3 Round SubBytes ShiftRows AddRoundKey]
+   0.207592963s
+   RESULT proved aes256__cipher = Cipher::Cipher`{256} [w4_unint_z3 Round SubBytes ShiftRows AddRoundKey]
+   0.303472787s
+   RESULT proved cipher__reverse_keys = reverse : [9]Block, bounds {1, M} [z3]
+   0.299705785s
+   RESULT proved cipher__reverse_keys = reverse : [11]Block, bounds {1, M} [z3]
+   0.316491747s
+   RESULT proved cipher__reverse_keys = reverse : [13]Block, bounds {1, M} [z3]
+   0.468603871s
+   RESULT proved aes128__invcipher = Cipher::InvCipher`{128} [w4_unint_z3 InvRound InvSubBytes InvShiftRows AddRoundKey]
+   0.509286736s
+   RESULT proved aes192__invcipher = Cipher::InvCipher`{192} [w4_unint_z3 InvRound InvSubBytes InvShiftRows AddRoundKey]
+   0.515677789s
+   RESULT proved aes256__invcipher = Cipher::InvCipher`{256} [w4_unint_z3 InvRound InvSubBytes InvShiftRows AddRoundKey]
+   0.492961402s
+   RESULT proved aes128__invcipher_prime = Cipher::InvCipher'`{128} [w4_unint_z3 InvRound' InvSubBytes InvShiftRows AddRoundKey]
+   0.47563644s
+   RESULT proved aes192__invcipher_prime = Cipher::InvCipher'`{192} [w4_unint_z3 InvRound' InvSubBytes InvShiftRows AddRoundKey]
+   0.520196347s
+   RESULT proved aes256__invcipher_prime = Cipher::InvCipher'`{256} [w4_unint_z3 InvRound' InvSubBytes InvShiftRows AddRoundKey]
+== Round fold chain, M = 9
+   7.173023855s
+== Round fold unfolded, M = 9
+   8.217173358s
+== InvRound fold chain, M = 9
+   7.288364687s
+== InvRound fold unfolded, M = 9
+   7.961168523s
+== InvRound' fold chain, M = 9
+   7.48676182s
+== InvRound' fold unfolded, M = 9
+   7.993110211s
+== Round fold chain, M = 11
+   10.883369427s
+== Round fold unfolded, M = 11
+   13.903002982s
+== InvRound fold chain, M = 11
+   10.624422701s
+== InvRound fold unfolded, M = 11
+   14.416780923s
+== InvRound' fold chain, M = 11
+   10.658158018s
+== InvRound' fold unfolded, M = 11
+   14.257301782s
+== Round fold chain, M = 13
+   14.201487433s
+== Round fold unfolded, M = 13
+   24.301631806s
+== InvRound fold chain, M = 13
+   15.557157885s
+== InvRound fold unfolded, M = 13
+   24.110889688s
+== InvRound' fold chain, M = 13
+   16.052575959s
+== InvRound' fold unfolded, M = 13
+   23.736793363s
+== GF28 Products chain, N = 0 .. 8
+   0.880266615s
+== GF28 Products unfolded, N = 8
+   0.060723807s
+== GF28 Pmod_Fold chain, N = 0 .. 15
+   1.650958566s
+== GF28 Pmod_Fold unfolded, N = 15
+   0.187143183s
+== GF2 Pmod_Fold unfolded, N = 9
+   34.119805421s
+== GF2 Pdiv_Fold unfolded, N = 9
+   34.066060283s
+== done
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:09.05
+	Maximum resident set size (kbytes): 3047704
+exit 0
