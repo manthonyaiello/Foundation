@@ -62,8 +62,7 @@ side:
 * **Every check gnatprove generates is proved**: 4264 of 4264 in the CI
   gate's 72 units, and 2565 of 2565 in one slow unit proved on demand
   (`SBox_Entries`, the S-box table against its algebraic definition). The
-  gate's count is the campaign board's for `main` at `6210b99`
-  (`.claude/campaign/PLAN.md`, "The board"; `scripts/board.py` recounts it
+  gate's count is for `main` at `6210b99` (`scripts/board.py` recounts it
   from a proof run); the slow unit's is its entry in
   [`scripts/proof-slow.txt`](scripts/proof-slow.txt).
 * **Nothing is assumed.** There is no `pragma Assume`, no justified check,
@@ -104,9 +103,8 @@ What is **not** proved:
   FIPS 180-4 and RFC 4231. [doc/ffi.md](doc/ffi.md).
 * **Coverage** of the executable code under those properties, statement,
   decision and MC/DC, with every gap explained in
-  [`coverage/explained.txt`](coverage/explained.txt). Measured in CI;
-  the campaign board records 496/499 statements, 10/11 decisions and
-  11/13 MC/DC (`.claude/campaign/PLAN.md`, "The board").
+  [`coverage/explained.txt`](coverage/explained.txt). Measured in CI:
+  496/499 statements, 10/11 decisions and 11/13 MC/DC.
   [doc/coverage.md](doc/coverage.md).
 * **Mutation testing**: 84 one-line faults in the executable code. The FFI
   properties catch 68. Of the other 16, 10 do not change behaviour, and 6

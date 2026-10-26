@@ -364,8 +364,7 @@ lax), `sha256_spec.saw` 4899 s, the whole 6257 s; before #99 (at
 7.2 GB; below, "Running it").
 
 **Why the spec layer costs about 76 times the implementation** (#69;
-`.claude/campaign/measurements/2026-10-22-saw-cost.md`, experiments in
-`saw/experiments/issue-69/`): 31 times as many results, each 2.6 times
+experiments in `saw/experiments/issue-69/`): 31 times as many results, each 2.6 times
 as long. Of the spec layer's time, 44% is lemmas proved again at another
 secondary-stack base (an override matches only the stack state its
 contract names, and SAW cannot name a symbolic one), 33% lemmas per
@@ -466,7 +465,7 @@ SAW's results are of particular subprograms at particular sizes. This
 section says, for every subprogram that has no SAW result of its own, which
 results execute its code (rather than replace a call to it with an
 override), at which sizes, and why it has no result of its own (a campaign
-decision of 2026-10-20; PLAN, "SAW's scope"; #67). Each is proved by gnatprove for all
+decision of 2026-10-20; #67). Each is proved by gnatprove for all
 inputs and FFI-checked. The board's SAW column counts only results of a
 row's own entities; this is what stands behind its `-`. A row whose spec
 entity is a dispatcher of `AES.Spec.Dispatch` (#80) counts the results

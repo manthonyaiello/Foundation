@@ -84,8 +84,7 @@ locally, set it.
 
 ## The board
 
-`scripts/board.py` (Python 3, standard library only) counts the campaign's board
-(`.claude/campaign/PLAN.md`)
+`scripts/board.py` (Python 3, standard library only) counts the board
 from what is on disk: the `.spark` files of the last `prove.sh` run
 (`obj/*/gnatprove/`), each unit's level from the GPR, the trust manifest, the
 rows file and the FFI log. `scripts/board.py` prints markdown;
@@ -177,9 +176,8 @@ at the first counterexample and does not say how many tests passed before it.
 The spec layer mirrors the Cryptol declaration by declaration; the
 implementation is shaped for execution. Mostly there is one implementation
 entity per spec function, proved equal to it. In the places below there is
-not, **by design** (a campaign decision of 2026-10-20; PLAN, "Spec and implementation need not
-be one-to-one"). Each is covered by a proved function, so none is a hole or
-a missing proof. The board shows each by its row kind.
+not, **by design** (a campaign decision of 2026-10-20). Each is covered by
+a proved function, so none is a hole or a missing proof. The board shows each by its row kind.
 
 | row | kind | covered by | why this is the design |
 |---|---|---|---|
@@ -200,7 +198,7 @@ counterpart but that SAW does not prove on their own are in [saw.md, "What SAW p
 (`GF28MultiplicationCorrect`, `SBoxCorrect`, `SBoxInverts`, the `*Inverts`
 of `Cipher.cry`, `InvCipherEquivalence`, `EncryptInverts`, and the others
 its header lists). **They are optional, and they are kept for now** (a campaign
-decision of 2026-10-20; PLAN, "Re-proved Cryptol properties are optional"; #67):
+decision of 2026-10-20; #67):
 
 - **Optional.** SAW proves the spec layer equal to NSA's Cryptol at k =
   128, 192 and 256, which is all of AES, so the Cryptol's properties

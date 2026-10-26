@@ -66,9 +66,7 @@ FSF 16.1.0, gprbuild 26.0.0, rustc 1.95.0, at `3b757f4` plus this
 section. Two full runs, 2026-10-23 00:25 UTC, back to back; the numbers are
 the first's; the second's medians are within 3% of them in 80 of 87 cells
 and within 9% in all (the largest moves are `Expand_Key`'s, the shortest
-operation). Both
-reports, with the quartiles and every function's size, are kept with the
-campaign's measurements. **A
+operation). **A
 shared desktop, not an idle machine**: the 1-minute load was 1.9 before and
 2.4–2.7 after (the benchmark is one of it), no proof was running, and desktop daemons used about one core between them. macOS
 cannot pin a thread to a core; the quartiles are 5–8% apart, against 1%
@@ -146,9 +144,7 @@ Intel Xeon (8 vCPUs), Ubuntu 24.04, GNAT FSF
 16.1.0, gprbuild 26.0.0, rustc 1.95.0, at `6023e8a`, the script
 unmodified. Two full runs, 2026-10-23 18:02 UTC, back to back; the
 numbers are the first's; the second's medians are within 3% of them in
-86 of 87 cells and within 5.4% in all, and the sizes are identical. Both
-reports are in
-[`.claude/campaign/measurements/2026-10-23-aes-perf-x86_64.md`](../../.claude/campaign/measurements/2026-10-23-aes-perf-x86_64.md). **An
+86 of 87 cells and within 5.4% in all, and the sizes are identical. **An
 idle machine**: nothing else ran on it, the 1-minute load was 0.65 before
 and 0.97 after. The quartiles are 1% apart in the median cell; the 8 of
 87 cells wider than 3% (up to 9%) are all table S-box builds.
