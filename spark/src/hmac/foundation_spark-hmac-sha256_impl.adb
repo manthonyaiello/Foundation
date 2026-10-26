@@ -253,7 +253,7 @@ is
    --  spec's `K0 ^ ipad` or `K0 ^ opad`, when K0's bits are K and the
    --  pad's bits are Pad. Stated apart from Lemma_HMAC, whose context is
    --  large, so that the provers see this step alone: within Lemma_HMAC
-   --  it ran out of time on x86_64 (PR #46).
+   --  it ran out of time on x86_64.
    --  @param P K0 xor X, byte by byte.
    --  @param K0 The key block.
    --  @param X The pad's byte, 0x36 or 0x5C.
@@ -699,7 +699,7 @@ is
    --  guarded by its precondition) where an inline Join had an unguarded
    --  'Length = 8 * K'Length, and the first conjunct did not prove there
    --  in 60 s. Changing either difference alone did not help; changing
-   --  both did (#75). Here, without Init_Key, it proves at once.
+   --  both did. Here, without Init_Key, it proves at once.
    --  @param P The prefix, K0 xor ipad.
    --  @param M The text before.
    --  @param Data The bytes absorbed.

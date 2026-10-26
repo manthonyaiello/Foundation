@@ -4,13 +4,13 @@
 --  InvRound and InvRound', the folds of the rounds, and reverse: everything
 --  of Cipher.cry that has no {k}, proved once. Its {k} functions, Cipher,
 --  InvCipher and InvCipher', are in the generic AES_K, one instance per
---  key size (issue #80).
+--  key size.
 --
---  Cipher.cry's properties (M1.5) are not stated here. Ada has no primes
+--  Cipher.cry's properties are not stated here. Ada has no primes
 --  in names, so InvRound' is InvRound_Prime.
 --
 --  Cryptol's built-ins come from the Cryptol prelude in SPARK
---  (Foundation_Spark.Cryptol, #75), instantiated here at AES's types:
+--  (Foundation_Spark.Cryptol), instantiated here at AES's types:
 --  * @@ in SubBytes, InvSubBytes, ShiftRows and InvShiftRows is
 --    Bulk_Indexing's Bulk_Index;
 --  * foldl over the middle round keys, one fold per round function

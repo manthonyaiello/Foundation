@@ -1,7 +1,7 @@
 --  The bridge from the generic {k} functions (AES_K, instantiated as
 --  AES128, AES192 and AES256) to an implementation that is flexible in the
 --  key size: one ghost dispatcher per {k} function, which selects the
---  instance by a run-time K (issue #80, from spike #74). Main.cry's
+--  instance by a run-time K. Main.cry's
 --  split (split key), which depends on k, has one too (Split_Key), so that
 --  Encrypt's and Decrypt's postconditions state their bodies.
 --

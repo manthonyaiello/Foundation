@@ -1,5 +1,5 @@
---  The ghost shims for the Cryptol prelude in SPARK (Foundation_Spark.Cryptol,
---  #75): instances of its generics, exported with Cryptol's C calling
+--  The ghost shims for the Cryptol prelude in SPARK (Foundation_Spark.Cryptol):
+--  instances of its generics, exported with Cryptol's C calling
 --  convention and checked against Cryptol's built-ins by
 --  spark/cryptol/SPARK/Prelude.cry.
 --

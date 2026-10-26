@@ -220,8 +220,8 @@ is
      (if Word_Size >= 32 then 2 ** 64 else 2 ** (2 * Word_Size));
    --  The bound on message lengths: `hash` admits `l` with
    --  `width l <= 2 * w` (Main.cry:55), that is `l < 2 ** (2 * w)`, and
-   --  the spec layer admits lengths below 2 ** 64 (the campaign's bit
-   --  sequence decision), which is the same bound at w = 32.
+   --  the spec layer admits lengths below 2 ** 64 (a bit sequence's index
+   --  type), which is the same bound at w = 32.
 
    function Small_K (L : Bit_Index) return Bit_Index is
      (Lengths.Ceil_Mod (L + 1 + 2 * Bit_Index (Word_Size), Block_Size))

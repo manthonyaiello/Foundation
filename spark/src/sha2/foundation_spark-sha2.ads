@@ -40,7 +40,7 @@ is
    --  and Lengths.Ceil_Mod directly. A wrapper here (SHA2.Ceil_Div whose
    --  body calls Lengths.Ceil_Div) is one more definition between `k` and
    --  its arithmetic, and that layer alone took SHA256_Bytes'
-   --  Lemma_Pad_Bytes_Bits from 3831 CVC5 steps to 52939 (#75).
+   --  Lemma_Pad_Bytes_Bits from 3831 CVC5 steps to 52939.
 
    function To_Bits (Value, Width : Bit_Index) return Bits is
      (Sequences_Of_Bits.Literal (Value, Width))

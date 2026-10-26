@@ -9,7 +9,7 @@
 --  Foundation_Spark.FFI).
 --
 --  Spec_xTimes and Spec_Dot name the spec functions the shims call, in
---  M1.1's Foundation_Spark.AES.Spec.GF28. (Function renamings rather than
+--  Foundation_Spark.AES.Spec.GF28. (Function renamings rather than
 --  a package renaming, which gnatdoc 26 cannot document.)
 
 with Interfaces;

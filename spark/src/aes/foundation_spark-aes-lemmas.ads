@@ -15,7 +15,7 @@
 --  Folds. The implementation's loops apply one round at a time, so their
 --  invariant needs the fold over a prefix extended by one key at the
 --  back. The Lemma_Foldl_*_Snoc lemmas state that, one per round function.
---  The spec's folds are the Cryptol prelude's Folds (#75), which recurse
+--  The spec's folds are the Cryptol prelude's Folds, which recurse
 --  from the last element, so a Snoc lemma is the definition, except that
 --  the fold over the prefix is a fold over a slice, a different array: the
 --  Lemma_Foldl_*_Take_Eq lemmas state that a fold's first N steps depend

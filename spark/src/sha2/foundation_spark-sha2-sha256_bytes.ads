@@ -15,7 +15,7 @@
 --
 --  Everything here is ghost: Step, the compression, is ghost in the spec
 --  layer, and the executable compression and its streaming interface are
---  M2.4's. This unit is what M2.4 refines to, at the level of bytes and
+--  SHA256_Stream's. This unit is what SHA256_Stream refines to, at the level of bytes and
 --  words, with no bit sequences left in its statements.
 --
 --  The padding lemma Lemma_Pad is stated for a message of any bit length,

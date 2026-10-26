@@ -1,4 +1,4 @@
---  The FFI harness (#4): SPARK spec-layer functions exported through C so
+--  The FFI harness: SPARK spec-layer functions exported through C so
 --  that Cryptol can call them by foreign, and properties in spark/cryptol/
 --  can compare them with the NSA Cryptol they mirror.
 --

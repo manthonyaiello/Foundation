@@ -1,7 +1,7 @@
 --  The key schedule's helpers, mirroring algorithms/AES/KeyExpansion.cry
 --  [FIPS-PUB-197 Section 5.2]: Rcon, RotWord and SubWord, which have no
 --  {k}. KeyExpansion itself, KeyExpansion : {k} (Key k) => ..., is in the
---  generic AES_K (issue #80), one instance per key size.
+--  generic AES_K, one instance per key size.
 
 with Foundation_Spark.AES.Spec.SBox;
 with Foundation_Spark.AES.Spec.Types;

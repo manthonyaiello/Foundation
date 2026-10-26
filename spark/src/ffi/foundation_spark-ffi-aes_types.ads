@@ -66,7 +66,7 @@ is
    --  conversion of K to Types.Key_Size, whose predicate Is_Key_Size
    --  discharges. Named Key_Size_Of, not Key_Size, so that it does not
    --  hide (and is not hidden by) Types.Key_Size under the shims' use
-   --  clauses (issue #80, from spike #74).
+   --  clauses.
    --  @param K The key size Cryptol passed.
    --  @return K, as a Key_Size.
 

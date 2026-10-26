@@ -3,22 +3,22 @@
 --  apply, which have no {k}.
 --
 --  Main.cry's Encrypt and Decrypt take a key [k] and a block [128] as bit
---  sequences. Following the campaign's decision on bit sequences, a bit
+--  sequences. As throughout the spec layer, a bit
 --  sequence is a ghost Boolean array (Bits) with an integer index wide
 --  enough for AES's longest, a 256-bit key, and Cryptol's join and split
 --  between [128] and Block are stated here over it. Cryptol sequences are
 --  big-endian: bit 0 of a [8] is the most significant bit of the Byte, and
 --  byte 0 of a [128] is its first eight bits.
 --
---  Main.cry's record AES`{k} of Encrypt and Decrypt is the generic AES_K
---  (issue #80): AES`{k}.Encrypt is AES_K's Encrypt, and Main.cry's
+--  Main.cry's record AES`{k} of Encrypt and Decrypt is the generic AES_K:
+--  AES`{k}.Encrypt is AES_K's Encrypt, and Main.cry's
 --  AES128 = AES`{128} is the instance Spec.AES128, so AES128.Encrypt is
 --  Spec.AES128.Encrypt, as in the Cryptol. The split of a key [k] into
 --  [Nk k]AESWord depends on k, so it is there too (AES_K.Split_Key).
 --  Main.cry's property EncryptInverts is in Spec.Properties.
 --
 --  Cryptol's join and split between bytes and bits, and @ on a byte, come
---  from the Cryptol prelude in SPARK (Foundation_Spark.Cryptol, #75): the
+--  from the Cryptol prelude in SPARK (Foundation_Spark.Cryptol): the
 --  instance Byte_Bits of Join_Split at [8].
 
 with Interfaces;
@@ -44,8 +44,8 @@ is
    --  Bit_Index'Base. Unlike SHA-2's Bit_Index (Foundation_Spark.SHA2),
    --  which must hold message lengths past 2 ** 64, AES needs no wider
    --  type. And 256 needs nine bits, so no value is held in 8 bits, where
-   --  LLVM, whose getelementptr indices are signed, would read 255 as -1
-   --  (#68).
+   --  LLVM, whose getelementptr indices are signed, would read 255 as
+   --  -1.
 
    type Bits is array (Bit_Index range <>) of Boolean;
    --  A Cryptol bit sequence [n], indexed from 0 as Cryptol's @ indexes
