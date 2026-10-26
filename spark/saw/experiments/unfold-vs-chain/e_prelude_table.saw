@@ -1,5 +1,5 @@
 /*
- * #75 item 3: the prelude's @@ on a symbolic [256][8] table indexed by a
+ * The prelude's @@ on a symbolic [256][8] table indexed by a
  * symbolic block (aes_spec_prelude.saw's Table_Indexing proof), by yices
  * and by rme, against z3's 226.5 s in e_prelude_aes.saw. Run 2026-10-23:
  * yices had not finished after 15 minutes and the run was stopped (rme

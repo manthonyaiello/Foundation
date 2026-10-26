@@ -3,7 +3,7 @@
  * (spark/src/aes/foundation_spark-aes-spec-main.ads): the splits of
  * algorithms/AES/Main.cry's Encrypt and Decrypt and their join; and
  * Main.cry's AES`{k} itself, the Split_Key, Encrypt and Decrypt of the
- * instances AES128, AES192 and AES256 of the generic AES_K (#80), at
+ * instances AES128, AES192 and AES256 of the generic AES_K, at
  * k = 128, 192 and 256. Included by aes_spec.saw after the other
  * aes_spec_*.saw files, whose lemmas it uses.
  *
@@ -18,7 +18,7 @@
  * bounds record is two i16, {First, Last}; Block_Bits, Bits (0 .. 127),
  * is passed by reference.
  *
- * Until #68 Bit_Index was 128-bit, and these contracts said i128. The i16
+ * Bit_Index is 16-bit, so these contracts say i16, not i128. The i16
  * is read from GNAT-LLVM 27's IR (2026-10-21): bits_BOUNDS is { i16, i16 }
  * and Byte_At's From an i16, as Bit_Index'Object_Size gives.
  */
@@ -86,7 +86,7 @@ m_byte_at_192 <- verify_byte_at 192;
 m_byte_at_256 <- verify_byte_at 256;
 
 /*
- * Split_Block = Main.cry's split in : [128] -> Block. Since #75 it calls
+ * Split_Block = Main.cry's split in : [128] -> Block. It calls
  * the prelude's Byte_Bits.Split_At (Join_Split, which calls its Value),
  * not Byte_At, so SAW executes those at each concrete byte index and no
  * override applies.
@@ -104,10 +104,10 @@ m_split_block <- verify_spec "main__split_block" []
  * caller's [128 x i8] (sret). While Bit_Index was 128-bit, Join_Block's
  * aggregate indexed its temporary with an i128 GEP index, which SAW 1.6
  * rejects ("Invalid index value in GEP"), and check-saw.sh rewrote it
- * (gep64). #68 narrowed Bit_Index and retired the rewrite; Join_Block no
+ * (gep64). The narrow Bit_Index retired the rewrite; Join_Block no
  * longer indexes anything itself.
  *
- * Since #75 Join_Block is the prelude's Byte_Bits.Join (Join_Split) of the
+ * Join_Block is the prelude's Byte_Bits.Join (Join_Split) of the
  * block, which returns an unconstrained Bits on the secondary stack, that
  * Join_Block copies into the caller's [128]; Join reads bits through
  * Word_Bits.Bit, not Bit_Of, so no override applies. GNAT-LLVM 27
@@ -136,12 +136,12 @@ m_join_block <- verify_spec "main__join_block" []
 
 /*
  * AES<k>.Split_Key (Key) = Main.cry's split (split key) : [Nk k]AESWord,
- * at k = 128, 192, 256 (#80: the generic AES_K's, with no K argument).
+ * at k = 128, 192, 256 (the generic AES_K's, with no K argument).
  * Key, of the instance's constrained Key_Bits (0 .. K - 1), is a pointer
  * to k bits with no bounds. The result, of the constrained Key_Words, is
  * returned BY VALUE at every k ([4|6|8 x [4 x i8]], GNAT-LLVM 27,
- * 2026-10-21; not through sret at 192 and 256, as #80 assumed). Since #75
- * it reads each byte with the prelude's Byte_Bits.Split_At, not Byte_At,
+ * 2026-10-21; not through sret at 192 and 256, as first assumed).
+ * It reads each byte with the prelude's Byte_Bits.Split_At, not Byte_At,
  * so no override applies; SAW executes Split_At and its Value.
  */
 let verify_split_key (k : Int) (nk : Int) =
@@ -161,10 +161,10 @@ m_split_key_256 <- verify_split_key 256 8;
  * Section 5] (Main.cry:21-24): join (Cipher`{k} (KeyExpansion`{k}
  * (split (split key))) (split in)), and InvCipher for Decrypt. These are
  * Main.cry's AES128.Encrypt and the others (Main.cry:43-55), since the
- * instance AES128 of AES_K is Main.cry's AES128 = AES`{128}; before #80
- * they were Main's K-explicit Encrypt and its wrappers in Main's nested
- * AES128 packages, proved separately. Key is a pointer to k bits (the
- * constrained Key_Bits), Input a pointer to 128, the result written
+ * instance AES128 of AES_K is Main.cry's AES128 = AES`{128}, and
+ * likewise at 192 and 256.
+ * Key is a pointer to k bits (the constrained Key_Bits), Input a
+ * pointer to 128, the result written
  * through the caller's pointer. Split_Key's and KeyExpansion's results
  * are constrained, so they live in stack temporaries. Neither function
  * marks the secondary stack itself, but both reach it (GNAT-LLVM 27,

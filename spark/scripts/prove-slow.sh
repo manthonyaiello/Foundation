@@ -25,8 +25,8 @@
 #                                             # push)
 #
 # Env: as scripts/prove.sh (PROVE_JOBS, GNATPROVE_EXTRA, ALR,
-# FOUNDATION_SPARK_PROOF_ALLOWANCE). On the campaign machine, run it through
-# spark-scheduler, with PROVE_JOBS set to the grant.
+# FOUNDATION_SPARK_PROOF_ALLOWANCE). On a machine shared through
+# spark-scheduler, run it through the scheduler, with PROVE_JOBS set to the grant.
 #
 set -euo pipefail
 

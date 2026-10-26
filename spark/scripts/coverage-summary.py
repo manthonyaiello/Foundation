@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""coverage-summary.py -- the per-unit coverage table of check-coverage.sh (#49).
+"""coverage-summary.py -- the per-unit coverage table of check-coverage.sh.
 
 Reads the per-source XML that `gnatcov coverage --annotate=xml` writes (one
 <source> per file, whose first <scope_metric> is the whole unit) and prints,

@@ -1,5 +1,5 @@
 /*
- * #99, experiment "unfold_aes": the AES spec layer's linear recursions,
+ * Unfold vs chain, experiment "unfold_aes": the AES spec layer's linear recursions,
  * each proved unfolded and as the per-index lemma chain, same contracts,
  * overrides and tactics, one after the other in one saw run.
  *
@@ -11,7 +11,7 @@
  *     too, so unfolded it executes Pmod_Fold at every level), unfolded,
  *     against the chains. The GF2 chains are aes_spec_gf.saw's own (its
  *     RESULT lines); the GF28 ones are proved here, as aes_spec_gf.saw
- *     proved them before #99.
+ *     proved them before it unfolded them.
  *
  * Measured 2026-10-23 on the x86_64 instance (results-2026-10-23.txt).
  */

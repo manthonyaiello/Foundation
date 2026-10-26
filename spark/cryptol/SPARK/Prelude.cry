@@ -1,5 +1,5 @@
 /*
- * The Cryptol prelude in SPARK (spark/src/cryptol/, #75), checked against
+ * The Cryptol prelude in SPARK (spark/src/cryptol/), checked against
  * Cryptol's own built-ins through Cryptol's FFI: each property states that
  * an instance of a Foundation_Spark.Cryptol generic computes what the
  * built-in it states computes.

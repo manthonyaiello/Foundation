@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 #
-# gen-sbox-entries.py -- generate Foundation_Spark.AES.Spec.SBox.SBox_Entries
-# (issue #12), the case enumeration that proves SBox.cry's SBoxCorrect.
+# gen-sbox-entries.py -- generate Foundation_Spark.AES.Spec.SBox.SBox_Entries,
+# the case enumeration that proves SBox.cry's SBoxCorrect.
 #
-# The unit is a child of SBox (issue #70), not of Properties, so that its
+# The unit is a child of SBox, not of Properties, so that its
 # closure, and with it the slow proof's fingerprint, is only Types, GF2,
 # GF28 and SBox: a change to KeyExpansion, Cipher or Main does not make it
 # stale.
@@ -15,7 +15,7 @@
 # checks every step against the spec layer's GF2, so a wrong state here is
 # an unproved check, not a wrong proof.
 #
-# The unit is split in two kinds of lemma per row of 16 bytes (#70):
+# The unit is split in two kinds of lemma per row of 16 bytes:
 #   * Lemma_Inverse_Row_X evaluates inner, and states inverse b
 #     SBoxPolynomial for each b of the row as a literal. It names nothing of
 #     SBox but the constant SBoxPolynomial, so its proof context is GF2's;
@@ -117,7 +117,7 @@ SPEC_HEADER = '''\
 --  constants. Lemma_SBox_Row_X then checks the affine transformation of
 --  those inverses against the table. The inverse lemmas name nothing of
 --  SBox but SBoxPolynomial, so that the goals of the steps, nearly all of
---  the unit's, do not carry the table and affine (#70).
+--  the unit's, do not carry the table and affine.
 --
 --  The unit is a child of SBox, so that what its proof depends on is SBox
 --  and what SBox depends on (Types, GF2, GF28), and nothing else of the

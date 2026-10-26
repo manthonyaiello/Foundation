@@ -137,7 +137,7 @@ is
    --  Cryptol's foreign spark_Impl_Dot : [8] -> [8] -> [8]. The executable
    --  AES.Impl.Dot, proved equal to the spec's Dot. The ciphers do not call
    --  it (they multiply by X_Times), so no other property runs it: the
-   --  coverage of the FFI properties (#49) found it never executed.
+   --  coverage of the FFI properties found it never executed.
    --  @param B The first factor.
    --  @param C The second factor.
    --  @return AES.Impl.Dot (B, C).

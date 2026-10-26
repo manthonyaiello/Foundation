@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run.sh -- the controlled experiments of #69 (why SAW costs so much more
+# run.sh -- the controlled spec-layer cost experiments (why SAW costs so much more
 # on the spec layer than on the implementation). Write-up:
 # .claude/campaign/measurements/2026-10-22-saw-cost.md.
 #
@@ -23,7 +23,7 @@
 #               for the experiments that compare two ways of writing a
 #               function;
 #   EXPERIMENT  e_<EXPERIMENT>.saw;
-#   OUT_DIR     default /tmp/saw-issue-69/<EXPERIMENT>[-VARIANT].
+#   OUT_DIR     default /tmp/saw-spec-layer-cost/<EXPERIMENT>[-VARIANT].
 #
 # Needs: saw/obj built by `scripts/check-saw.sh --print` (any SAW_LAYERS
 # that includes spec), the env check-saw.sh needs (GNAT_LLVM_DIR,
@@ -50,7 +50,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 EXP="${1:?usage: run.sh [-v VARIANT] [-p] EXPERIMENT [OUT_DIR]}"
-OUT="${2:-/tmp/saw-issue-69/$EXP${VARIANT:+-$VARIANT}}"
+OUT="${2:-/tmp/saw-spec-layer-cost/$EXP${VARIANT:+-$VARIANT}}"
 
 [ -f "$HERE/e_$EXP.saw" ] || { echo "no $HERE/e_$EXP.saw" >&2; exit 2; }
 [ -f "$SAW_DIR/obj/spec/sha256_spec.bc" ] || { echo "no saw/obj/spec: run scripts/check-saw.sh --print first" >&2; exit 2; }

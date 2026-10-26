@@ -1,6 +1,6 @@
 /*
  * The SPARK spec layer's GF(2^^8), checked against algorithms/AES/GF28.cry
- * through Cryptol's FFI (issue #4).
+ * through Cryptol's FFI.
  *
  * The foreign functions below are the C exports of the SPARK crate's FFI
  * library (spark/foundation_spark_ffi.gpr): spark/scripts/check-ffi.sh links
@@ -31,7 +31,7 @@ foreign spark_Dot : [8] -> [8] -> [8]
 /**
  * Foundation_Spark.FFI.AES_Impl.Dot: the executable AES.Impl.Dot, proved
  * equal to the spec's Dot. The ciphers do not call it, so this is the only
- * property that runs it (found by the coverage run, #49).
+ * property that runs it (found by the coverage run).
  */
 foreign spark_Impl_Dot : [8] -> [8] -> [8]
 

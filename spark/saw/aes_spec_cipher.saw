@@ -3,7 +3,7 @@
  * Foundation_Spark.AES.Spec.Cipher (spark/src/aes/foundation_spark-aes-
  * spec-cipher.ads), and the ciphers Cipher, InvCipher and InvCipher' of
  * the instances AES128, AES192 and AES256 of the generic AES_K
- * (foundation_spark-aes-spec-aes_k.ads, #80), against
+ * (foundation_spark-aes-spec-aes_k.ads), against
  * algorithms/AES/Cipher.cry. Included by
  * aes_spec.saw (and two negative controls) after aes_spec_common.saw and
  * aes_spec_gf.saw (whose Types and Dot lemmas it uses).
@@ -56,7 +56,7 @@ c_invround_prime <- verify_spec "cipher__invround_prime" [c_addroundkey, c_invmi
 /*
  * Foldl_Round, Foldl_InvRound and Foldl_InvRound_Prime: Cryptol's foldl
  * Round, foldl InvRound, foldl InvRound' over [M]Block, the folds in
- * Cipher, InvCipher and InvCipher'. Since #75 each is the prelude's Folds
+ * Cipher, InvCipher and InvCipher'. Each is the prelude's Folds
  * instance (Round_Folds and so on), whose Foldl_Take recurses on the
  * number of steps N, so the lemmas are Foldl_Take's, one per N at each M
  * in 9, 11, 13 (aes_spec_common.saw's foldls and foldl_take_contract).
@@ -64,9 +64,9 @@ c_invround_prime <- verify_spec "cipher__invround_prime" [c_addroundkey, c_invmi
  * bounds read-only, the inverse rounds' writable (foldl_take_contract).
  *
  * SubBytes and InvSubBytes now call Table_Indexing.Bulk_Index, and
- * ShiftRows and InvShiftRows Block_Indexing.Bulk_Index (the prelude's @@,
- * #75): their contracts above are unchanged, and SAW executes the
- * instances. Since #111 Reverse_Keys calls the prelude's
+ * ShiftRows and InvShiftRows Block_Indexing.Bulk_Index (the prelude's @@):
+ * their contracts above are unchanged, and SAW executes the
+ * instances. Reverse_Keys calls the prelude's
  * Key_Sequences.Reverse_Of (below).
  */
 c_foldl_round <- foldls true "cipher__round_folds__foldl_take" c_round {{ Round }} "Round";
@@ -78,7 +78,7 @@ c_foldl_invround_prime <- foldls false "cipher__invround_prime_folds__foldl_take
  * 192 and 256:
  *   Cipher ([w0] # ws # [wr]) in =
  *     AddRoundKey (ShiftRows (SubBytes (foldl Round (AddRoundKey in w0) ws))) wr
- * on the instances AES128, AES192 and AES256 of the generic AES_K (#80),
+ * on the instances AES128, AES192 and AES256 of the generic AES_K,
  * which read Nr as a constant. The overrides are Foldl_Round's (SAW
  * applies the one at length Nr - 1; it calls the shorter ones), SubBytes',
  * ShiftRows' and AddRoundKey's, and z3 leaves the four Cryptol functions
@@ -98,7 +98,7 @@ c_cipher_256 <- verify_spec_cipher 256 14;
  * Reverse_Keys = Cryptol's reverse at [m]Block, at the lengths InvCipher
  * and InvCipher' reverse (Nr - 1 = 9, 11, 13), with bounds {1, m}. The
  * result is on the secondary stack (README "SAW", "The secondary
- * stack"), whose SS_Allocate (GNAT Pro's) is executed. Since #111
+ * stack"), whose SS_Allocate (GNAT Pro's) is executed.
  * Reverse_Keys calls the prelude's Key_Sequences.Reverse_Of (Sequences),
  * executed: it returns Reverse_Of's fat pointer as it is, with no copy
  * (GNAT-LLVM 27's IR), so the contract, and InvCipher's stack, are as
@@ -121,7 +121,7 @@ c_reverse_keys_13 <- verify_reverse_keys 13;
  *   InvCipher' ([w0] # ws # [wr]) in =
  *     AddRoundKey (foldl InvRound' (InvSubBytes (InvShiftRows
  *       (AddRoundKey in wr))) (reverse ws)) w0
- * on the instances of AES_K (#80). Both mark the secondary stack,
+ * on the instances of AES_K. Both mark the secondary stack,
  * reverse ws onto it (Reverse_Keys, executed: its lemma's result is at
  * the stack's first free byte, and the mark leaves that byte where it
  * was), fold, and release the mark, leaving the stack empty and its

@@ -1,5 +1,5 @@
 /*
- * #69, experiment "tobits_w0": where a To_Bits lemma's fixed half second
+ * Spec-layer cost, experiment "tobits_w0": where a To_Bits lemma's fixed half second
  * goes. The lemma at W = 0 (an empty result: no recursion, no bits) is
  * proved in four settings, each timed, admit (no solver) throughout:
  *  - as recorded (stack at 48 bytes, 39 kept);

@@ -1,4 +1,4 @@
---  #69 probe: Probe_Bits at SHA2.Bit_Index's range, a 128-bit integer.
+--  Spec-layer cost probe: Probe_Bits at SHA2.Bit_Index's range, a 128-bit integer.
 
 with Probe_Bits;
 

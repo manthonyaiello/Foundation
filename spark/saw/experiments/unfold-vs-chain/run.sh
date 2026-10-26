@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# run.sh -- #99's measurements: the spec layer's linear recursions proved
+# run.sh -- the unfold-vs-chain measurements: the spec layer's linear recursions proved
 # unfolded against the per-index lemma chains they replaced. Each
 # experiment is a SAW script here, e_<name>.saw, run against the bitcode
 # check-saw.sh builds (saw/obj/), in a scratch copy of saw/'s scripts.
-# saw/experiments/ is outside the record (README "SAW"; #69's run.sh,
-# which this follows, says how).
+# saw/experiments/ is outside the record (README "SAW"; the
+# spec-layer-cost experiments' run.sh, which this follows, says how).
 #
 #   run.sh EXPERIMENT [OUT_DIR]
 #
 #   EXPERIMENT  e_<EXPERIMENT>.saw;
-#   OUT_DIR     default /tmp/saw-issue-99/<EXPERIMENT>.
+#   OUT_DIR     default /tmp/saw-unfold-vs-chain/<EXPERIMENT>.
 #
 # Needs saw/obj built by `scripts/check-saw.sh --print`, and the env
 # check-saw.sh needs (saw and z3 on PATH). The saw run is capped at
@@ -27,7 +27,7 @@ SPARK_DIR="$(cd "$SAW_DIR/.." && pwd)"
 ROOT_DIR="$(cd "$SPARK_DIR/.." && pwd)"
 
 EXP="${1:?usage: run.sh EXPERIMENT [OUT_DIR]}"
-OUT="${2:-/tmp/saw-issue-99/$EXP}"
+OUT="${2:-/tmp/saw-unfold-vs-chain/$EXP}"
 
 [ -f "$HERE/e_$EXP.saw" ] || { echo "no $HERE/e_$EXP.saw" >&2; exit 2; }
 [ -f "$SAW_DIR/obj/spec/sha256_spec.bc" ] || { echo "no saw/obj/spec: run scripts/check-saw.sh --print first" >&2; exit 2; }

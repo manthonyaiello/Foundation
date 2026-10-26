@@ -113,7 +113,7 @@ is
        and then HMAC_init'Result'Length = 8 * SHA2.Bit_Index (B);
    --  The key preprocessing, Cryptol's `HMAC_init Hk K` (Main.cry:56,
    --  Steps 1 to 3 of [FIPS-PUB-198-1 Section 4 Table 1]), private in
-   --  Main.cry and public here because M3.2 is proved against it. By
+   --  Main.cry and public here because HMAC.SHA256_Impl is proved against it. By
    --  cases on the key's length k: a key of B bytes is its bits
    --  (`join K`); a longer key is hashed with Hk and the L-byte digest is
    --  padded with zeros to B bytes; a shorter key is padded with zeros to

@@ -3,7 +3,7 @@
 # check-saw.sh -- SAW's llvm_verify of the SPARK AES, SHA-256 and
 # HMAC-SHA-256 implementations, and of the AES and SHA-256 spec layers,
 # against NSA's Cryptol, on GNAT-LLVM bitcode of the crate's own sources
-# (E4, #21; M4.1 #22, M4.2 #23, M4.3 #24, M4.4 #59). README "SAW".
+# README "SAW".
 #
 # LOCAL ONLY: never wired into a CI workflow. It needs GNAT Pro's LLVM back
 # end (llvm-gcc), which CI does not have and which nobody without GNAT Pro
@@ -18,7 +18,7 @@
 #   1. compiles each of the module's units with $GNAT_LLVM_DIR/bin/llvm-gcc
 #      to saw/obj/<unit>.bc (SWITCHES below), and links them with
 #      $LLVM_LINK_DIR/bin/llvm-link into one module, saw/obj/<module>.bc
-#      (M4.2, #23): SAW takes an override only from the module being
+#      SAW takes an override only from the module being
 #      verified;
 #   2. checks the bitcode, each unit's and the linked module: no symbol of a
 #      ghost entity (the spec layer, the lemmas, ghost functions of the
@@ -28,7 +28,7 @@
 #      by a solver), then runs saw/<module>_impl.saw, every llvm_verify of
 #      which must succeed;
 # then, for each module of SPEC_MODULES (aes_spec, sha256_spec), the spec
-# layer (M4.4):
+# layer:
 #   1. compiles its units the same way plus -fno-inline and the
 #      configuration pragmas of saw/spec.adc (ghost code on, every other
 #      assertion kind off) to saw/obj/spec/<unit>.bc, and links them into
@@ -44,7 +44,7 @@
 #
 # Every saw run is in its own systemd scope capped at SAW_MEMORY_MAX (10G,
 # no swap) when systemd-run --user works, so that a proof that blows up is
-# killed alone instead of taking the machine down (#24: one did, at
+# killed alone instead of taking the machine down (one did, at
 # 15.7 GB). A run killed by the cap is a failure, reported as such. Without
 # systemd-run the runs are not capped, and the script says so.
 #
@@ -201,7 +201,7 @@ UNITS_sha256=(
 #   with a .bc name ("incorrect object file extension").
 SWITCHES=(-c -gnat2022 -gnatp -gnatVn -O0 -emit-llvm)
 
-# The spec layer's modules (M4.4, #59), each the units listed linked into
+# The spec layer's modules, each the units listed linked into
 # saw/obj/spec/<module>.bc, and the script of proofs run on it,
 # saw/<module>.saw.
 SPEC_MODULES=(aes_spec sha256_spec)
@@ -209,7 +209,7 @@ SPEC_MODULES=(aes_spec sha256_spec)
 
 # aes_spec: the AES spec layer's units whose functions the script proves
 # (all ghost but AES.Spec.Types), with the instances AES128, AES192 and
-# AES256 of the generic AES_K, which hold the {k} functions (#80).
+# AES256 of the generic AES_K, which hold the {k} functions.
 UNITS_aes_spec=(
   aes/foundation_spark-aes-spec-types.ads
   aes/foundation_spark-aes-spec-gf28.ads
@@ -264,14 +264,14 @@ HARNESS_UNITS=(saw_soft_links.ads)
 # The ghost entities: none of their symbols may appear in the
 # implementation's bitcode (the spec layer's must define them).
 #  - AES: the spec layer's units (with the generic AES_K's instances and
-#    Dispatch, #80) and the lemmas (all ghost);
+#    Dispatch) and the lemmas (all ghost);
 #  - SHA-256 and HMAC: the ghost units SHA2.SHA256_Blocks, HMAC.Main and
 #    its instance HMAC.SHA256; the ghost functions of the units that also
 #    hold executable code (the SHA2 root, the SHA-256 instance of Main,
 #    SHA256_Bytes, SHA256_Stream, the HMAC root, HMAC.SHA256_Impl); the
-#    instances of the Cryptol prelude (a ghost generic, #75) in the SHA2
-#    and HMAC roots and in the SHA-256 instance of Main (since #111,
-#    SHA2.Lengths holds Ceil_Div and Ceil_Mod, and HMAC.Join calls
+#    instances of the Cryptol prelude (a ghost generic) in the SHA2
+#    and HMAC roots and in the SHA-256 instance of Main (SHA2.Lengths
+#    holds Ceil_Div and Ceil_Mod, and HMAC.Join calls
 #    HMAC.Byte_Words.Join); and every lemma (`__lemma_`), wherever it is
 #    declared.
 GHOST_RE_AES='foundation_spark__aes__(spec__(aes128|aes192|aes256|aes_k|cipher|dispatch|gf2|gf28|keyexpansion|main|properties|sbox)|lemmas|main_lemmas)(__|_E$|$)'
@@ -410,7 +410,7 @@ for mod in "${SPEC_MODULES[@]}"; do
   # SAW 1.6 rejects a getelementptr index wider than 64 bits ("Invalid
   # index value in GEP"; README "The bitcode ABI"). GNAT-LLVM emits one
   # where an array whose index type is 128-bit is indexed directly, as
-  # AES's Join_Block did until #68 narrowed AES.Spec.Main.Bit_Index. Say so
+  # AES's Join_Block did before AES.Spec.Main.Bit_Index was narrowed. Say so
   # here, by name, rather than deep in a proof. (llvm-link -S disassembles.)
   wide="$("$LLVM_LINK" -S "$SPEC_OBJ_DIR/$mod.bc" -o - | grep -c 'getelementptr.*, i128 ' || true)"
   [ "$wide" -eq 0 ] || die "spec/$mod.bc has $wide getelementptr with an i128 index, which SAW 1.6 rejects"
@@ -425,7 +425,7 @@ done
 # and the tactics that prove nothing, admit and its older names assume_unsat
 # and assume_valid, matched as whole words, comments included. saw/experiments/
 # is left out: no recorded run loads it, its scripts are outside the record,
-# and they may use admit on purpose (#69 timed symbolic execution with it).
+# and they may use admit on purpose (one times symbolic execution with it).
 assumed="$(grep -rn --include='*.saw' -E '_unsafe_assume|(^|[^[:alnum:]_])(admit|assume_unsat|assume_valid)([^[:alnum:]_]|$)' "$SAW_DIR" \
   | grep -v "^$SAW_DIR/experiments/" || true)"
 [ -z "$assumed" ] || die "an assumed spec or admit in saw/ (outside saw/experiments/): every override and goal must be proved:
@@ -449,7 +449,7 @@ KILLED_BY_CAP=137  # 128 + SIGKILL: what a scope killed by its MemoryMax returns
 run_saw() {  # run_saw FILE LOG: saw FILE from saw/, capped, its output in LOG; returns saw's status
   local status=0
   # "${CAP[@]+...}": CAP is empty without systemd-run (macOS), and bash 3.2
-  # calls an empty array unbound under set -u (#110).
+  # calls an empty array unbound under set -u.
   (cd "$SAW_DIR" && "${CAP[@]+"${CAP[@]}"}" saw "$1") > "$2" 2>&1 || status=$?
   if [ "$status" -eq "$KILLED_BY_CAP" ] && [ "${#CAP[@]}" -gt 0 ]; then
     echo "!! KILLED (SIGKILL): saw $1 reached the memory cap ($SAW_MEMORY_MAX)" >> "$2"
@@ -539,7 +539,7 @@ T_TOTAL=$(( $(date +%s) - T0 ))
 
 # --- 5. the record --------------------------------------------------------------------------
 
-# sha256sum is GNU coreutils; older macOS has only shasum -a 256 (#110).
+# sha256sum is GNU coreutils; older macOS has only shasum -a 256.
 sha() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
 
 record() {

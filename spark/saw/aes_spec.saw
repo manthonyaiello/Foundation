@@ -1,17 +1,17 @@
 /*
  * llvm_verify of the SPARK AES spec layer (spark/src/aes/foundation_spark-
- * aes-spec-*.ads, ghost) against NSA's Cryptol: M4.4 (#59). Where M4.1 and
- * M4.2 prove the implementation equal to the Cryptol, this proves the spec
+ * aes-spec-*.ads, ghost) against NSA's Cryptol. Where aes_impl.saw
+ * proves the implementation equal to the Cryptol, this proves the spec
  * layer equal to it, so that spec = Cryptol is a proof at these sizes and
  * not only the FFI check's tests.
  *
- * The spec layer's recursions (#99; README "SAW", "The spec layer"). A
+ * The spec layer's recursions (README "SAW", "The spec layer"). A
  * recursive ghost function whose variant is a size is proved one index
  * at a time, each lemma with the lemmas at the smaller indices it calls
  * as overrides, as algorithms/AES/rust/Cipher/theorems/saw.py composes
  * its leaf lemmas, where unfolding it costs more: KeyExpansion's W (two
  * recursive calls), the cipher folds' Foldl_Take and GF2's Pmod_Fold and
- * Pdiv_Fold (measured dearer unfolded, saw/experiments/issue-99). GF28's
+ * Pdiv_Fold (measured dearer unfolded, saw/experiments/unfold-vs-chain). GF28's
  * Products and Pmod_Fold, cheaper unfolded, are proved once, at the size
  * their callers use, SAW unfolding the recursion. GF2's Inner, whose variant is a value (the
  * degree of r'), has no such index: Pgcd and Inverse, which call it, are
@@ -25,7 +25,7 @@
  * are here.
  *
  * The {k} functions are the generic AES_K's, proved on its instances
- * AES128, AES192 and AES256 (#80), one per key size as before #80, now
+ * AES128, AES192 and AES256, one per key size,
  * with no K argument (aes_spec_common.saw's header says how GNAT-LLVM 27
  * passes their arguments, read from the IR).
  */
@@ -65,6 +65,6 @@ print_results 256 "gf2__pgcd" "\\a -> [zext p | p <- GF2::pgcd`{7, 8} a SBox::SB
 print_results 256 "gf2__inverse" "\\a -> GF2::inverse a SBox::SBoxPolynomial, every a : [8]" "rme";
 print_results 256 "sbox__affine" "SBox::affine, every b : [8]" "rme";
 
-/* --- the prelude's instances on their own (#75 item 3) ------------------ */
+/* --- the prelude's instances on their own ------------------------------ */
 
 include "aes_spec_prelude.saw";

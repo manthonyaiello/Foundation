@@ -24,7 +24,7 @@
 #     unit's files, or a tracked unit had no entity analyzed at all. A
 #     library-level generic instance without pragma SPARK_Mode (On) is skipped
 #     whole, with no SPARK_Mode text for the trust gate to find, and gnatprove
-#     still reports success (#5);
+#     still reports success;
 #   * a slow unit's recorded proof is stale, or the slow-proof manifest
 #     disagrees with the tree (below).
 #
@@ -236,7 +236,7 @@ fi
 #
 # The two unit lists reach awk through ENVIRON, not -v: BSD awk (macOS)
 # rejects a -v value with a newline in it ("newline in string"), and POSIX
-# leaves the escape processing of -v values to each awk (#107).
+# leaves the escape processing of -v values to each awk.
 TRACKED_UNITS="$(git ls-files -- src | grep -E '^src/.+\.(ads|adb)$' \
   | sed -E 's#^.*/##; s/\.(ads|adb)$//' | sort -u \
   | { if [ -n "$SLOW_UNITS" ]; then grep -vxF "$SLOW_UNITS"; else cat; fi; } || true)"
@@ -265,7 +265,7 @@ SKIPPED="$(
     }' "$OUT"
 )"
 
-# An imported subprogram (an FFI export unit's Import of its ghost shim, #4)
+# An imported subprogram (an FFI export unit's Import of its ghost shim)
 # has no body to analyze, and gnatprove lists it as "skipped; body is
 # SPARK_Mode => Off". It is allowed when its unit is a foreign-binding entry
 # in trust-surface.txt and its declaration, from the reported line to the

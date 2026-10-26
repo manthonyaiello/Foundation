@@ -132,9 +132,9 @@ Arrays are indexed from 0, as Cryptol's `@` is. The rest of `Types`:
 |---|---|---|
 | `type Block = [16][8]`, [18](../../../algorithms/AES/Types.cry#L18) | `Block`, [59](../../src/aes/foundation_spark-aes-spec-types.ads#L59) | `array (0 .. 15) of Byte` |
 | `type AESWord = [4][8]`, [25](../../../algorithms/AES/Types.cry#L25) | `AESWord`, [66](../../src/aes/foundation_spark-aes-spec-types.ads#L66) | `array (0 .. 3) of Byte` |
-| `type Nk k = k / 32`, [32](../../../algorithms/AES/Types.cry#L32) | `Nk`, [98-100](../../src/aes/foundation_spark-aes-spec-types.ads#L98-L100) | a type function becomes a `Static` function |
-| `type Nr k = Nk k + 6`, [39](../../../algorithms/AES/Types.cry#L39) | `Nr`, [108-110](../../src/aes/foundation_spark-aes-spec-types.ads#L108-L110) | as `Nk` |
-| `[Nk k]AESWord`, `[Nr k + 1]Block` | `Key_Words`, `Round_Keys`, with `Is_Key_Words`, `Is_Round_Keys`, [125-147](../../src/aes/foundation_spark-aes-spec-types.ads#L125-L147) | unconstrained arrays for a run-time `k`; in `AES_K` they are constrained subtypes |
+| `type Nk k = k / 32`, [32](../../../algorithms/AES/Types.cry#L32) | `Nk`, [97-99](../../src/aes/foundation_spark-aes-spec-types.ads#L97-L99) | a type function becomes a `Static` function |
+| `type Nr k = Nk k + 6`, [39](../../../algorithms/AES/Types.cry#L39) | `Nr`, [107-109](../../src/aes/foundation_spark-aes-spec-types.ads#L107-L109) | as `Nk` |
+| `[Nk k]AESWord`, `[Nr k + 1]Block` | `Key_Words`, `Round_Keys`, with `Is_Key_Words`, `Is_Round_Keys`, [124-146](../../src/aes/foundation_spark-aes-spec-types.ads#L124-L146) | unconstrained arrays for a run-time `k`; in `AES_K` they are constrained subtypes |
 | `split`, `join` between `Block` and `[4]AESWord` | `Split`, `Join`, [74-82](../../src/aes/foundation_spark-aes-spec-types.ads#L74-L82) | |
 
 `Types` is the only spec unit that is not ghost: the implementation uses

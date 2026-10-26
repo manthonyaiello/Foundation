@@ -1,5 +1,5 @@
 /*
- * #69, experiment "tobits_w0b": the To_Bits lemma at W = 0 on an empty
+ * Spec-layer cost, experiment "tobits_w0b": the To_Bits lemma at W = 0 on an empty
  * stack, its contract cut down one piece at a time, admit throughout
  * (no solver), each run twice. Which piece of a stack contract costs the
  * half second the simulation itself (2 ms, crucible's profile) does not?

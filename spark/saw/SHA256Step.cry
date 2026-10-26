@@ -1,7 +1,7 @@
 /*
  * The local definitions of algorithms/SHA2/Main.cry's `step` (Main.cry:67)
  * at SHA-256's parameters, lifted out of `step` so that they can be named,
- * for spark/saw/sha256_spec.saw (M4.4, #59). This is ours, not NSA's: it
+ * for spark/saw/sha256_spec.saw. This is ours, not NSA's: it
  * copies `step`'s `where` clause, text for text, with the block `M` that
  * the locals close over made an explicit first argument, and with
  * SHA256.cry's parameters (Klen = 64, w = 32, K = K_256 and the

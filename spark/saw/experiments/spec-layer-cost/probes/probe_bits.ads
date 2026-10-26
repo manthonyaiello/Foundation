@@ -1,8 +1,8 @@
---  #69 probe (not part of the crate; never proved by gnatprove, never
+--  Spec-layer cost probe (not part of the crate; never proved by gnatprove, never
 --  linked into the library): one function of the SHA-2 spec layer written
 --  several ways, each one change away from the spec layer as it is, so
 --  that SAW's cost can be measured one feature at a time. Compiled by
---  saw/experiments/issue-69/run.sh -p with the spec layer's switches
+--  saw/experiments/spec-layer-cost/run.sh -p with the spec layer's switches
 --  (-fno-inline, ghost on), and linked with the secondary stack.
 --
 --  Generic over the bit index, so that the 128-bit index of SHA2.Bits

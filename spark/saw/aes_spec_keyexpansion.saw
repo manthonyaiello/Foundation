@@ -19,7 +19,7 @@ ke_xor <- verify_spec "keyexpansion__Oxor" [] (word_word_contract {{ \a b -> a ^
 /*
  * AES<k>.W (Key, I) = KeyExpansion.cry's w @ i, one lemma per index at
  * each key size, 44, 52 and 60 lemmas (aes_spec_common.saw's w_lemmas
- * says how), on the instances of the generic AES_K (#80).
+ * says how), on the instances of the generic AES_K.
  */
 ke_w_128 <- w_lemmas [ke_rotword, ke_subword, ke_xor] 128 4 43 0 [] [];
 ke_w_192 <- w_lemmas [ke_rotword, ke_subword, ke_xor] 192 6 51 0 [] [];

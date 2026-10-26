@@ -1,4 +1,4 @@
---  The size and performance harness of issue #51 (M5.3): the SPARK AES
+--  The size and performance harness: the SPARK AES
 --  built as release code, against NSA's Rust (algorithms/AES/rust/, driven
 --  by perf/rust/). Not part of the library, not proved, and not scanned by
 --  the proof, trust or docs gates. scripts/perf-aes.sh builds every variant

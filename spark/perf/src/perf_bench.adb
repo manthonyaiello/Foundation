@@ -1,4 +1,4 @@
---  The SPARK side of the AES benchmark (issue #51); perf/rust/src/main.rs is
+--  The SPARK side of the AES benchmark; perf/rust/src/main.rs is
 --  the Rust side, and does the same thing in the same order.
 --
 --  First the FIPS-197 Appendix C known answers go through the build under

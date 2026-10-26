@@ -1,4 +1,4 @@
---  #69 probe: Probe_Bits at a 64-bit index.
+--  Spec-layer cost probe: Probe_Bits at a 64-bit index.
 
 with Probe_Bits;
 

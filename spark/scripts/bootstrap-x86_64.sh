@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
 # bootstrap-x86_64.sh -- from a bare Ubuntu 24.04 x86_64 machine to a green
-# check-ffi.sh, in one command (issue #6, M0.5).
+# check-ffi.sh, in one command.
 #
 # The x86_64 instance dies 24 hours after it starts, and anything not
-# scripted is lost with it. This script installs the campaign's toolchain,
+# scripted is lost with it. This script installs the pinned toolchain,
 # clones (or updates) the fork, and runs the build, the proof gate and the FFI
 # check. Run it again at any time: every phase skips what is already in place.
 #
@@ -69,7 +69,7 @@
 #
 # Env:
 #   FOUNDATION_TOOLS   where fetched tools go, and env.sh (default
-#                      ~/foundation-tools). Alire's own state stays where alr
+#                      ~/spark-tools). Alire's own state stays where alr
 #                      puts it (~/.alire, ~/.config/alire,
 #                      ~/.local/share/alire), as in CI.
 #   FOUNDATION_REPO    the checkout (default: the checkout this script is in,
@@ -85,7 +85,7 @@
 #                      passed through to the GPR: "ci" (the default here:
 #                      CI's allowance, which never shortens a committed
 #                      level, README "Levels") or "none" (the levels' own
-#                      timeouts, as on the campaign machine).
+#                      timeouts, as on the aarch64 container).
 #   SAW_SIGNING_KEY_FILE
 #                      an armored public key; when set, SAW's .sig is verified
 #                      with it (and the key must be SAW_SIGNING_KEY's).
@@ -117,7 +117,7 @@ for arg in "$@"; do
   esac
 done
 
-TOOLS="${FOUNDATION_TOOLS:-$HOME/foundation-tools}"
+TOOLS="${FOUNDATION_TOOLS:-$HOME/spark-tools}"
 REMOTE="${FOUNDATION_REMOTE:-$REMOTE_DEFAULT}"
 REF="${FOUNDATION_REF:-}"
 
@@ -477,7 +477,7 @@ fi
 echo ">> $REPO at $(git -C "$REPO" rev-parse --short HEAD) ($(git -C "$REPO" log -1 --format=%s))"
 
 PINS="$REPO/spark/scripts/toolchain-pins.env"
-[ -f "$PINS" ] || die "$PINS missing: is $REPO a checkout of the fork at M0.5 or later?"
+[ -f "$PINS" ] || die "$PINS missing: is $REPO a checkout of the fork with spark/scripts/toolchain-pins.env?"
 # shellcheck source=/dev/null  # the clone's copy, not this script's sibling
 . "$PINS"
 # Where a tool goes when it is fetched (and where a later run finds it).
@@ -638,20 +638,20 @@ done
 # --- gnat-llvm ------------------------------------------------------------------------
 
 begin gnat-llvm
-# The GNAT-LLVM that E4's SAW checks use is GNAT Pro's (M4.1, #22), which is
+# The GNAT-LLVM that the SAW checks use is GNAT Pro's, which is
 # not public: nothing of it is downloaded. When GNAT_LLVM_DIR names its
 # install, check it and record it in env.sh for scripts/check-saw.sh; when it
 # is unset, skip: everything but check-saw.sh works without it. It is not put
 # on PATH: the crate's toolchain stays FSF GNAT (README "SAW").
 #
-# check-saw.sh also needs llvm-link (M4.2, #23), which GNAT Pro does not
+# check-saw.sh also needs llvm-link, which GNAT Pro does not
 # ship, of the same LLVM version, pinned in toolchain-pins.env. Present:
 # LLVM_LINK_DIR's bin/llvm-link, else PATH's (in a bin/ directory, whose
 # parent becomes LLVM_LINK_DIR), else an earlier run's. Fetched: from LLVM's
 # own release; the tarball is 2 GB, and only bin/llvm-link, linked against
-# libc and libz only, is extracted, to $TOOLS/llvm-<version>. Either way its
-# directory is written to env.sh as LLVM_LINK_DIR. (Until #68, bin/opt and
-# bin/llvm-extract were extracted too, for a GEP rewrite #68 retired.)
+# libc and libz only, is extracted, to $TOOLS/llvm-<version>.
+# Either way its directory is written to env.sh as
+# LLVM_LINK_DIR.
 # Only when GNAT_LLVM_DIR is set: nothing else uses it.
 GNAT_LLVM_ENV=""
 LLVM_LINK_GIVEN="${LLVM_LINK_DIR:-}"
@@ -695,7 +695,7 @@ if [ -n "${GNAT_LLVM_DIR:-}" ]; then
 export LLVM_LINK_DIR=\"$LLVM_LINK_DIR\""
   end
 else
-  echo ">> skipped: GNAT_LLVM_DIR is unset. Only scripts/check-saw.sh (local, E4) needs it:"
+  echo ">> skipped: GNAT_LLVM_DIR is unset. Only scripts/check-saw.sh (local only) needs it:"
   echo "   set it to a GNAT Pro LLVM install (the directory holding bin/llvm-gcc) and rerun."
   end "skipped (no GNAT_LLVM_DIR)"
 fi

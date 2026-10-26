@@ -1,5 +1,5 @@
 /*
- * #69, experiment "recursion_aes": KeyExpansion's W at k = 128 (two
+ * Spec-layer cost, experiment "recursion_aes": KeyExpansion's W at k = 128 (two
  * recursive calls, at I - 1 and I - Nk) unfolded at I = 4 .. 20, no W
  * lemma as an override (the leaves' lemmas still are), against the
  * recorded 44 lemmas (aes_spec_keyexpansion.saw's w_lemmas, rerun here

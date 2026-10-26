@@ -12,7 +12,7 @@
 #     the GPR's proof switches, alire.toml, a tool version;
 #   * `refresh` keeps a recorded proof when the only change is a new input
 #     unchanged since the recorded commit (alire.toml joining the
-#     fingerprint, #67), and refuses otherwise;
+#     fingerprint), and refuses otherwise;
 #   * check-proof.sh, gating a synthetic gnatprove.out (CHECK_PROOF_OUT),
 #     exempts the listed unit, and ONLY it, from the "tracked unit absent"
 #     and "entity skipped" rules: an unlisted unit still fails both.

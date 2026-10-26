@@ -12,13 +12,13 @@
 --  division, a recursive fold over the bits of the dividend, most
 --  significant first, as GF28's Pmod_Fold is for pmod.
 --
---  From the Cryptol prelude in SPARK (Foundation_Spark.Cryptol, #75): @ on
+--  From the Cryptol prelude in SPARK (Foundation_Spark.Cryptol): @ on
 --  a [9] (Words). pmult and pdiv stay inline. pmult: as the prelude's
 --  Pmult (Polynomial_Products at {8, 8}), GF2 still proves, but
 --  SBox_Entries, which evaluates pmult on constants at every step of
 --  inner for all 256 bytes, ran past 77 minutes at -j6 with 9 of its 32
 --  subprograms done, against about 26 minutes for the whole unit with
---  Pmult's closed form below (#75). pdiv: the prelude's Pdiv reduces by its Top (y), the largest power of
+--  Pmult's closed form below. pdiv: the prelude's Pdiv reduces by its Top (y), the largest power of
 --  2 not above y, where Pdiv_Fold reduces by Lead (y), and Inner_Step's
 --  postcondition rests on Pdiv_Fold's, which pairs it with Pmod_Fold.
 --  With Pdiv as the prelude's (an instance of Polynomial_Quotients at

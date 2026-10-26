@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # check-coverage.sh -- GNATcoverage of the executable SPARK under the
-# Cryptol-driven FFI properties (issue #49): statement, decision and MC/DC
+# Cryptol-driven FFI properties: statement, decision and MC/DC
 # (gnatcov's stmt+mcdc, which includes decision)
 # coverage of the units in coverage/units.txt (the executable
 # implementations and the non-ghost FFI export units), from every property

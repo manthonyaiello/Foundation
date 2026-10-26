@@ -1,7 +1,7 @@
 /*
  * llvm_verify of Foundation_Spark.AES.Impl (spark/src/aes/foundation_
  * spark-aes-impl.ad[sb]) against NSA's Cryptol, directly: the SPARK spec
- * layer plays no part. M4.1 (#22) proved three leaves; M4.2 (#23) proves
+ * layer plays no part. It proves three leaves, and
  * the key schedule and both ciphers at k = 128, 192 and 256: Expand_Key
  * = KeyExpansion.cry's KeyExpansion`{k}, Encrypt_Block = Cipher.cry's
  * Cipher`{k} and Decrypt_Block = Cipher.cry's InvCipher`{k}.

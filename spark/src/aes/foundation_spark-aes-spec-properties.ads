@@ -6,7 +6,7 @@
 --  CipherInverts and CipherInverts', and Main.cry's EncryptInverts.
 --  SBoxCorrect is proved entry by entry, by evaluation, in
 --  Foundation_Spark.AES.Spec.SBox.SBox_Entries, a child of SBox so that its
---  slow proof depends on nothing else of the spec layer (issue #70).
+--  slow proof depends on nothing else of the spec layer.
 --
 --  Each property is a ghost procedure named as the Cryptol property, whose
 --  postcondition is the property's body and whose parameters are its
@@ -20,7 +20,7 @@
 --  the same theorem, and a property that SAW already carries to the spec
 --  layer is kept only as a cross-check (PLAN.md, "Re-proved Cryptol
 --  properties are optional"). Proved over the dispatchers, each holds for
---  every key size at the cost of one proof (issue #80). The other
+--  every key size at the cost of one proof. The other
 --  procedures are the lemmas the properties are proved with.
 --
 --  Ada's = on arrays is componentwise, not the provers' equality, so a
@@ -407,7 +407,7 @@ is
    with Post => Main.Join_Block (Main.Split_Block (Bs)) = Bs;
    --  Cryptol's join at [16][8] -> [128] undoes its split at [128] ->
    --  [16][8]. Stated apart from EncryptInverts, whose context holds the
-   --  dispatchers' contracts and timed out on it (spike #74).
+   --  dispatchers' contracts and timed out on it.
    --  @param Bs The block as 128 bits.
 
    procedure Lemma_Split_Join_Block (B : Block)

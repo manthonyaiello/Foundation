@@ -1,7 +1,7 @@
 /*
  * NEGATIVE CONTROL: must FAIL. check-saw.sh fails if it proves.
  *
- * One of aes_spec.saw's fold lemmas with the wrong Cryptol: since #75
+ * One of aes_spec.saw's fold lemmas with the wrong Cryptol:
  * the fold of Foldl_Round is the prelude's Round_Folds.Foldl_Take, and
  * this is its lemma at M = 9 (the length Cipher at k = 128 folds), N = 9,
  * against foldl Round z (take`{9} (reverse xs)), with the overrides of

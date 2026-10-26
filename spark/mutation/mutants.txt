@@ -1,4 +1,4 @@
-# mutants.txt -- the mutants of the executable SPARK (#104), read by
+# mutants.txt -- the mutants of the executable SPARK, read by
 # scripts/mutation.py.
 #
 # Each mutant is one small change to one line of one source, in the

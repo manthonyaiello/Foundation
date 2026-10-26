@@ -1,5 +1,5 @@
-//! The entry points the benchmark times and the size table measures (issue
-//! #51): one non-inlined wrapper per operation of NSA's Rust AES
+//! The entry points the benchmark times and the size table measures:
+//! one non-inlined wrapper per operation of NSA's Rust AES
 //! (`algorithms/AES/rust/`), as `perf/src/perf_aes.ads` has for the SPARK.
 //! Whatever the optimizer inlines into a wrapper is counted in its size,
 //! and every timed call is one real call on both sides.

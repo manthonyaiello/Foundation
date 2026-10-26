@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # test-bootstrap-detect.sh -- tests bootstrap-x86_64.sh's "present and
-# matching the pin" detection (#100), anywhere bash 3.2 or later runs.
+# matching the pin" detection, anywhere bash 3.2 or later runs.
 #
 # bootstrap-x86_64.sh itself runs only on x86_64 Linux, and its real test is
 # the bootstrap workflow, which runs it on machines with nothing installed and

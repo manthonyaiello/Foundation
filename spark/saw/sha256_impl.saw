@@ -3,15 +3,15 @@
  * foundation_spark-sha2-sha256_stream.ad[sb]) and Foundation_Spark.HMAC.
  * SHA256_Impl (spark/src/hmac/foundation_spark-hmac-sha256_impl.ad[sb])
  * against NSA's Cryptol, directly: the SPARK spec layer plays no part.
- * M4.3 (#24) proves Compress = Main.cry's `step` at SHA-256 for all
+ * It proves Compress = Main.cry's `step` at SHA-256 for all
  * inputs, the one-shot Hash = Main.cry's `hash` at SHA-256 at fixed
  * message lengths, and HMAC_SHA256 = HMAC/Main.cry's `HMAC` at SHA-256
  * (packaging/Hash.cry's HMAC) at fixed key and text lengths.
  *
- * SAW proves each length separately; gnatprove (E2, E3) proves the same
+ * SAW proves each length separately; gnatprove proves the same
  * subprograms for every length, against the SPARK spec layer.
  *
- * Why fixed lengths (#67 item 9; README "SAW", "What SAW proves on its
+ * Why fixed lengths (README "SAW", "What SAW proves on its
  * own, in place, or not at all"): NSA has no implementation proof of
  * SHA-256 or HMAC to compare against. There is no Rust or C for them, and
  * algorithms/SHA2/theorems proves properties of the Cryptol alone
@@ -166,7 +166,7 @@ let prove_compress m (tag : String) = do {
  * with SAW's lax arithmetic (sha256_impl_common.saw), under which an
  * overflowing nuw/nsw operation yields its wrapped value instead of a
  * failed obligation. The functional result is still proved equal to the
- * Cryptol; the absence of overflow is gnatprove's (AoRTE, E2 and E3), not
+ * Cryptol; the absence of overflow is gnatprove's (AoRTE), not
  * SAW's. Their overrides are re-proved in that module (an override must
  * come from the module verified), and every result of it is marked "lax
  * arithmetic module".

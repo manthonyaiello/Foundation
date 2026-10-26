@@ -1,4 +1,4 @@
---  A Cryptol prelude in SPARK (#75): the Cryptol built-ins that the spec
+--  A Cryptol prelude in SPARK: the Cryptol built-ins that the spec
 --  layers use, each stated once, under its Cryptol name, as a ghost
 --  generic. A spec unit instantiates a child at its own types and calls the
 --  instance where the Cryptol calls the built-in, so the translation from
@@ -23,7 +23,7 @@
 --
 --  What is not imposed. The spec layers keep their own types: each child
 --  is generic over the index, element and array types it works on, so AES's
---  narrow bit index (#68) and SHA-2's 128-bit one both instantiate it, and
+--  narrow bit index and SHA-2's 128-bit one both instantiate it, and
 --  AES's bytes stay Unsigned_8 with a Cryptol-order bit accessor.
 --
 --  Each child's functions are expression functions, so a caller's proof

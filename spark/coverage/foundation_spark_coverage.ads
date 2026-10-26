@@ -1,4 +1,4 @@
---  The coverage dump (#49): in the coverage build of the FFI library only
+--  The coverage dump: in the coverage build of the FFI library only
 --  (foundation_spark_ffi.gpr with FOUNDATION_SPARK_FFI_BUILD=coverage, as
 --  scripts/check-coverage.sh builds it), never in the crate, the proof or
 --  the FFI check.

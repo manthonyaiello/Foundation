@@ -5,7 +5,7 @@
 --  (bytes for bits, streaming for whole-message hashing), so it is not
 --  part of the spec layer, which mirrors the Cryptol.
 --
---  The MAC is computed with M2.4's streaming SHA-256 (SHA2.SHA256_Stream)
+--  The MAC is computed with the streaming SHA-256 (SHA2.SHA256_Stream)
 --  as FIPS 198-1 describes it: the key is brought to one 64-byte block
 --  K0 (Init_Key, Steps 1 to 3), an inner context hashes K0 xor ipad and
 --  then the text (Steps 4 to 6), and an outer context hashes K0 xor opad
@@ -14,7 +14,7 @@
 --
 --  The proof composes SHA256_Stream's streaming theorem (Lemma_Update and
 --  Lemma_Final: the contexts compute Hash_Bytes of what they were fed),
---  #35's Lemma_Hash_Bytes (Hash_Bytes is SHA256.Hash on the bits), and
+--  SHA256_Bytes.Lemma_Hash_Bytes (Hash_Bytes is SHA256.Hash on the bits), and
 --  extensionality: Ada's array "=" is not the provers' equality, so
 --  SHA256.Hash of two bit sequences that are "=" is shown "=" by a lemma
 --  in the body.

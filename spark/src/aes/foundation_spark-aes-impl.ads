@@ -8,7 +8,7 @@
 --  256, with the key size K : Key_Size as an explicit parameter and
 --  Is_Key_Words or Is_Round_Keys as the precondition: no executable code is
 --  tripled. The spec's {k} functions are generic in the key size
---  (Spec.AES_K, issue #80), and the postconditions name them through the
+--  (Spec.AES_K), and the postconditions name them through the
 --  ghost dispatchers Spec.Dispatch.KeyExpansion, Cipher, InvCipher and
 --  InvCipher_Prime, which select the instance by K.
 --

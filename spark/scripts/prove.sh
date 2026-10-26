@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# prove.sh -- the one way this crate calls gnatprove (issue #5).
+# prove.sh -- the one way this crate calls gnatprove.
 #
 # Local ticks and CI's proof gate (check-proof.sh) both prove through this
 # script, so the two cannot drift apart: same project, same committed levels,

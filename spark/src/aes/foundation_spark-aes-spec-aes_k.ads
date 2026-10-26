@@ -2,7 +2,7 @@
 --  Cryptol is polymorphic in it: {k} (Key k) => ... They are
 --  KeyExpansion (KeyExpansion.cry), Cipher, InvCipher and InvCipher'
 --  (Cipher.cry), and Main.cry's AES`{k}, the record of Encrypt and
---  Decrypt (issue #80, from spike #74).
+--  Decrypt.
 --
 --  The formal K is the Cryptol's k, and its subtype Types.Key_Size is the
 --  constraint Key k. The Cryptol's [Nk k]AESWord, [Nr k + 1]Block and [k]

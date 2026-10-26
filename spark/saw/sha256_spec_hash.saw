@@ -23,7 +23,7 @@
  * Count <= len. P and its bounds are writable and stated unchanged (Pad
  * leaves them on the secondary stack).
  *
- * Since #75 the recursion is the prelude's: Word_Of calls the SHA-256
+ * The recursion is the prelude's: Word_Of calls the SHA-256
  * Word_Sequences.Value (Cryptol.Join_Split), and Parse_Block calls
  * Word_Sequences.Split_At, which calls Value at Count = 32. So these
  * lemmas are Value's, with Word_Of's contract, and Parse_Block takes the
@@ -54,7 +54,7 @@ rec word_of_lemmas (len : Int) (c : Int) (prev : [LLVMSpec]) : TopLevel LLVMSpec
 /*
  * Parse (P, N) = Preprocessing.cry's parse`{w = 32, N} P (Preprocessing.cry:47,
  * [FIPS-PUB-180-4 Section 5.2]): parse M = split`{N, 16} (split`{N * 16, w} M),
- * on its own (#67 item 3), at the padded lengths Hash uses: N = 1 and 2
+ * on its own, at the padded lengths Hash uses: N = 1 and 2
  * blocks, and 3 and 4 with saw_long. P is a fat pointer to 512 * N bits
  * with bounds {0, 512 * N - 1}, writable and stated unchanged, as
  * word_of_contract has it (in Hash it is Pad's result, on the secondary
@@ -94,12 +94,12 @@ let verify_parse (nb : Int) (word_of : LLVMSpec) =
  * bounds are writable and stated unchanged (Parse leaves them on the
  * secondary stack).
  *
- * Since #75 the recursion is the prelude's: Foldl_Step (H, Ms, N) calls
+ * The recursion is the prelude's: Foldl_Step (H, Ms, N) calls
  * the SHA-256 Blocks.Foldl_Take (H, Ms, N) (Cryptol.Folds), with the same
  * arguments, which recurses on N, one call per level. So this lemma is
  * Foldl_Take's, with Foldl_Step's contract, and Hash reaches it through
- * Foldl_Step, which SAW executes. Since #99 SAW unfolds the recursion: one
- * proof at N = nt, where there was a lemma per N in 0 .. nt.
+ * Foldl_Step, which SAW executes. SAW unfolds the recursion: one
+ * proof at N = nt, not a lemma per N in 0 .. nt.
  */
 let block_vector_bounds_t = bits_bounds_t;
 let foldl_step_contract (nt : Int) (n : Int) = do {

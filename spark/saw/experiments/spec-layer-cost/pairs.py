@@ -1,4 +1,4 @@
-"""#69: the same Cryptol function proved twice, once of the implementation
+"""Spec-layer cost: the same Cryptol function proved twice, once of the implementation
 and once of the spec layer: results and SAW's summed time per side, from
 a check-saw.sh record (saw/results.txt). Leaves are counted on the side
 that proves them, once per module load.

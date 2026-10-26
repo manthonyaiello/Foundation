@@ -1,4 +1,4 @@
---  Part of the SAW harness of the spec layer (M4.4, #59), not of the crate:
+--  Part of the SAW harness of the spec layer, not of the crate:
 --  scripts/check-saw.sh compiles it to bitcode and links it into the spec
 --  modules (saw/obj/spec/), with GNAT Pro's runtime units
 --  System.Secondary_Stack and System.Soft_Links, also compiled to bitcode

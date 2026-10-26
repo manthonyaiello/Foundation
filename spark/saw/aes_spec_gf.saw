@@ -65,7 +65,7 @@ gf28_product_bit <- verify_spec "gf28__product_bit" []
                        }) z3 "z3" "\\x i -> (drop`{1} x : [15]) @ i, i < 15";
 
 /*
- * Since #75, Head, Bit and Product_Bit call the prelude's Words.Head and
+ * Head, Bit and Product_Bit call the prelude's Words.Head and
  * Words.Bit (instances Byte_Bits and Product_Bits), which SAW executes;
  * their contracts above are unchanged.
  *
@@ -76,9 +76,9 @@ gf28_product_bit <- verify_spec "gf28__product_bit" []
  * zero-extended):
  *   Products (X, Y, N) = zext (pmult x (take`{N} y))
  * Pmult (B, C) calls Products.Pmult, which calls Products at N = 8. The
- * recursion has one call per level, and since #99 SAW unfolds it: one
+ * recursion has one call per level, and SAW unfolds it: one
  * proof at N = 8 (0.06 s, against 0.88 s for a lemma per N in
- * 0 .. 8; saw/experiments/issue-99).
+ * 0 .. 8; saw/experiments/unfold-vs-chain).
  */
 let products_contract (n : Int) (rhs : Term) = do {
   x <- llvm_fresh_var "x" poly_t;
@@ -116,9 +116,9 @@ gf28_reduce <- verify_spec "gf28__reduce" []
  * modulo the [9] Y of the leading N bits of the [15] X, with Reduce's and
  * Product_Bit's lemmas as overrides:
  *   Pmod_Fold (X, Y, N) = pmod (take`{N} x) y
- * under the precondition 256 <= Y < 512. One call per level: since #99
+ * under the precondition 256 <= Y < 512. One call per level:
  * SAW unfolds it, one proof at N = 15 (0.19 s, against 1.65 s for a
- * lemma per N in 0 .. 15; saw/experiments/issue-99).
+ * lemma per N in 0 .. 15; saw/experiments/unfold-vs-chain).
  */
 let pmod_fold_contract (n : Int) (rhs : Term) = do {
   x <- llvm_fresh_var "x" poly_t;

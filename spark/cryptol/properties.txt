@@ -1,4 +1,4 @@
-# properties.txt -- the FFI properties, run by scripts/check-ffi.sh (#4).
+# properties.txt -- the FFI properties, run by scripts/check-ffi.sh.
 #
 # One line per property:
 #
@@ -136,7 +136,7 @@ SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked          | HMAC::Main::HMAC (SH
 SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked_long     | HMAC::Main::HMAC (SHA-256)           | check   | 3
 SPARK/HMAC/SHA256.cry        | prop_HMAC_Chunked_RFC4231  | HMAC::Main::HMAC (SHA-256)           | check   | 100
 SPARK/HMAC/SHA256.cry        | prop_Init_Key              | HMAC::Main::HMAC_init (SHA-256)      | check   | 100
-# The Cryptol prelude in SPARK (#75): each generic of Foundation_Spark.Cryptol
+# The Cryptol prelude in SPARK: each generic of Foundation_Spark.Cryptol
 # against the Cryptol built-in it states, through the instances the spec
 # layers use or AES's types. Not board rows: the board counts the NSA
 # declarations, and these are the built-ins they are written in.

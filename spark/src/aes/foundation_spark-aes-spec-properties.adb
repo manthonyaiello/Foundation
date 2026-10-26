@@ -12,7 +12,7 @@ is
    --  GF28MultiplicationCorrect's two conjuncts are proved apart, each in a
    --  lemma of its own, so that the provers never unfold Dot, Pmult_Fold,
    --  Pmod_Fold and Foldl_Mult for both at once: together, the one
-   --  postcondition ran out of time on x86_64 (PR #46).
+   --  postcondition ran out of time on x86_64.
 
    procedure Lemma_xTimes_Dot (B : Byte)
    with Post => GF28.xTimes (B) = GF28.Dot (B, 2);

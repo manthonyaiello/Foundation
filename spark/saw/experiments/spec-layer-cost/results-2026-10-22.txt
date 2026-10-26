@@ -1,4 +1,4 @@
-# #69 experiments: run-all.sh on the x86_64 IOD, main = 09fa337, 2026-10-22 00:35-01:15 UTC, nothing else running.
+# Spec-layer cost experiments: run-all.sh on the x86_64 instance, main = 09fa337, 2026-10-22 00:35-01:15 UTC, nothing else running.
 # One block per experiment: labels.sh's output (label, Time lines after it, first and last Time), then wall-clock, peak RSS, exit status.
 # Per-lemma lines of the chains are left out (in each saw.log).
 

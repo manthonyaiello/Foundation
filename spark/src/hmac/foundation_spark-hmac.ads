@@ -76,7 +76,7 @@ is
    --  the prelude's Join_Split.Join states it: each byte's bits in order,
    --  most significant first, so bit I is bit I mod 8 of byte I / 8.
    --  Through the instance, SHA256_Impl.Lemma_Update needs its prefix
-   --  reasoning stated apart (Lemma_Prefix_Extends there says why, #75).
+   --  reasoning stated apart (Lemma_Prefix_Extends there says why).
    --  @param K The bytes.
    --  @return Their 8 * K'Length bits, indexed from 0.
 

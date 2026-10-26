@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""board.py -- count the campaign's board from what is on disk (issue #5).
+"""board.py -- count the campaign's board from what is on disk.
 
 The PLAN's board says, per function, how far along it is: does the spec
 exist, is it checked against the Cryptol (FFI), is its implementation proved,
-and (E4) does SAW prove it. This script counts that board instead of
+and does SAW prove it. This script counts that board instead of
 remembering it. It reads, relative to spark/:
 
   obj/*/gnatprove/*.spark      gnatprove's per-unit results, as written by the
@@ -12,9 +12,9 @@ remembering it. It reads, relative to spark/:
   scripts/trust-surface.txt    the trust manifest: every site gnatprove does
                                not prove (the trust gate keeps it exact)
   scripts/board-rows.txt       the rows: function -> spec entity, impl entity,
-                               and the row's kind (#67)
-  obj/ffi/ffi-results.txt      the FFI log written by scripts/check-ffi.sh
-                               (M0.3); "not run" while it does not exist
+                               and the row's kind
+  obj/ffi/ffi-results.txt      the FFI log written by scripts/check-ffi.sh;
+                               "not run" while it does not exist
   scripts/proof-slow.txt       the units proved on demand: their recorded
                                proofs, checked against their fingerprints
                                (README "Slow proofs")
@@ -89,7 +89,7 @@ SAW_SCRIPTS = ["saw", "scripts/check-saw.sh", "scripts/toolchain-pins.env"]
 
 #: What is under saw/ but not an input of the record, as git exclude
 #: pathspecs: the records themselves, and saw/experiments/, scratch
-#: measurements (#69) that no recorded run loads (nothing check-saw.sh runs
+#: measurements that no recorded run loads (nothing check-saw.sh runs
 #: includes them, and its assumed-spec guard skips saw/experiments/, whose
 #: scripts may use admit). The trailing
 #: slash keeps the exclusion to that one directory.
@@ -242,7 +242,7 @@ def find_entity(spark, name):
         # A .spark file's "entities" also names entities its unit only
         # refers to (a shim's callee in another unit). The unit that
         # declares an entity is the one whose "spark" map has a status for
-        # it, so only those ids count (#4).
+        # it, so only those ids count.
         status = doc.get("spark", {})
         ids = {int(k) for k, v in doc.get("entities", {}).items()
                if v.get("name", "").lower() == want
@@ -482,7 +482,7 @@ def saw_cell(rec, layer, entity):
 
     A result matches when its name's parts are the last parts of the
     entity's qualified name (sha256_stream.hash is ...SHA2.SHA256_Stream.Hash).
-    An AES.Spec.Dispatch entity (#80) is never proved by SAW itself: it
+    An AES.Spec.Dispatch entity is never proved by SAW itself: it
     selects an instance of AES_K by K, and gnatprove proves it is each
     instance's function. Its results are the instances' (AES128, AES192,
     AES256) of the same name, one per key size.
@@ -589,7 +589,7 @@ def build(args):
             "holes": holes,
             # PLAN: complete = spec exists and FFI-checked, impl proved with
             # zero unproved, assumptions and justifications. A spec-only or
-            # subsumed-by row is complete when what covers it is (#67).
+            # subsumed-by row is complete when what covers it is.
             "complete": bool(not kind["error"] and spec_ok and ffi_cond and impl_proved
                              and holes["assume"] == 0 and holes["justification"] == 0
                              and holes["unproved"] == 0),

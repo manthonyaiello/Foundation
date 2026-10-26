@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""perf-report.py -- the size and benchmark tables of issue #51.
+"""perf-report.py -- the size and benchmark tables.
 
 Called by scripts/perf-aes.sh with the perf output directory. It reads
 <dir>/manifest.txt, one build per line:

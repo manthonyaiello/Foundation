@@ -24,29 +24,29 @@
 #                                             scripts/slow_proofs.py
 
 unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
-  reason      SBoxCorrect by a generated case enumeration over the 256 bytes (8,700 lines, level 4). Cold: 1h40m47s in CI (#41 at 09475b8); 1102 s of gnatprove on the campaign machine at 46c5799 (6 tokens); 1122 s at f3243aa as a child of SBox (#70), 2501 checks with the two pgcd lemmas it now carries (6 tokens, pool otherwise idle); 1148 s again at 464bd4a, then 493 s at 283afe5 with pgcd evaluated in lemmas that do not name the S-box table (#70), 2565 checks (6 tokens, pool otherwise idle)
-  commit      283afe5350aa10efeeaaef9454b56f783df02765
-  date        2026-10-21
+  reason      SBoxCorrect by a generated case enumeration over the 256 bytes (8,700 lines, level 4). Cold: 1h40m47s in CI (at 09475b8); 1102 s of gnatprove on the aarch64 container at 46c5799 (6 tokens); 1122 s at f3243aa as a child of SBox, 2501 checks with the two pgcd lemmas it now carries (6 tokens, pool otherwise idle); 1148 s again at 464bd4a, then 493 s at 283afe5 with pgcd evaluated in lemmas that do not name the S-box table, 2565 checks (6 tokens, pool otherwise idle); 692 s on the arm64 Mac at 7eeb961, 2565 checks (6 tokens, pool otherwise idle)
+  commit      7eeb961596c95387a73027851465618bd618ea9a
+  date        2026-10-26
   level       4
   checks      2565/2565
-  fingerprint sha256:66d7644fd84742d9c1cc23823637509572ded661c120e38f4661fc2f946d0077
+  fingerprint sha256:3970976111157680debcb24be61761cb7047f412ee07aa86962bee180197f093
   input       5030e19415af080b alire.toml
   input       ad09bcbb5ff17488 gpr: Proof_Switches ("Ada")
   input       97881b83f6e39847 gpr: Proof_Switches ("foundation_spark-aes-spec-gf2.ads")
   input       aa059e55e489211e gpr: Proof_Switches ("foundation_spark-aes-spec-sbox-sbox_entries.adb")
   input       3eaa6e154b2487e7 gpr: Prove level definitions
-  input       52425aa756bd18be scripts/gen-sbox-entries.py
-  input       89fd6f012745a9cc src/aes/foundation_spark-aes-spec-gf2.ads
-  input       a6f78dc15de3d168 src/aes/foundation_spark-aes-spec-gf28.ads
+  input       c570cc545b5da44b scripts/gen-sbox-entries.py
+  input       39df74efa0e78146 src/aes/foundation_spark-aes-spec-gf2.ads
+  input       b107d1fd48496253 src/aes/foundation_spark-aes-spec-gf28.ads
   input       5ea82bc6d8f92eab src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
-  input       5f5c2c42c81ac1d6 src/aes/foundation_spark-aes-spec-sbox-sbox_entries.ads
+  input       a592cd2a1c817db6 src/aes/foundation_spark-aes-spec-sbox-sbox_entries.ads
   input       b91e355aff08b22d src/aes/foundation_spark-aes-spec-sbox.ads
-  input       52406116aa97eb76 src/aes/foundation_spark-aes-spec-types.ads
+  input       f296613a3b6f1806 src/aes/foundation_spark-aes-spec-types.ads
   input       7b4ee9d71433c9bc src/aes/foundation_spark-aes-spec.ads
   input       17a5f08744da9620 src/aes/foundation_spark-aes.ads
   input       180f5a31079abbb6 src/cryptol/foundation_spark-cryptol-polynomial_products.ads
   input       c36aef664321135c src/cryptol/foundation_spark-cryptol-words.ads
-  input       2b1d469b3d23f8b9 src/cryptol/foundation_spark-cryptol.ads
+  input       57fcd2b4148d286e src/cryptol/foundation_spark-cryptol.ads
   input       57a3341a74660a95 src/foundation_spark.ads
   input       71696c8d0667e537 tool: alt-ergo
   input       be64e49d21ad3911 tool: cvc5

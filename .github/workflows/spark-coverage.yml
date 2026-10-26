@@ -1,7 +1,7 @@
 name: SPARK coverage
 
 # GNATcoverage of the executable SPARK under the Cryptol-driven FFI
-# properties (issue #49): spark/scripts/check-coverage.sh instruments the FFI
+# properties: spark/scripts/check-coverage.sh instruments the FFI
 # library's coverage build, runs every property of
 # spark/cryptol/properties.txt against it through check-ffi.sh, and reports
 # statement, decision and MC/DC coverage of the units in
