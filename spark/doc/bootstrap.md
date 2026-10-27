@@ -193,9 +193,8 @@ workflow's lint job and runnable anywhere, tests the detection of every
 tool, `llvm-link` included, against stub tools.
 
 **The proof gate is arm64 only** (`spark-prove.yml`, on
-`ubuntu-24.04-arm`). x86_64's provers are slower on some goals, and on
-x86_64 six checks run out of time under the committed levels and CI's
-allowance: four in `Foundation_Spark.AES.Lemmas` and the postconditions of
-`Sub_Bytes` and `Inv_Sub_Bytes` in `Foundation_Spark.AES.Impl`. The
-bootstrap's `proof` phase still proves on x86_64 when run without
-`--no-proof`, and reports those six as unproved.
+`ubuntu-24.04-arm`). It also passes on x86_64: on the x86_64 instance
+(8 vCPUs), a cold run of the gate at `383bce7` under CI's allowance
+(`FOUNDATION_SPARK_PROOF_ALLOWANCE=ci`, `-j8`) proved all 4085 checks in
+13:59 wall-clock. The bootstrap's `proof` phase runs that gate, under
+CI's allowance by default, when run without `--no-proof`.

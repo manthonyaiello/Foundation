@@ -64,8 +64,9 @@ demand with `scripts/prove-slow.sh`; the gate checks that its recorded
 proof is still current. `board.py` counts the results. Details:
 [proving.md](proving.md).
 
-The gate runs on arm64 Linux in CI. On x86_64 the provers are slower on
-some goals, and six checks run out of time under the committed levels
+The gate runs on arm64 Linux in CI. It passes on x86_64 Linux too: on an
+x86_64 instance with 8 vCPUs, a cold run at `383bce7` under CI's
+allowance (`-j8`) proved all 4085 checks in 13:59 wall-clock
 ([bootstrap.md](bootstrap.md#bootstrapping-the-x86_64-instance)).
 
 **Check against the Cryptol.**
