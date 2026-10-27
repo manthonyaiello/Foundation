@@ -59,11 +59,12 @@ side:
 
 ## What is proved
 
-* **Every check gnatprove generates is proved**: 4264 of 4264 in the CI
-  gate's 72 units, and 2565 of 2565 in one slow unit proved on demand
-  (`SBox_Entries`, the S-box table against its algebraic definition). The
-  gate's count is for `main` at `6210b99` (`scripts/board.py` recounts it
-  from a proof run); the slow unit's is its entry in
+* **Every check gnatprove generates is proved**: 4085 of 4085 in the CI
+  gate's 72 units (gnatprove analyzes 71 of them), and 2565 of 2565 in one
+  slow unit proved on demand (`SBox_Entries`, the S-box table against its
+  algebraic definition). The gate's count is for `main` at `383bce7`
+  (`scripts/board.py` recounts it from a proof run); the slow unit's is
+  its entry in
   [`scripts/proof-slow.txt`](scripts/proof-slow.txt).
 * **Nothing is assumed.** There is no `pragma Assume`, no justified check,
   no `SPARK_Mode => Off`, and no warning or check suppression. The only
@@ -75,10 +76,12 @@ side:
   every message length below 2^61 bytes (for HMAC, every text shorter than its
   `Max_Text`) and every way of splitting a message into chunks for the
   streaming SHA-256 and HMAC interfaces.
-* **SAW**: 1898 results in its default run, 90 of the implementation
+* **SAW**: 1895 results in its default run, 87 of the implementation
   layer and 1808 of the spec layer, with 20 negative controls that fail
-  as they must (`saw/results.txt`, at `82b10e6`, as `scripts/board.py`
-  counts it; 2145 with `SAW_LONG=1`, `saw/results-long.txt`). AES at
+  as they must (`saw/results.txt`, at `ae3eb2c`, as `scripts/board.py`
+  counts it); 2142 with `SAW_LONG=1`, 87 and 2055
+  (`saw/results-long.txt`, at `8279ca5`). Both commits differ from
+  `383bce7` only by records (the slow proof's and the default run's). AES at
   k = 128, 192 and 256; SHA-256's compression function for every input;
   hashing and HMAC at fixed lengths chosen at the padding boundaries.
   Details and what SAW leaves out: [doc/saw.md](doc/saw.md).
@@ -143,6 +146,11 @@ $ alr -n build
 $ FOUNDATION_SPARK_PROOF_ALLOWANCE=ci scripts/check-proof.sh   # the CI proof gate
 $ scripts/check-ffi.sh                                         # needs Cryptol 3.6.0 with FFI
 ```
+
+`alr` 2.1.1 comes from [Alire's release
+page](https://github.com/alire-project/alire/releases/tag/v2.1.1), and
+Cryptol 3.6.0 from [Galois's](https://github.com/GaloisInc/cryptol/releases/tag/3.6.0)
+(take a build "with solvers").
 
 Everything but SAW needs only free tools (the FSF path). SAW needs GNAT
 Pro 27's LLVM back end. Both paths, step by step:
