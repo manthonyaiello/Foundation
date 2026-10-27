@@ -278,6 +278,12 @@ unit src/aes/foundation_spark-aes-spec-sbox-sbox_entries.adb
 - the gnatprove, why3 and prover versions (`gnatprove --version`, install
   paths stripped, as in CI's cache key).
 
+These versions come from the `gnatprove` first on `PATH` (`alr exec`'s
+when there is none). So with another gnatprove first on `PATH`,
+`slow_proofs.py check` reports the entry stale, naming the gnatprove and
+provers that differ, although nothing the proof read has changed; run it
+with the pinned FSF gnatprove first on `PATH`.
+
 The closure is found by parsing context clauses rather than from the
 compiler's `.ali` dependency lines because the gate must answer before
 anything is compiled, on a checkout with no `obj/`. `slow_proofs.py inputs
