@@ -185,9 +185,13 @@ puts them there). Writing the record needs a clean tree, since the record
 names `HEAD`. Each `saw` run is capped at 10 GB of memory through
 `systemd-run --user` where that works (`SAW_MEMORY_MAX` changes it).
 
-The recorded default run took 2749 s, and the `SAW_LONG=1` run 6257 s
-(the `wall-clock` lines of `saw/results.txt` and `saw/results-long.txt`,
-both at commit `82b10e6`, on an x86_64 Linux instance with 8 CPUs).
+The recorded default run took 2835 s, and the `SAW_LONG=1` run 6409 s
+(the `wall-clock` lines of `saw/results.txt`, at commit `ae3eb2c`, and of
+`saw/results-long.txt`, at `8279ca5`, on an x86_64 Linux instance with 8
+CPUs; both commits differ from `383bce7` only by records). By script, the
+default run: `aes_impl.saw` 7 s, `sha256_impl.saw` 33 s, `aes_spec.saw`
+681 s, `sha256_spec.saw` 1414 s; the long run: 6 s, 32 s, 674 s and
+4996 s.
 
 `scripts/board.py` reports a SAW record **stale** when any input it
 hashed (a source, a Cryptol file, a SAW script) has changed since. Only a
