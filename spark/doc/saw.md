@@ -95,7 +95,7 @@ padding fits one block; 56, the shortest that needs two; 64 and 128, whole
 blocks; 119 and 120, the boundary in the second block; 200, four blocks)
 and each case of `HMAC_init` (a key shorter than the block, the block, and
 longer: hashed first). `Compress` takes about 3 s; `Hash` 0.2 to
-1.2 s, and `HMAC_SHA256` 0.6 to 1.6 s, except at 0 bytes (2.6 s) and at
+1.2 s, and `HMAC_SHA256` 0.6 to 1.6 s, except at 0 bytes (2.7 s) and at
 (0, 0) (10 s), where the whole digest is evaluated on constants;
 `results.txt` has each one's time. Their
 leaves:
@@ -338,8 +338,9 @@ The recursions `Folds.Foldl_Take`, `Enumeration_Folds.Foldl` and
 word, is not a Cryptol built-in: it is proved per bit count for SHA-256
 (`Word_Of`, above) and executed within `Split_At`'s proofs for AES.
 
-**Measured** (`results.txt`, the default run at `82b10e6` on an x86_64
-Linux instance, 2026-10-23): 1808 proofs of the spec
+**Measured** (`results.txt`, the default run at `ae3eb2c` on an x86_64
+Linux instance, 2026-10-26; `ae3eb2c` differs from `383bce7` only by
+records): 1808 proofs of the spec
 layer, 1141 of AES (768 of them the exhaustive `Pgcd`, `Inverse` and
 `Affine`, recorded as three `RESULTS 256` lines; 108 the cipher folds'
 lemmas, `Foldl_Take` at N = 0 .. M for M = 9, 11, 13 and each of the three
@@ -347,16 +348,18 @@ rounds; 27 the prelude's instances on their own) and 667 of SHA-256 and
 HMAC (419 of them in the lax-arithmetic load; 95 the prelude's
 instances, 48 of them `Split_At` index by index), with 12 negative
 controls of the spec layer failing as they must. `aes_spec.saw` takes
-648 s (226 s of it the prelude's `@@` on a symbolic table),
-`sha256_spec.saw` 1385 s (most of it `Word_Of`), the whole
-`check-saw.sh` 2749 s. Before the linear recursions were unfolded
+681 s (246 s of it the prelude's `@@` on a symbolic table),
+`sha256_spec.saw` 1414 s (most of it `Word_Of`), the whole
+`check-saw.sh` 2835 s. (At `82b10e6`, with the same spec-layer results:
+648 s, 1385 s, 2749 s.) Before the linear recursions were unfolded
 (`5bf56ac`): 2800 proofs of the spec layer (AES 1137, SHA-256 and HMAC
 1663, most of the difference the 975 `To_Bits` lemmas, now 15 unfolded
 proofs), 3543 s; the same scripts at `6023e8a`, re-run on 2026-10-23,
 3686 s. Before the Cryptol prelude and the `AES_K` instances (at
 `d874133`): 2742; peak memory then 3.8 GB. `SAW_LONG=1`
-(`results-long.txt`, at `82b10e6`): 2055 proofs of the spec layer (666
-lax), `sha256_spec.saw` 4899 s, the whole 6257 s; before the unfolding
+(`results-long.txt`, at `8279ca5`, which also differs from `383bce7` only
+by records): 2055 proofs of the spec layer (666 lax), `sha256_spec.saw`
+4996 s, the whole 6409 s (at `82b10e6`: 4899 s, 6257 s); before the unfolding
 (at `babab6f`) 3582, 7819 s (before the prelude, at `c31472e`: 3522,
 7784 s, peak 7.2 GB; below, "Running it").
 
@@ -565,7 +568,7 @@ what SPARK adds:
   default run, 24 implementation-layer results (the 4 top-level ones:
   `Hash` at 0, 64 and 128 bytes and `HMAC_SHA256` at (0, 0); and the 19
   leaves and `Compress` re-proved in that module as their overrides) and
-  1396 spec-layer results (2178 under `SAW_LONG=1`) are proved in the
+  419 spec-layer results (666 under `SAW_LONG=1`) are proved in the
   module loaded with lax arithmetic. There, absence of overflow rests on
   gnatprove (AoRTE), not on SAW.
 - **The subprograms SAW leaves out** (above): gnatprove covers them.
@@ -599,10 +602,10 @@ layer alone, with the `spec_*` controls. A one-layer run is never a
 record: the script requires `--print` with it, and prints its
 `layers` line.
 
-**What the default run proves, and `SAW_LONG`.** The default run (2749 s
+**What the default run proves, and `SAW_LONG`.** The default run (2835 s
 on an x86_64 Linux instance, `results.txt`) proves everything above but `Hash`
 at 120, 128 and 200 bytes and HMAC at (key, text) = (0, 0), (32, 32),
-(64, 3) and (100, 32) bytes; `SAW_LONG=1` (6257 s) adds those (`Word_Of`'s
+(64, 3) and (100, 32) bytes; `SAW_LONG=1` (6409 s) adds those (`Word_Of`'s
 lemmas for 1536 and 2048 bits, `Foldl_Step` at 3 and 4 blocks, the
 prelude's `Split_At` at those lengths, and four more HMAC lengths
 with their hashes' lemmas at their stack bases) and records the run in

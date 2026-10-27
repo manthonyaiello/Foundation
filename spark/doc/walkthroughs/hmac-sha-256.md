@@ -2,7 +2,7 @@
 
 This page walks through the SPARK HMAC-SHA-256 in `foundation_spark` and
 shows how it is tied to NSA's Cryptol specification of HMAC
-(FIPS 198-1, RFC 2104). It quotes the code as it is at commit `6210b99`.
+(FIPS 198-1, RFC 2104). It quotes the code as it is at commit `383bce7`.
 Every excerpt is cited by file and line range, and the links go to the
 same lines in this repository.
 
@@ -865,8 +865,8 @@ The (key, text) lengths in bytes are (0, 0), (32, 3), (32, 32), (64, 3),
 it, and longer. SAW loads `HMAC` from `Main.cry` directly, because SAW 1.6
 cannot load `packaging/Hash.cry`'s instance ([saw.md, "SHA-256 and
 HMAC-SHA-256"](../saw.md#sha-256-and-hmac-sha-256)). All seven are proved in
-[`spark/saw/results.txt:215-221`](../../saw/results.txt#L215-L221), from
-0.57 s to 1.53 s each, and 9.96 s at (0, 0).
+[`spark/saw/results.txt:212-218`](../../saw/results.txt#L212-L218), from
+0.58 s to 1.54 s each, and 10.30 s at (0, 0).
 
 **The spec layer.**
 [`spark/saw/sha256_spec_hmac.saw`](../../saw/sha256_spec_hmac.saw) proves
@@ -884,26 +884,28 @@ lemmas at new positions of the secondary stack
 
 | (key, text) bytes | run | `HMAC.SHA256.HMAC` proved |
 |---|---|---|
-| (32, 3) | default | 15.41 s, [results.txt:1133](../../saw/results.txt#L1133) |
-| (64, 32) | default | 27.07 s, [results.txt:1146](../../saw/results.txt#L1146) |
-| (65, 3) | default | 16.77 s, [results.txt:1169](../../saw/results.txt#L1169) |
-| (0, 0) | `SAW_LONG=1` | 872.07 s, [results-long.txt:1255](../../saw/results-long.txt#L1255) |
-| (32, 32) | `SAW_LONG=1` | 18.86 s, [results-long.txt:1268](../../saw/results-long.txt#L1268) |
-| (64, 3) | `SAW_LONG=1` | 23.83 s, [results-long.txt:1281](../../saw/results-long.txt#L1281) |
-| (100, 32) | `SAW_LONG=1` | 19.19 s, [results-long.txt:1304](../../saw/results-long.txt#L1304) |
+| (32, 3) | default | 15.60 s, [results.txt:1130](../../saw/results.txt#L1130) |
+| (64, 32) | default | 26.93 s, [results.txt:1143](../../saw/results.txt#L1143) |
+| (65, 3) | default | 17.07 s, [results.txt:1166](../../saw/results.txt#L1166) |
+| (0, 0) | `SAW_LONG=1` | 880.19 s, [results-long.txt:1252](../../saw/results-long.txt#L1252) |
+| (32, 32) | `SAW_LONG=1` | 17.89 s, [results-long.txt:1265](../../saw/results-long.txt#L1265) |
+| (64, 3) | `SAW_LONG=1` | 22.79 s, [results-long.txt:1278](../../saw/results-long.txt#L1278) |
+| (100, 32) | `SAW_LONG=1` | 19.52 s, [results-long.txt:1301](../../saw/results-long.txt#L1301) |
 
 The prelude instances HMAC uses are also proved on their own: `Join` at
 keys of 0, 32, 64, 65 and 100 bytes and `Repeat` at `[64][8]`
-([results.txt:1213-1218](../../saw/results.txt#L1213-L1218)). Two
+([results.txt:1210-1215](../../saw/results.txt#L1210-L1215)). Two
 negative controls show the HMAC proofs can fail: a version of
 `HMAC_SHA256` with the key reversed, and of the spec's `HMAC_init` with
 the key reversed, are both refuted with counterexamples
-([results.txt:1224](../../saw/results.txt#L1224),
-[1229](../../saw/results.txt#L1229)).
+([results.txt:1221](../../saw/results.txt#L1221),
+[1226](../../saw/results.txt#L1226)).
 
-These SAW records were made at commit `82b10e6`
-([results.txt:9](../../saw/results.txt#L9)). The HMAC and SHA-2 sources
-and NSA's Cryptol are unchanged between that commit and `6210b99`.
+The default record was made at commit `ae3eb2c`
+([results.txt:9](../../saw/results.txt#L9)), the `SAW_LONG=1` one at
+`8279ca5` ([results-long.txt:9](../../saw/results-long.txt#L9)). Both
+differ from `383bce7` only by records, so the HMAC and SHA-2 sources and
+NSA's Cryptol are those quoted here.
 
 ### What is proved for all inputs, and what is not
 

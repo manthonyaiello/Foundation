@@ -3,7 +3,7 @@
 # run-all.sh OUT_DIR -- every spec-layer cost experiment, one after the other (one saw
 # at a time), each into OUT_DIR/<experiment>[-<variant>]/ (run.sh). The
 # write-up's numbers are from one such run on an otherwise idle machine:
-# .claude/campaign/measurements/2026-10-22-saw-cost.md.
+# spark/doc/saw.md, "Why the spec layer costs about 76 times the implementation".
 #
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

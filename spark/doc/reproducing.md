@@ -24,9 +24,23 @@ action and the bootstrap script both read that file. Back to the
 | Cryptol, built with FFI support, and z3 | 3.6.0 | the FFI check |
 | gnatcov | 26.2.1 | coverage |
 
+Where to get them:
+
+- **Alire 2.1.1**: its [release
+  page](https://github.com/alire-project/alire/releases/tag/v2.1.1). The
+  bootstrap pins `alr-2.1.1-bin-x86_64-linux.zip`; the page has builds
+  for other platforms too.
+- **Cryptol 3.6.0**: its [release
+  page](https://github.com/GaloisInc/cryptol/releases/tag/3.6.0). CI and
+  the bootstrap pin `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers.tar.gz`.
+- The rest come through `alr`, as below.
+
+The sha256 of each pinned download is in `toolchain-pins.env`.
+
 gnat_native 16.1.0 is the compiler that matches gnatprove 16.1.0: both
 have GNAT 16's front end, so they read the sources alike. The crate
-depends on no other crate.
+depends on no other crate. gprbuild 26.0.1 is the version Alire installs,
+but `gprbuild --version` prints `GPRBUILD 26.0.0`.
 
 Cryptol must say `FFI enabled` in `cryptol --version`. Galois's release
 builds for x86_64 Linux and macOS do. There is no release for aarch64
@@ -64,8 +78,9 @@ demand with `scripts/prove-slow.sh`; the gate checks that its recorded
 proof is still current. `board.py` counts the results. Details:
 [proving.md](proving.md).
 
-The gate runs on arm64 Linux in CI. On x86_64 the provers are slower on
-some goals, and six checks run out of time under the committed levels
+The gate runs on arm64 Linux in CI. It passes on x86_64 Linux too: on an
+x86_64 instance with 8 vCPUs, a cold run at `383bce7` under CI's
+allowance (`-j8`) proved all 4085 checks in 13:59 wall-clock
 ([bootstrap.md](bootstrap.md#bootstrapping-the-x86_64-instance)).
 
 **Check against the Cryptol.**
@@ -170,9 +185,13 @@ puts them there). Writing the record needs a clean tree, since the record
 names `HEAD`. Each `saw` run is capped at 10 GB of memory through
 `systemd-run --user` where that works (`SAW_MEMORY_MAX` changes it).
 
-The recorded default run took 2749 s, and the `SAW_LONG=1` run 6257 s
-(the `wall-clock` lines of `saw/results.txt` and `saw/results-long.txt`,
-both at commit `82b10e6`, on an x86_64 Linux instance with 8 CPUs).
+The recorded default run took 2835 s, and the `SAW_LONG=1` run 6409 s
+(the `wall-clock` lines of `saw/results.txt`, at commit `ae3eb2c`, and of
+`saw/results-long.txt`, at `8279ca5`, on an x86_64 Linux instance with 8
+CPUs; both commits differ from `383bce7` only by records). By script, the
+default run: `aes_impl.saw` 7 s, `sha256_impl.saw` 33 s, `aes_spec.saw`
+681 s, `sha256_spec.saw` 1414 s; the long run: 6 s, 32 s, 674 s and
+4996 s.
 
 `scripts/board.py` reports a SAW record **stale** when any input it
 hashed (a source, a Cryptol file, a SAW script) has changed since. Only a

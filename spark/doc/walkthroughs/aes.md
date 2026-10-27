@@ -2,7 +2,7 @@
 
 This page walks through the SPARK proof of AES (FIPS 197) next to the
 Cryptol it is proved against. Every excerpt is copied from the files at
-commit `6210b99`, with its path and line range.
+commit `383bce7`, with its path and line range.
 
 NSA's Cryptol for AES is in [`algorithms/AES/`](../../../algorithms/AES/),
 unmodified. The SPARK is in [`spark/src/aes/`](../../src/aes/), in three
@@ -994,14 +994,14 @@ mode and 62 in `check` mode.
 
 SAW proves LLVM bitcode compiled from the crate's sources equal to NSA's
 unmodified Cryptol. The run is recorded in
-[`spark/saw/results.txt`](../../saw/results.txt): commit `82b10e6`, on an
+[`spark/saw/results.txt`](../../saw/results.txt): commit `ae3eb2c`, on an
 x86_64 Linux instance
 ([lines 9-11](../../saw/results.txt#L9-L11)), with the SHA-256 of every
-source and Cryptol file it read. The AES files at `6210b99` have the
-same hashes.
+source and Cryptol file it read. `ae3eb2c` differs from `383bce7` only by
+records, so the AES files at `383bce7` have the same hashes.
 
-- **Implementation** ([`aes_impl.saw`](../../saw/aes_impl.saw)): 31
-  results ([lines 132-162](../../saw/results.txt#L132-L162)). The leaves
+- **Implementation** ([`aes_impl.saw`](../../saw/aes_impl.saw)): 28
+  results ([lines 132-159](../../saw/results.txt#L132-L159)). The leaves
   (`X_Times`, the S-box, `Sub_Bytes`, `Mix_Column`, `Round`, and the
   others) are proved for all inputs. `Expand_Key`, `Encrypt_Block` and
   `Decrypt_Block` are proved against ``KeyExpansion`{k}``,
@@ -1013,20 +1013,20 @@ same hashes.
 - **Spec layer** ([`aes_spec.saw`](../../saw/aes_spec.saw), with
   `aes_spec_gf.saw`, `aes_spec_cipher.saw`, `aes_spec_keyexpansion.saw`
   and `aes_spec_main.saw`): 376 results
-  ([lines 222-597](../../saw/results.txt#L222-L597)) covering the
+  ([lines 219-594](../../saw/results.txt#L219-L594)) covering the
   spec-layer declarations above, up to each instance's `Encrypt` and
   `Decrypt`. Recursive functions are proved one index at a time where
   that is cheaper (44, 52 and 60 lemmas for `W` at the three key sizes).
   `Pgcd`, `Inverse` and `Affine` are proved for each of the 256 bytes,
   one proof per byte, because SAW's evaluation of `pgcd`'s `inner` does
   not terminate on a symbolic byte
-  ([lines 568-570](../../saw/results.txt#L568-L570)).
+  ([lines 565-567](../../saw/results.txt#L565-L567)).
 - **Negative controls:** 12 deliberately wrong AES contracts (reversed
   round keys, `xTimes` without reduction, the wrong modulus in `Dot`,
   and others) are each rejected with a counterexample
-  ([lines 1220-1238](../../saw/results.txt#L1220-L1238)).
-- **Time:** 4 s for `aes_impl.saw` and 648 s for `aes_spec.saw`
-  ([line 1239](../../saw/results.txt#L1239)).
+  ([lines 1217-1235](../../saw/results.txt#L1217-L1235)).
+- **Time:** 7 s for `aes_impl.saw` and 681 s for `aes_spec.saw`
+  ([line 1236](../../saw/results.txt#L1236)).
   [`results-long.txt`](../../saw/results-long.txt) adds only SHA-256 and
   HMAC proofs ([line 19](../../saw/results-long.txt#L19)), nothing for
   AES.
