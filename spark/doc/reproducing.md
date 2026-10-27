@@ -24,9 +24,23 @@ action and the bootstrap script both read that file. Back to the
 | Cryptol, built with FFI support, and z3 | 3.6.0 | the FFI check |
 | gnatcov | 26.2.1 | coverage |
 
+Where to get them:
+
+- **Alire 2.1.1**: its [release
+  page](https://github.com/alire-project/alire/releases/tag/v2.1.1). The
+  bootstrap pins `alr-2.1.1-bin-x86_64-linux.zip`; the page has builds
+  for other platforms too.
+- **Cryptol 3.6.0**: its [release
+  page](https://github.com/GaloisInc/cryptol/releases/tag/3.6.0). CI and
+  the bootstrap pin `cryptol-3.6.0-ubuntu-24.04-X64-with-solvers.tar.gz`.
+- The rest come through `alr`, as below.
+
+The sha256 of each pinned download is in `toolchain-pins.env`.
+
 gnat_native 16.1.0 is the compiler that matches gnatprove 16.1.0: both
 have GNAT 16's front end, so they read the sources alike. The crate
-depends on no other crate.
+depends on no other crate. gprbuild 26.0.1 is the version Alire installs,
+but `gprbuild --version` prints `GPRBUILD 26.0.0`.
 
 Cryptol must say `FFI enabled` in `cryptol --version`. Galois's release
 builds for x86_64 Linux and macOS do. There is no release for aarch64
