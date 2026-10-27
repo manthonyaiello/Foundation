@@ -2,5 +2,5 @@
 \#*\#
 **/rust/**/target/
 
-# Claude Code worktrees for campaign ticks
-.claude/worktrees/
+# Claude Code's local state
+.claude/

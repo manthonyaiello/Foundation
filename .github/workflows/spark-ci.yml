@@ -35,13 +35,11 @@ on:
     paths:
       - 'spark/**'
       - '.github/**'
-      - '.claude/**'
       - '!**.md'
   pull_request:
     paths:
       - 'spark/**'
       - '.github/**'
-      - '.claude/**'
       - '!**.md'
   workflow_dispatch:
 
